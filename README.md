@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.9.0  
+**Version:** 1.10.0  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-18 (inline relation summaries in retrieve_context to reduce MCP roundtrips)
+**Date:** 2026-04-18 (first-stage TS/JS indexing support + pipeline cleanup)
 
 ## 1. Introduction
 
