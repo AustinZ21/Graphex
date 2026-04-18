@@ -142,6 +142,7 @@ def test_parse_typescript_symbols_and_imports(tmp_path):
     assert names["buildUser"] == "function"
     assert names["loadUser"] == "function"
     assert "./lib" in [i.imported_module for i in result.imports]
+    assert len(result.calls) > 0
 
 
 def test_parse_javascript_symbols_and_requires(tmp_path):
@@ -185,3 +186,34 @@ def test_source_parser_dispatches_by_extension(tmp_path):
     ts_result = parser.parse(str(ts))
     assert py_result.language == "python"
     assert ts_result.language == "typescript"
+
+
+def test_typescript_call_extraction(tmp_path):
+    path = tmp_path / "calls.ts"
+    path.write_text(
+        textwrap.dedent(
+            """\
+            function helperA() {
+                return 42;
+            }
+            function helperB() {
+                return helperA();
+            }
+            export class MyClass {
+                method1() {
+                    return helperB();
+                }
+                method2() {
+                    return this.method1();
+                }
+            }
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    result = TypeScriptJavaScriptParser().parse(str(path))
+    call_pairs = [(c.caller_qname, c.callee_name) for c in result.calls]
+    assert len(call_pairs) > 0
+    assert any(callee == "helperA" for _, callee in call_pairs)
+    assert any(callee == "helperB" for _, callee in call_pairs)

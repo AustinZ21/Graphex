@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.10.0  
+**Version:** 1.11.0  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-18 (first-stage TS/JS indexing support + pipeline cleanup)
+**Date:** 2026-04-18 (TS/JS call extraction + unified CALLS edge support)
 
 ## 1. Introduction
 

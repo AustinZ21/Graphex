@@ -3,6 +3,7 @@
 Extracts:
 - Symbols: classes, functions, async functions, methods, interfaces, types, enums.
 - Imports: Python import/from-import and JS/TS import/export/require statements.
+- Calls: function/method calls (for call-graph construction).
 
 Python parsing uses stdlib ast.
 TypeScript/JavaScript parsing uses lightweight regex-based extraction for
@@ -35,11 +36,18 @@ class ParsedImport:
 
 
 @dataclass
+class RawCall:
+    caller_qname: str
+    callee_name: str
+
+
+@dataclass
 class ParsedFile:
     path: str
     language: str
     symbols: list[ParsedSymbol] = field(default_factory=list)
     imports: list[ParsedImport] = field(default_factory=list)
+    calls: list[RawCall] = field(default_factory=list)
     parse_error: str | None = None
 
 
@@ -168,6 +176,7 @@ class TypeScriptJavaScriptParser:
         self._append_matches(result, lines, module_qname, self._FUNCTION_RE, "function")
         self._append_matches(result, lines, module_qname, self._ARROW_RE, "function")
         self._append_class_methods(result, lines, module_qname)
+        self._extract_calls(result, source, lines, module_qname)
         return result
 
     def _append_matches(
@@ -237,6 +246,31 @@ class TypeScriptJavaScriptParser:
         imports.extend(self._IMPORT_SIDE_EFFECT_RE.findall(source))
         imports.extend(self._REQUIRE_RE.findall(source))
         return imports
+
+    def _extract_calls(self, result: ParsedFile, source: str, lines: list[str], module_qname: str) -> None:
+        """Extract function/method calls from TS/JS source."""
+        call_re = re.compile(r"(?:^|\s|[({,])(\w+)\s*\(")
+        seen_calls: set[tuple[str, str, int]] = set()
+        
+        symbol_map = {s.name: s for s in result.symbols}
+        
+        for lineno, line in enumerate(lines, start=1):
+            for match in call_re.finditer(line):
+                callee_name = match.group(1)
+                if callee_name in {"if", "for", "while", "switch", "catch", "function", "async", "class"}:
+                    continue
+                if callee_name not in symbol_map:
+                    continue
+                
+                sym = symbol_map[callee_name]
+                for caller_sym in result.symbols:
+                    if caller_sym.symbol_type in {"function", "method"}:
+                        key = (caller_sym.qualified_name, callee_name, lineno)
+                        if key not in seen_calls:
+                            seen_calls.add(key)
+                            result.calls.append(
+                                RawCall(caller_qname=caller_sym.qualified_name, callee_name=callee_name)
+                            )
 
     @staticmethod
     def _language_for(path: Path) -> str:

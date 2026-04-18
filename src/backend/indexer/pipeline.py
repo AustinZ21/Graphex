@@ -112,6 +112,8 @@ class IndexPipeline:
 
             if parsed.language == "python":
                 result["calls"] = self._write_python_call_edges(file_path, symbol_map)
+            elif parsed.language in {"typescript", "javascript"}:
+                result["calls"] = self._write_ts_js_call_edges(parsed.calls, symbol_map)
 
             result["files"] = 1
         except Exception as exc:
@@ -128,6 +130,22 @@ class IndexPipeline:
 
         module_qname = path_to_module(file_path)
         raw_calls: list[RawCall] = self._call_analyzer.extract(tree, file_path, module_qname)
+        written = 0
+        for rc in raw_calls:
+            callee_qname = symbol_map.get(rc.callee_name)
+            if callee_qname and callee_qname != rc.caller_qname:
+                try:
+                    self._graph.query(
+                        S.EDGE_SYMBOL_CALLS,
+                        {"caller_qname": rc.caller_qname, "callee_qname": callee_qname},
+                    )
+                    written += 1
+                except Exception:
+                    pass
+        return written
+
+    def _write_ts_js_call_edges(self, raw_calls: list[RawCall], symbol_map: dict[str, str]) -> int:
+        """Write CALLS edges for TS/JS calls."""
         written = 0
         for rc in raw_calls:
             callee_qname = symbol_map.get(rc.callee_name)

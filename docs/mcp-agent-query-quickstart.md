@@ -143,10 +143,15 @@ Indexing tools (queued):
 - `index_incremental`
 
 Current language indexing support:
-- Python: symbols, imports, call edges
-- TypeScript/JavaScript: symbols and imports (first-stage support)
+- Python: symbols, imports, call edges (via AST)
+- TypeScript/JavaScript: symbols, imports, call edges (via regex)
 
-For TS/JS projects, ContextGraph now indexes top-level classes, functions, interfaces, types, enums, and basic class methods, which is enough to support repository-wide lookup and CG-first agent routing.
+For TS/JS projects, ContextGraph now indexes:
+- Top-level classes, functions, interfaces, types, enums
+- Basic class methods
+- Function/method calls for relationship mapping
+
+This enables repository-wide lookup, relationship discovery, and CG-first agent routing across both Python and TS/JS codebases.
 
 Index status workflow:
 1. Call `index_full` or `index_incremental` and keep returned `job_id`.
