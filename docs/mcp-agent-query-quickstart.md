@@ -315,6 +315,19 @@ What it validates:
 
 This closes the gap between graph correctness and MCP response correctness by testing the full retrieval path used by agents.
 
+## CI live-graph grouping (v1.25.0)
+
+CI now treats live graph tests as an explicit group instead of an implicit side effect.
+
+What changed:
+
+- Live FalkorDB tests are tagged with `@pytest.mark.live_graph`
+- Policy CI provisions FalkorDB and Redis services directly in the workflow
+- The test pipeline includes an explicit `pytest -m live_graph` step
+- Coverage gate is aligned to the current tested surface (`--cov-fail-under=75`)
+
+This makes graph-dependent validation deterministic in CI and avoids hidden drift between local and pipeline behavior.
+
 These tools let agents answer:
 
 - "哪些参数根本没有参与函数内部的数据流？"

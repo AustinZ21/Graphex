@@ -15,6 +15,9 @@ from backend.indexer.parser import path_to_module
 import backend.tools.server as mcp_srv
 
 
+pytestmark = pytest.mark.live_graph
+
+
 def _connect_live_graph() -> GraphClient:
     client = GraphClient(
         host=os.getenv("FALKORDB_HOST", "localhost"),

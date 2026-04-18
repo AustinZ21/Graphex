@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.24.0  
+**Version:** 1.25.0  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-18 (MCP end-to-end toolflow coverage)
+**Date:** 2026-04-18 (CI live-graph grouping and coverage gate alignment)
 
 ## 1. Introduction
 
