@@ -99,15 +99,25 @@ async def lifespan(app: FastAPI):
     log.info("contextgraph.stopped")
 
 
-app = FastAPI(title="ContextGraph", version="0.2.0", lifespan=lifespan)
-
-# Mount MCP server at /mcp (Streamable HTTP transport)
-app.mount("/mcp", mcp_server.mcp.streamable_http_app())
+app = FastAPI(title="ContextGraph", version="0.2.2", lifespan=lifespan)
 
 
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok", "service": "contextgraph"}
+
+
+@app.get("/mcp")
+async def mcp_info() -> dict:
+    return {
+        "transport": "sse",
+        "sse_endpoint": "/mcp/sse",
+        "message_endpoint": "/mcp/messages",
+    }
+
+
+# Use SSE transport app for stable embedding under FastAPI.
+app.mount("/mcp", mcp_server.mcp.sse_app(mount_path="/mcp"))
 
 
 if __name__ == "__main__":

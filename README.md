@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.2.1  
+**Version:** 1.2.3  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-17 (Compose profile fix: dev startup isolated from prod builds)
+**Date:** 2026-04-17 (MCP transport fix: stable /mcp/sse + trace Redis import fix)
 
 ## 1. Introduction
 

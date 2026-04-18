@@ -25,6 +25,7 @@ import uuid
 from dataclasses import asdict, dataclass
 from typing import Any
 
+import redis
 import redis.asyncio as aioredis
 import structlog
 
