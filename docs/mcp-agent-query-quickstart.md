@@ -5,7 +5,7 @@ This quickstart shows how an agent can query graph results through the ContextGr
 ## 1) Start dependencies
 
 ```powershell
-docker compose --profile dev up -d
+docker compose up -d falkordb-dev redis-dev
 ```
 
 Expected dev containers:
@@ -15,13 +15,10 @@ Expected dev containers:
 ## 2) Start ContextGraph backend
 
 ```powershell
-$env:PYTHONPATH='src'
-$env:FALKORDB_HOST='localhost'
-$env:FALKORDB_PORT='16379'
-$env:QUEUE_REDIS_URL='redis://localhost:6380/1'
-$env:CACHE_REDIS_URL='redis://localhost:6380'
-python -m uvicorn backend.main:app --host 127.0.0.1 --port 8011
+./src/scripts/start-backend.ps1 -PreferredPort 8011
 ```
+
+If the preferred port is occupied, the script automatically selects the next free port.
 
 ## 3) Discover MCP endpoints
 
@@ -536,4 +533,11 @@ Index status workflow:
 
 - `400 Bad Request` on `/mcp/messages`: session id is missing or expired. Re-open `/mcp/sse` and use the fresh endpoint payload.
 - `404` on MCP path: verify base URL and port, then query `/mcp` first.
-- Port conflict on `8000`: use another port (`8011` in examples).
+- Port conflict on startup: use `./src/scripts/start-backend.ps1 -PreferredPort <port>` and let the script auto-pick the next free port.
+
+## Startup reliability update (v1.29.0)
+
+To reduce local startup friction:
+
+- Dependency startup now uses explicit dev services (`falkordb-dev`, `redis-dev`) instead of profile-only invocation.
+- Backend startup now uses `src/scripts/start-backend.ps1`, which detects port conflicts and automatically switches to the next available port.
