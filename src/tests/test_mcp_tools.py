@@ -226,3 +226,68 @@ def test_strategy_query_uses_server_strategy():
     assert result["strategy"] == "cg-first"
     mocked.assert_called_once()
 
+
+# ---------------------------------------------------------------------------
+# Aggregation & architecture analysis tools
+# ---------------------------------------------------------------------------
+
+def test_get_architecture_overview():
+    mcp_srv._graph = _mock_graph([[15, 250, 2, 8, 16.7, 1.2]])
+    result = mcp_srv.get_architecture_overview()
+    assert result["total_files"] == 15
+    assert result["total_symbols"] == 250
+    assert result["languages"] == 2
+    assert result["files_with_incoming_calls"] == 8
+    assert result["avg_symbols_per_file"] == 16.7
+    assert result["avg_callers_per_file"] == 1.2
+
+
+def test_get_key_modules():
+    rows = [
+        ["src/main.py", "python", 12, 15, 8, 5.6],
+        ["src/util.py", "python", 8, 5, 3, 2.1],
+    ]
+    mcp_srv._graph = _mock_graph(rows)
+    result = mcp_srv.get_key_modules(limit=10)
+    assert len(result) == 2
+    assert result[0]["file_path"] == "src/main.py"
+    assert result[0]["importance_score"] == 5.6
+
+
+def test_get_file_stats():
+    mcp_srv._graph = _mock_graph([[12, 5, 8]])
+    result = mcp_srv.get_file_stats("src/core.py")
+    assert result["file_path"] == "src/core.py"
+    assert result["symbol_count"] == 12
+    assert result["incoming_calls"] == 5
+    assert result["symbols_with_outgoing_calls"] == 8
+
+
+def test_analyze_dependencies():
+    rows = [
+        ["src/main.py", "src/util.py", 3, 2],
+        ["src/core.py", "src/main.py", 2, 4],
+    ]
+    mcp_srv._graph = _mock_graph(rows)
+    result = mcp_srv.analyze_dependencies(limit=20)
+    assert len(result) == 2
+    assert result[0]["from_file"] == "src/main.py"
+    assert result[0]["caller_symbols"] == 3
+
+
+def test_find_dependency_chain():
+    rows = [[2, 5], [3, 2]]
+    mcp_srv._graph = _mock_graph(rows)
+    result = mcp_srv.find_dependency_chain("src/a.py", "src/b.py")
+    assert result["source_path"] == "src/a.py"
+    assert result["target_path"] == "src/b.py"
+    assert result["closest_distance"] == 2
+    assert len(result["chains"]) == 2
+
+
+def test_find_dependency_chain_no_path():
+    mcp_srv._graph = _mock_graph([])
+    result = mcp_srv.find_dependency_chain("src/x.py", "src/y.py")
+    assert result["closest_distance"] is None
+    assert result["chains"] == []
+

@@ -99,3 +99,70 @@ LIMIT $limit
 QUERY_COUNT_SYMBOLS = """
 MATCH (s:Symbol) RETURN count(s) AS cnt
 """
+
+# ---------------------------------------------------------------------------
+# Aggregation queries (architecture analysis)
+# ---------------------------------------------------------------------------
+
+QUERY_FILE_STATS = """
+MATCH (f:File {path: $file_path})
+WITH f
+OPTIONAL MATCH (f)-[:DEFINES]->(s:Symbol)
+WITH f, count(s) AS symbol_count
+OPTIONAL MATCH (f)<-[:CALLS]-(caller:Symbol)
+WITH f, symbol_count, count(DISTINCT caller) AS incoming_calls
+OPTIONAL MATCH (f)-[:DEFINES]-(s:Symbol)-[:CALLS]->()
+RETURN symbol_count AS symbols, incoming_calls, count(DISTINCT s) AS symbols_with_outgoing_calls
+"""
+
+QUERY_KEY_FILES = """
+MATCH (f:File)
+WITH f
+OPTIONAL MATCH (f)-[:DEFINES]->(s:Symbol)
+WITH f, count(s) AS symbol_count
+OPTIONAL MATCH (f)<-[:CALLS]-(caller:Symbol)
+WITH f, symbol_count, count(DISTINCT caller) AS incoming_calls
+OPTIONAL MATCH (f)-[:DEFINES]-(s:Symbol)-[:CALLS]->()
+WITH f, symbol_count, incoming_calls, count(DISTINCT s) AS symbols_with_calls,
+     (symbol_count * 0.3 + coalesce(incoming_calls, 0) * 0.7) AS importance_score
+ORDER BY importance_score DESC
+LIMIT $limit
+RETURN f.path AS file_path, f.language AS language, symbol_count, incoming_calls, symbols_with_calls, importance_score
+"""
+
+QUERY_MODULE_DEPENDENCIES = """
+MATCH (f1:File)-[:DEFINES]->(s1:Symbol)-[:CALLS]->(s2:Symbol)<-[:DEFINES]-(f2:File)
+WHERE f1.path <> f2.path
+WITH f1.path AS from_file, f2.path AS to_file, count(DISTINCT s1) AS caller_symbols, count(DISTINCT s2) AS callee_symbols
+RETURN from_file, to_file, caller_symbols, callee_symbols
+ORDER BY caller_symbols DESC
+LIMIT $limit
+"""
+
+QUERY_ARCHITECTURE_OVERVIEW = """
+MATCH (f:File)
+WITH f
+OPTIONAL MATCH (f)-[:DEFINES]->(s:Symbol)
+WITH f, count(s) AS symbol_count
+OPTIONAL MATCH (f)<-[:CALLS]-(caller:Symbol)
+WITH f, symbol_count, count(DISTINCT caller) AS callers
+OPTIONAL MATCH (f)-[:DEFINES]-(s:Symbol)-[:CALLS]->()
+WITH f, symbol_count, callers, count(s) AS functions_with_calls
+OPTIONAL MATCH (f)<-[:DEFINES]-(s:Symbol)<-[:CALLS]-()
+RETURN 
+  count(DISTINCT f) AS total_files,
+  sum(symbol_count) AS total_symbols,
+  count(DISTINCT f.language) AS languages,
+  sum(CASE WHEN callers > 0 THEN 1 ELSE 0 END) AS files_with_incoming_calls,
+  avg(symbol_count) AS avg_symbols_per_file,
+  avg(callers) AS avg_callers_per_file
+"""
+
+QUERY_FILE_DEPENDENCY_CHAIN = """
+MATCH path = (f1:File)-[:DEFINES]->(s1:Symbol)-[:CALLS*1..3]->(s2:Symbol)<-[:DEFINES]-(f2:File)
+WHERE f1.path = $source_path AND f2.path = $target_path
+WITH relationships(path) AS edges
+RETURN length(edges) AS hops, count(*) AS paths
+ORDER BY hops
+LIMIT 10
+"""

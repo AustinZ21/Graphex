@@ -361,6 +361,134 @@ def clear_cache() -> dict:
     return {"status": "ok", "deleted": deleted}
 
 
+# ---------------------------------------------------------------------------
+# Aggregation & architecture analysis
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+def get_architecture_overview() -> dict:
+    """Get high-level architecture stats: file count, symbols, languages, interconnectedness."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+    
+    def _fetch():
+        result = _graph.query(S.QUERY_ARCHITECTURE_OVERVIEW)
+        if result.result_set:
+            row = result.result_set[0]
+            return {
+                "total_files": row[0],
+                "total_symbols": row[1],
+                "languages": row[2],
+                "files_with_incoming_calls": row[3],
+                "avg_symbols_per_file": round(float(row[4]) if row[4] else 0, 2),
+                "avg_callers_per_file": round(float(row[5]) if row[5] else 0, 2),
+            }
+        return {"error": "no_data"}
+    
+    return _cached_read("get_architecture_overview", {}, _fetch)
+
+
+@mcp.tool()
+def get_key_modules(limit: int = 10) -> list[dict]:
+    """Find key modules (files with high importance based on symbols and incoming calls)."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+    
+    def _fetch():
+        result = _graph.query(S.QUERY_KEY_FILES, {"limit": limit})
+        return [
+            {
+                "file_path": row[0],
+                "language": row[1],
+                "symbol_count": row[2],
+                "incoming_calls": row[3],
+                "symbols_with_calls": row[4],
+                "importance_score": round(float(row[5]), 2),
+            }
+            for row in result.result_set
+        ]
+    
+    return _cached_read("get_key_modules", {"limit": limit}, _fetch)
+
+
+@mcp.tool()
+def get_file_stats(file_path: str) -> dict:
+    """Get detailed stats for a specific file: symbols, incoming calls, outgoing calls."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+    
+    def _fetch():
+        result = _graph.query(S.QUERY_FILE_STATS, {"file_path": file_path})
+        if result.result_set:
+            row = result.result_set[0]
+            return {
+                "file_path": file_path,
+                "symbol_count": row[0],
+                "incoming_calls": row[1],
+                "symbols_with_outgoing_calls": row[2],
+            }
+        return {"file_path": file_path, "error": "not_found"}
+    
+    return _cached_read("get_file_stats", {"file_path": file_path}, _fetch)
+
+
+@mcp.tool()
+def analyze_dependencies(limit: int = 20) -> list[dict]:
+    """Analyze top file dependencies: which files call which, and how often."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+    
+    def _fetch():
+        result = _graph.query(S.QUERY_MODULE_DEPENDENCIES, {"limit": limit})
+        return [
+            {
+                "from_file": row[0],
+                "to_file": row[1],
+                "caller_symbols": row[2],
+                "callee_symbols": row[3],
+            }
+            for row in result.result_set
+        ]
+    
+    return _cached_read("analyze_dependencies", {"limit": limit}, _fetch)
+
+
+@mcp.tool()
+def find_dependency_chain(source_path: str, target_path: str) -> dict:
+    """Analyze how source_path reaches target_path through call chains (hops)."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+    
+    def _fetch():
+        result = _graph.query(
+            S.QUERY_FILE_DEPENDENCY_CHAIN,
+            {"source_path": source_path, "target_path": target_path},
+        )
+        if result.result_set:
+            chains = [
+                {"hops": row[0], "path_count": row[1]}
+                for row in result.result_set
+            ]
+            return {
+                "source_path": source_path,
+                "target_path": target_path,
+                "chains": chains,
+                "closest_distance": chains[0]["hops"] if chains else None,
+            }
+        return {
+            "source_path": source_path,
+            "target_path": target_path,
+            "chains": [],
+            "closest_distance": None,
+        }
+    
+    return _cached_read(
+        "find_dependency_chain",
+        {"source_path": source_path, "target_path": target_path},
+        _fetch,
+    )
+
+
 @mcp.tool()
 def strategy_query(
     query: str,

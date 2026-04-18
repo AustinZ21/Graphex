@@ -109,7 +109,31 @@ Output fields:
 - `fallback_context`: local snippets only when needed
 - `estimated_tokens`: approximate token usage for returned context
 
-## 5) Available graph query tools
+## 6) Architecture analysis tools
+
+These tools help agents understand project structure and dependencies:
+
+- `get_architecture_overview()` - High-level stats (total files, symbols, languages, interconnectedness)
+- `get_key_modules(limit)` - Find critical modules by importance (weighted by symbols + incoming calls)
+- `get_file_stats(file_path)` - Detailed file metrics (symbols, incoming calls, outgoing calls)
+- `analyze_dependencies(limit)` - Top file-to-file dependencies
+- `find_dependency_chain(source_path, target_path)` - Analyze how files are connected through calls
+
+Usage example:
+```python
+# Agent wants to understand codebase structure
+overview = cg.get_architecture_overview()
+key_files = cg.get_key_modules(limit=5)
+dependencies = cg.analyze_dependencies(limit=10)
+```
+
+These tools enable agents to answer:
+- "What is the core architecture of this project?"
+- "Which modules are most central?"
+- "How are these files related?"
+- "What is the dependency flow?"
+
+## 7) Available graph query tools
 
 Read/query tools:
 - `find_symbol`
