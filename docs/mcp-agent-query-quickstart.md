@@ -302,6 +302,19 @@ What it validates:
 
 This reduces the risk that variable-flow features only work in mocked tests while silently drifting at runtime.
 
+## MCP end-to-end toolflow coverage (v1.24.0)
+
+In addition to pipeline-level live graph validation, the repository now includes an MCP-level end-to-end test.
+
+What it validates:
+
+- Indexing a temporary Python repo into a live FalkorDB graph
+- Calling MCP tool handlers directly on the indexed graph (`get_variable_flows`, `explain_data_flow`, `analyze_return_influence`)
+- Verifying that cross-function `argument` and `call_return` flows are visible from MCP responses
+- Verifying Chinese `narrative` output is produced from real indexed data
+
+This closes the gap between graph correctness and MCP response correctness by testing the full retrieval path used by agents.
+
 These tools let agents answer:
 
 - "哪些参数根本没有参与函数内部的数据流？"
