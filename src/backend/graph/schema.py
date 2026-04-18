@@ -267,8 +267,9 @@ LIMIT $limit
 QUERY_SCOPE_VARIABLE_METRICS = """
 MATCH (s:Symbol {qualified_name: $scope_qname})-[:USES_VARIABLE]->(v:Variable)
 OPTIONAL MATCH (incoming:Variable)-[:FLOWS_TO {scope_qname: $scope_qname}]->(v)
+WITH v, count(DISTINCT incoming) AS incoming_count
 OPTIONAL MATCH (v)-[:FLOWS_TO {scope_qname: $scope_qname}]->(outgoing:Variable)
-RETURN v.qualified_name, v.name, v.role, count(DISTINCT incoming) AS incoming_count, count(DISTINCT outgoing) AS outgoing_count
+RETURN v.qualified_name, v.name, v.role, incoming_count, count(DISTINCT outgoing) AS outgoing_count
 ORDER BY v.role, v.name
 """
 

@@ -259,6 +259,49 @@ analysis = cg.analyze_scope_variables(scope, limit=10)
 explanation = cg.explain_data_flow(scope, limit=20)
 ```
 
+## Cross-function flow propagation (v1.21.0)
+
+ContextGraph now propagates lightweight variable flow across direct function calls during indexing.
+
+What is added:
+
+- **Argument propagation**: caller variables can flow into callee parameter variables
+- **Return propagation**: callee `__return__` can flow back into the caller assignment target or caller `__return__`
+- **Narrative explanation**: `explain_data_flow` now returns both `summary` and a Chinese `narrative` string for direct agent consumption
+
+Example effect:
+
+```python
+def normalize(raw):
+    value = raw.strip()
+    return value
+
+def render(input_text):
+    cleaned = normalize(input_text)
+    return cleaned
+```
+
+With cross-function propagation, agents can trace that `render:input_text` influences `normalize:raw`, then `normalize:__return__`, and finally `render:cleaned` and `render:__return__`.
+
+This helps answer:
+
+- "这个返回值是不是经过别的函数加工后得到的？"
+- "调用链里参数是怎样跨函数传播的？"
+- "当前函数只是转发了下游函数的返回值，还是做了额外转换？"
+
+## Live graph integration coverage (v1.23.0)
+
+The repository now includes a live FalkorDB integration test for the indexing pipeline.
+
+What it validates:
+
+- A temporary Python repo can be indexed end-to-end through `IndexPipeline`
+- Cross-function argument propagation reaches callee parameters in the graph
+- Callee `__return__` values flow back into caller variables
+- `QUERY_RETURN_INFLUENCE` and `QUERY_VARIABLE_LINEAGE` both observe the propagated path on a real graph
+
+This reduces the risk that variable-flow features only work in mocked tests while silently drifting at runtime.
+
 These tools let agents answer:
 
 - "哪些参数根本没有参与函数内部的数据流？"

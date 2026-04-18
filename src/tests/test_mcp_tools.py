@@ -178,7 +178,8 @@ def test_explain_data_flow():
     assert result["scope_qname"] == "backend.service.render"
     assert "backend.service.render:suffix" in result["unused_parameters"]
     assert "backend.service.render:label" in result["key_intermediates"]
-    assert any("返回值受这些参数影响" in line for line in result["summary"])
+    assert any("返回值最终受这些输入影响" in line for line in result["summary"])
+    assert "render 的输入参数包括" in result["narrative"]
 
 
 def test_retrieve_context():

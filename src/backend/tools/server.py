@@ -104,6 +104,10 @@ def _summarize_symbol(symbol_type: str, qualified_name: str, file_path: str, lin
     return f"{symbol_type} {qualified_name} at {location}"
 
 
+def _short_variable_name(qualified_name: str) -> str:
+    return qualified_name.split(":")[-1] if ":" in qualified_name else qualified_name
+
+
 def _fetch_relation_summary(qualified_name: str, limit: int = 3) -> dict:
     if not _graph:
         return {"callers": [], "callees": [], "callers_count": 0, "callees_count": 0}
@@ -438,25 +442,36 @@ def explain_data_flow(scope_qname: str, limit: int = 20) -> dict:
             )[:limit]
         ]
         summary: list[str] = []
+        scope_name = scope_qname.split(".")[-1]
+        parameter_names = sorted({_short_variable_name(item["qualified_name"]) for item in variables if item["role"] == "parameter"})
+        influenced_parameters = sorted({_short_variable_name(item["parameter"]) for item in return_paths})
+        unused_parameter_names = [_short_variable_name(item) for item in unused_parameters[:limit]]
+        key_intermediate_names = [_short_variable_name(item) for item in key_intermediates[:limit]]
+
+        if parameter_names:
+            summary.append(f"{scope_name} 的输入参数包括: {', '.join(parameter_names)}。")
         if return_paths:
-            params = ", ".join(sorted({item["parameter"].split(":")[-1] for item in return_paths}))
-            summary.append(f"返回值受这些参数影响: {params}")
+            params = ", ".join(influenced_parameters)
+            summary.append(f"返回值最终受这些输入影响: {params}。")
         else:
-            summary.append("当前没有发现参数到返回值的变量流路径")
-        if unused_parameters:
-            summary.append("未使用参数: " + ", ".join(item.split(":")[-1] for item in unused_parameters[:limit]))
-        if key_intermediates:
-            summary.append("关键中间变量: " + ", ".join(item.split(":")[-1] for item in key_intermediates[:limit]))
+            summary.append("当前还没有发现从输入参数流向返回值的清晰路径。")
+        if unused_parameter_names:
+            summary.append("这些参数目前没有参与后续传播: " + ", ".join(unused_parameter_names) + "。")
+        if key_intermediate_names:
+            summary.append("承接多步转换的关键中间变量: " + ", ".join(key_intermediate_names) + "。")
         if flows:
             preview = "; ".join(
-                f"{item['source'].split(':')[-1]} -> {item['target'].split(':')[-1]} ({item['flow_type']})"
+                f"{_short_variable_name(item['source'])} -> {_short_variable_name(item['target'])} ({item['flow_type']})"
                 for item in flows[: min(5, len(flows))]
             )
-            summary.append("主要数据流: " + preview)
+            summary.append("前几条关键传播路径是: " + preview + "。")
+
+        narrative = "".join(summary)
 
         return {
             "scope_qname": scope_qname,
             "summary": summary,
+            "narrative": narrative,
             "flows": flows,
             "return_influence": return_paths,
             "unused_parameters": unused_parameters,

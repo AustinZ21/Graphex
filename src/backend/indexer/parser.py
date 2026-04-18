@@ -39,6 +39,8 @@ class ParsedImport:
 class RawCall:
     caller_qname: str
     callee_name: str
+    arg_names: list[str] = field(default_factory=list)
+    result_var_name: str | None = None
 
 
 @dataclass
@@ -458,28 +460,89 @@ class TypeScriptJavaScriptParser:
 
     def _extract_calls(self, result: ParsedFile, source: str, lines: list[str], module_qname: str) -> None:
         """Extract function/method calls from TS/JS source."""
-        call_re = re.compile(r"(?:^|\s|[({,])(\w+)\s*\(")
-        seen_calls: set[tuple[str, str, int]] = set()
-        
-        symbol_map = {s.name: s for s in result.symbols}
-        
+        call_re = re.compile(r"(?:^|\s|[({,])(\w+)\s*\(([^)]*)\)")
+        assign_call_re = re.compile(r"^\s*(?:(?:const|let|var)\s+)?(\w+)\s*=\s*(\w+)\s*\(([^)]*)\)")
+        return_call_re = re.compile(r"^\s*return\s+(\w+)\s*\(([^)]*)\)")
+        seen_calls: set[tuple[str, str, int, str | None]] = set()
+
+        class_stack: list[tuple[str, int]] = []
+        scope_stack: list[tuple[str, int]] = []
+        brace_depth = 0
+        method_re = re.compile(r"^\s*(?:async\s+)?(\w+)\s*\(([^\)]*)\)\s*\{")
+
         for lineno, line in enumerate(lines, start=1):
-            for match in call_re.finditer(line):
-                callee_name = match.group(1)
-                if callee_name in {"if", "for", "while", "switch", "catch", "function", "async", "class"}:
-                    continue
-                if callee_name not in symbol_map:
-                    continue
-                
-                sym = symbol_map[callee_name]
-                for caller_sym in result.symbols:
-                    if caller_sym.symbol_type in {"function", "method"}:
-                        key = (caller_sym.qualified_name, callee_name, lineno)
+            class_match = self._CLASS_RE.search(line)
+            if class_match:
+                class_name = class_match.group(1)
+                current_depth = brace_depth + line.count("{") - line.count("}")
+                class_stack.append((class_name, max(1, current_depth)))
+
+            function_match = self._FUNCTION_SCOPE_RE.search(line)
+            arrow_match = self._ARROW_SCOPE_RE.search(line)
+            method_match = method_re.search(line) if class_stack else None
+            if function_match:
+                scope_stack.append((f"{module_qname}.{function_match.group(1)}", brace_depth + max(1, line.count("{"))))
+            elif arrow_match:
+                scope_stack.append((f"{module_qname}.{arrow_match.group(1)}", brace_depth + max(1, line.count("{"))))
+            elif method_match and method_match.group(1) != "constructor":
+                class_name = class_stack[-1][0]
+                scope_stack.append((f"{module_qname}.{class_name}.{method_match.group(1)}", brace_depth + max(1, line.count("{"))))
+
+            current_scope = scope_stack[-1][0] if scope_stack else None
+            if current_scope:
+                assign_match = assign_call_re.search(line)
+                return_match = return_call_re.search(line)
+                if assign_match:
+                    target_name = assign_match.group(1)
+                    callee_name = assign_match.group(2)
+                    arg_names = self._extract_js_identifiers(assign_match.group(3), excluded=set())
+                    key = (current_scope, callee_name, lineno, target_name)
+                    if key not in seen_calls:
+                        seen_calls.add(key)
+                        result.calls.append(
+                            RawCall(
+                                caller_qname=current_scope,
+                                callee_name=callee_name,
+                                arg_names=arg_names,
+                                result_var_name=target_name,
+                            )
+                        )
+                elif return_match:
+                    callee_name = return_match.group(1)
+                    arg_names = self._extract_js_identifiers(return_match.group(2), excluded=set())
+                    key = (current_scope, callee_name, lineno, "__return__")
+                    if key not in seen_calls:
+                        seen_calls.add(key)
+                        result.calls.append(
+                            RawCall(
+                                caller_qname=current_scope,
+                                callee_name=callee_name,
+                                arg_names=arg_names,
+                                result_var_name="__return__",
+                            )
+                        )
+                else:
+                    for match in call_re.finditer(line):
+                        callee_name = match.group(1)
+                        if callee_name in {"if", "for", "while", "switch", "catch", "function", "async", "class", "return"}:
+                            continue
+                        arg_names = self._extract_js_identifiers(match.group(2), excluded=set())
+                        key = (current_scope, callee_name, lineno, None)
                         if key not in seen_calls:
                             seen_calls.add(key)
                             result.calls.append(
-                                RawCall(caller_qname=caller_sym.qualified_name, callee_name=callee_name)
+                                RawCall(
+                                    caller_qname=current_scope,
+                                    callee_name=callee_name,
+                                    arg_names=arg_names,
+                                )
                             )
+
+            brace_depth += line.count("{") - line.count("}")
+            while class_stack and brace_depth < class_stack[-1][1]:
+                class_stack.pop()
+            while scope_stack and brace_depth < scope_stack[-1][1]:
+                scope_stack.pop()
 
     def _extract_variable_flows(self, result: ParsedFile, lines: list[str], module_qname: str) -> None:
         class_stack: list[tuple[str, int]] = []

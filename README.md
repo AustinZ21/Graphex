@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.20.0  
+**Version:** 1.23.0  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-18 (multi-language variable flow insights)
+**Date:** 2026-04-18 (live FalkorDB integration coverage)
 
 ## 1. Introduction
 

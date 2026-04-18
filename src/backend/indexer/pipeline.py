@@ -113,7 +113,7 @@ class IndexPipeline:
         symbol_map: dict[str, str],
         force: bool,
     ) -> dict:
-        result = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "imports": 0, "errors": 0}
+        result = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "imports": 0, "variables": 0, "variable_flows": 0, "errors": 0}
         try:
             from backend.indexer.hasher import hash_symbols, hash_calls, hash_imports
             
@@ -176,9 +176,13 @@ class IndexPipeline:
                     symbol_map[sym.name] = sym.qualified_name
                     result["symbols"] += 1
 
+            python_raw_calls: list[RawCall] = []
+            if parsed.language == "python" and (calls_changed or variables_changed):
+                python_raw_calls = self._extract_python_raw_calls(file_path)
+
             if calls_changed:
                 if parsed.language == "python":
-                    result["calls"] = self._write_python_call_edges(file_path, symbol_map)
+                    result["calls"] = self._write_python_call_edges(python_raw_calls, symbol_map)
                 elif parsed.language in {"typescript", "javascript"}:
                     result["calls"] = self._write_ts_js_call_edges(parsed.calls, symbol_map)
 
@@ -190,6 +194,12 @@ class IndexPipeline:
                 result["variables"] = variable_stats["variables"]
                 result["variable_flows"] = variable_stats["variable_flows"]
 
+            if calls_changed or variables_changed:
+                if parsed.language == "python":
+                    result["variable_flows"] += self._write_cross_scope_variable_flows(python_raw_calls, symbol_map)
+                elif parsed.language in {"typescript", "javascript"}:
+                    result["variable_flows"] += self._write_cross_scope_variable_flows(parsed.calls, symbol_map)
+
             if symbols_changed or calls_changed or imports_changed or variables_changed:
                 result["files"] = 1
             else:
@@ -199,15 +209,17 @@ class IndexPipeline:
             result["errors"] = 1
         return result
 
-    def _write_python_call_edges(self, file_path: str, symbol_map: dict[str, str]) -> int:
+    def _extract_python_raw_calls(self, file_path: str) -> list[RawCall]:
         try:
             source = Path(file_path).read_text(encoding="utf-8", errors="replace")
             tree = ast.parse(source, filename=file_path)
         except (SyntaxError, OSError):
-            return 0
+            return []
 
         module_qname = path_to_module(file_path)
-        raw_calls: list[RawCall] = self._call_analyzer.extract(tree, file_path, module_qname)
+        return self._call_analyzer.extract(tree, file_path, module_qname)
+
+    def _write_python_call_edges(self, raw_calls: list[RawCall], symbol_map: dict[str, str]) -> int:
         written = 0
         for rc in raw_calls:
             callee_qname = symbol_map.get(rc.callee_name)
@@ -293,6 +305,66 @@ class IndexPipeline:
             except Exception:
                 pass
         return stats
+
+    def _write_cross_scope_variable_flows(self, raw_calls: list[RawCall], symbol_map: dict[str, str]) -> int:
+        written = 0
+        parameter_cache: dict[str, list[str]] = {}
+        for call in raw_calls:
+            callee_qname = symbol_map.get(call.callee_name)
+            if not callee_qname:
+                continue
+
+            if callee_qname not in parameter_cache:
+                parameter_cache[callee_qname] = self._get_scope_parameter_qnames(callee_qname)
+
+            callee_params = parameter_cache[callee_qname]
+            arg_names = call.arg_names or []
+            for index, arg_name in enumerate(arg_names[: len(callee_params)]):
+                source_qname = f"{call.caller_qname}:{arg_name}"
+                target_qname = callee_params[index]
+                try:
+                    self._graph.query(
+                        S.EDGE_VARIABLE_FLOWS,
+                        {
+                            "source_qname": source_qname,
+                            "target_qname": target_qname,
+                            "scope_qname": call.caller_qname,
+                            "line_number": 0,
+                            "flow_type": "argument",
+                        },
+                    )
+                    written += 1
+                except Exception:
+                    pass
+
+            if call.result_var_name:
+                source_qname = f"{callee_qname}:__return__"
+                target_qname = f"{call.caller_qname}:{call.result_var_name}"
+                try:
+                    self._graph.query(
+                        S.EDGE_VARIABLE_FLOWS,
+                        {
+                            "source_qname": source_qname,
+                            "target_qname": target_qname,
+                            "scope_qname": call.caller_qname,
+                            "line_number": 0,
+                            "flow_type": "call_return",
+                        },
+                    )
+                    written += 1
+                except Exception:
+                    pass
+        return written
+
+    def _get_scope_parameter_qnames(self, scope_qname: str) -> list[str]:
+        try:
+            result = self._graph.query(
+                "MATCH (:Symbol {qualified_name: $scope_qname})-[:USES_VARIABLE]->(v:Variable {role: 'parameter'}) RETURN v.qualified_name ORDER BY v.line_number, v.name",
+                {"scope_qname": scope_qname},
+            )
+            return [row[0] for row in result.result_set if row and row[0]]
+        except Exception:
+            return []
 
     def _get_stored_hash(self, file_path: str) -> str | None:
         result = self._graph.query(S.QUERY_FILE_HASH, {"path": file_path})

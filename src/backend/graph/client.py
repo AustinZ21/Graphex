@@ -52,6 +52,9 @@ class GraphClient:
             "CREATE INDEX FOR (n:File) ON (n.path)",
             "CREATE INDEX FOR (n:Symbol) ON (n.name)",
             "CREATE INDEX FOR (n:Symbol) ON (n.qualified_name)",
+            "CREATE INDEX FOR (n:Variable) ON (n.name)",
+            "CREATE INDEX FOR (n:Variable) ON (n.qualified_name)",
+            "CREATE INDEX FOR (n:Variable) ON (n.scope_qname)",
             "CREATE INDEX FOR (n:Repository) ON (n.path)",
         ]
         for stmt in stmts:
