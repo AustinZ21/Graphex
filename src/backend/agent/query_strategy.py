@@ -312,7 +312,8 @@ def run_cg_first_strategy(
         item.setdefault("file_path", hit.get("file_path"))
         item.setdefault("line_start", hit.get("line_start"))
         item.setdefault("line_end", hit.get("line_end"))
-        if include_relations and qname:
+        inline_relations_present = bool(item.get("callers") or item.get("callees"))
+        if include_relations and qname and not inline_relations_present:
             try:
                 graph = get_call_graph(qualified_name=qname, depth=relation_depth)
                 if isinstance(graph, dict):

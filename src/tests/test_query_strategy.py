@@ -92,6 +92,39 @@ def test_run_cg_first_strategy_without_fallback(tmp_path: Path):
     assert result["quality_score"] >= result["quality_threshold"]
 
 
+def test_run_cg_first_strategy_reuses_inline_relations(tmp_path: Path):
+    def retrieve_graph_hits(query: str, limit: int):
+        return [
+            {
+                "qualified_name": "pkg.mod.fn",
+                "symbol_type": "function",
+                "file_path": "sample.py",
+                "line_start": 1,
+                "line_end": 3,
+                "summary": "function pkg.mod.fn at sample.py:1-3 sample handler",
+                "snippet": "def fn():\n    return 'sample'",
+                "callers": ["caller.a"],
+                "callees": ["callee.b"],
+            }
+        ]
+
+    def get_call_graph(qualified_name: str, depth: int):
+        raise AssertionError("get_call_graph should not be called when inline relations exist")
+
+    result = run_cg_first_strategy(
+        query="sample",
+        repo_root=tmp_path,
+        retrieve_graph_hits=retrieve_graph_hits,
+        get_call_graph=get_call_graph,
+        graph_top_k=5,
+        min_graph_hits=1,
+        token_budget=500,
+    )
+
+    assert result["used_fallback"] is False
+    assert result["graph_context"][0]["callers"] == ["caller.a"]
+
+
 def test_decide_fallback_for_low_quality():
     items = [
         {

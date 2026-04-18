@@ -81,11 +81,21 @@ def test_retrieve_context():
     mcp_srv._graph = _mock_graph(
         [["backend.indexer.parser.PythonParser.parse", "method", "src/backend/indexer/parser.py", 40, 70]]
     )
-    with patch("backend.tools.server._read_symbol_snippet", return_value="def parse(...): ..."):
+    with patch("backend.tools.server._read_symbol_snippet", return_value="def parse(...): ..."), patch(
+        "backend.tools.server._fetch_relation_summary",
+        return_value={
+            "callers": ["caller.one"],
+            "callees": ["callee.one"],
+            "callers_count": 1,
+            "callees_count": 1,
+        },
+    ):
         results = mcp_srv.retrieve_context(query="parse", limit=5)
     assert results[0]["file_path"] == "src/backend/indexer/parser.py"
     assert results[0]["snippet"] == "def parse(...): ..."
     assert "summary" in results[0]
+    assert results[0]["callers"] == ["caller.one"]
+    assert results[0]["callees"] == ["callee.one"]
 
 
 @pytest.mark.asyncio

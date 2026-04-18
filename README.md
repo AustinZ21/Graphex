@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.8.0  
+**Version:** 1.9.0  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-18 (adaptive quality scoring for CG-first routing + class path fix)
+**Date:** 2026-04-18 (inline relation summaries in retrieve_context to reduce MCP roundtrips)
 
 ## 1. Introduction
 

@@ -131,8 +131,12 @@ Fallback is no longer based only on fixed hit count. The strategy also evaluates
 `retrieve_context` now returns enriched items with:
 - `summary`: compact symbol/location summary
 - `snippet`: bounded code snippet around the symbol
+- `callers` / `callees`: compact relation summaries inline
+- `callers_count` / `callees_count`: inline relation counts
 
 This reduces the need for agents to perform extra file reads after initial graph retrieval.
+
+When these inline relations are present, `strategy_query` can often skip a separate `find_call_graph` call for the same symbol.
 
 Indexing tools (queued):
 - `index_full`

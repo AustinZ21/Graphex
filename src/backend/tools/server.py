@@ -104,6 +104,28 @@ def _summarize_symbol(symbol_type: str, qualified_name: str, file_path: str, lin
     return f"{symbol_type} {qualified_name} at {location}"
 
 
+def _fetch_relation_summary(qualified_name: str, limit: int = 3) -> dict:
+    if not _graph:
+        return {"callers": [], "callees": [], "callers_count": 0, "callees_count": 0}
+
+    callers_result = _graph.query(
+        S.QUERY_FIND_CALLERS,
+        {"qualified_name": qualified_name, "limit": limit},
+    )
+    callees_result = _graph.query(
+        S.QUERY_FIND_CALLEES,
+        {"qualified_name": qualified_name, "limit": limit},
+    )
+    callers = [row[0] for row in callers_result.result_set]
+    callees = [row[0] for row in callees_result.result_set]
+    return {
+        "callers": callers,
+        "callees": callees,
+        "callers_count": len(callers),
+        "callees_count": len(callees),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Write tools (async – go through MQ)
 # ---------------------------------------------------------------------------
@@ -250,6 +272,7 @@ def retrieve_context(query: str, limit: int = 10) -> list[dict]:
             line_start = row[3]
             line_end = row[4]
             snippet = _read_symbol_snippet(file_path, line_start, line_end)
+            relations = _fetch_relation_summary(qualified_name)
             items.append(
                 {
                     "qualified_name": qualified_name,
@@ -259,6 +282,7 @@ def retrieve_context(query: str, limit: int = 10) -> list[dict]:
                     "line_end": line_end,
                     "summary": _summarize_symbol(symbol_type, qualified_name, file_path, line_start, line_end),
                     "snippet": snippet,
+                    **relations,
                 }
             )
         return items
