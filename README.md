@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.2.0  
+**Version:** 1.2.1  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-18 (Phase 2+3: hash dedup, call graph, P@5 eval, Redis cache, trace eval)
+**Date:** 2026-04-17 (Compose profile fix: dev startup isolated from prod builds)
 
 ## 1. Introduction
 

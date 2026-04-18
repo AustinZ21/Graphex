@@ -49,6 +49,7 @@ services:
       context: .
       dockerfile: Dockerfile.gateway.prod
     container_name: your-app-gateway
+    profiles: [prod]
     restart: unless-stopped
     expose:
       - '8080'
@@ -85,6 +86,7 @@ services:
       context: .
       dockerfile: Dockerfile.prod
     container_name: your-app-api
+    profiles: [prod]
     restart: unless-stopped
     expose:
       - '8000'
@@ -141,6 +143,7 @@ services:
         - 'NEXT_PUBLIC_API_URL=https://your-domain.com'
         - 'API_URL=https://your-domain.com'
     container_name: your-app-frontend
+    profiles: [prod]
     restart: unless-stopped
     expose:
       - '3000'
@@ -170,6 +173,7 @@ services:
   falkordb:
     image: 'falkordb/falkordb:latest'
     container_name: contextgraph-falkordb
+    profiles: [prod]
     restart: unless-stopped
     ports:
       - '16379:6379'
@@ -196,6 +200,7 @@ services:
   redis:
     image: 'redis:7-alpine'
     container_name: your-app-redis
+    profiles: [prod]
     restart: unless-stopped
     volumes:
       - 'redis_data:/data'
@@ -213,6 +218,7 @@ services:
   postgres:
     image: 'pgvector/pgvector:pg16'
     container_name: your-app-postgres
+    profiles: [prod]
     restart: unless-stopped
     environment:
       - 'POSTGRES_DB=${POSTGRES_DB:-appdb}'
