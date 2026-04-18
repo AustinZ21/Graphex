@@ -63,10 +63,15 @@ services:
       - 'OPENAI_API_KEY=${OPENAI_API_KEY:-dummy-openai-key}'
       - 'OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}'
       - 'CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}'
+      - FALKORDB_HOST=falkordb
+      - FALKORDB_PORT=6379
+      - 'QUEUE_REDIS_URL=redis://redis:6379/1'
     depends_on:
       redis:
         condition: service_healthy
       postgres:
+        condition: service_healthy
+      falkordb:
         condition: service_healthy
     networks:
       - your-app-network
@@ -122,8 +127,8 @@ services:
     container_name: contextgraph-falkordb
     restart: unless-stopped
     ports:
-      - '6379:6379'
-      - '3000:3000'
+      - '16379:6379'
+      - '13000:3000'
     volumes:
       - 'falkordb_data:/data'
     networks:
