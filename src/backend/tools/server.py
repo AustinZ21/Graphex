@@ -592,3 +592,77 @@ def strategy_query(
         source_label="contextgraph-server",
     )
 
+
+# ---------------------------------------------------------------------------
+# Call-graph analysis & metrics (v1.17.0)
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+def compute_symbol_fan_in(qualified_name: str) -> list[dict]:
+    """Compute fan-in: how many distinct symbols call this symbol."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+    
+    def _fetch():
+        result = _graph.query(S.QUERY_FAN_IN, {"qualified_name": qualified_name})
+        return [
+            {"caller": row[0]}
+            for row in result.result_set
+        ]
+    
+    return _cached_read("compute_symbol_fan_in", {"qualified_name": qualified_name}, _fetch)
+
+
+@mcp.tool()
+def compute_symbol_fan_out(qualified_name: str) -> list[dict]:
+    """Compute fan-out: how many distinct symbols does this symbol call."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+    
+    def _fetch():
+        result = _graph.query(S.QUERY_FAN_OUT, {"qualified_name": qualified_name})
+        return [
+            {"callee": row[0]}
+            for row in result.result_set
+        ]
+    
+    return _cached_read("compute_symbol_fan_out", {"qualified_name": qualified_name}, _fetch)
+
+
+@mcp.tool()
+def find_critical_functions(top_n: int = 10) -> list[dict]:
+    """Find most critical functions (high fan-in, central in call graph)."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+    
+    def _fetch():
+        result = _graph.query(S.QUERY_CRITICAL_FUNCTIONS, {"limit": top_n})
+        return [
+            {
+                "qualified_name": row[0],
+                "symbol_type": row[1],
+                "fan_in": row[2],
+                "fan_out": row[3],
+                "importance_score": row[4],
+            }
+            for row in result.result_set
+        ]
+    
+    return _cached_read("find_critical_functions", {"top_n": top_n}, _fetch)
+
+
+@mcp.tool()
+def detect_cycles() -> list[dict]:
+    """Detect all cyclic dependencies in the call graph."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+    
+    def _fetch():
+        result = _graph.query(S.QUERY_CYCLIC_DEPENDENCIES, {})
+        return [
+            {"symbol": row[0]}
+            for row in result.result_set
+        ]
+    
+    return _cached_read("detect_cycles", {}, _fetch)
+

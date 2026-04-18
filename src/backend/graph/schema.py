@@ -176,6 +176,37 @@ LIMIT 10
 """
 
 # ---------------------------------------------------------------------------
+# Call-graph analysis queries (v1.17.0)
+# ---------------------------------------------------------------------------
+
+QUERY_FAN_IN = """
+MATCH (s:Symbol {qualified_name: $qualified_name})<-[:CALLS]-(caller:Symbol)
+RETURN DISTINCT caller.qualified_name AS caller
+"""
+
+QUERY_FAN_OUT = """
+MATCH (s:Symbol {qualified_name: $qualified_name})-[:CALLS]->(callee:Symbol)
+RETURN DISTINCT callee.qualified_name AS callee
+"""
+
+QUERY_CRITICAL_FUNCTIONS = """
+MATCH (s:Symbol)
+OPTIONAL MATCH (s)<-[:CALLS]-(callers:Symbol)
+OPTIONAL MATCH (s)-[:CALLS]->(callees:Symbol)
+WITH s, count(DISTINCT callers) AS fan_in, count(DISTINCT callees) AS fan_out
+WHERE fan_in > 0 OR fan_out > 0
+WITH s, fan_in, fan_out, (fan_in * 0.6) + ((fan_out / (MAX(fan_out) OVER ())) * 0.4) AS score
+RETURN s.qualified_name, s.symbol_type, fan_in, fan_out, round(score * 100) AS importance_score
+ORDER BY importance_score DESC
+LIMIT $limit
+"""
+
+QUERY_CYCLIC_DEPENDENCIES = """
+MATCH (s1:Symbol)-[:CALLS*2..]->(s2:Symbol)-[:CALLS*1..]->(s1:Symbol)
+RETURN DISTINCT s1.qualified_name AS symbol
+"""
+
+# ---------------------------------------------------------------------------
 # Import tracking queries
 # ---------------------------------------------------------------------------
 

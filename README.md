@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.16.0  
+**Version:** 1.17.0  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-18 (Go/Rust/Java language support)
+**Date:** 2026-04-18 (call-graph analysis & metrics)
 
 ## 1. Introduction
 

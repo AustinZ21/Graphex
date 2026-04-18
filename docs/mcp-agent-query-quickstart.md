@@ -164,6 +164,47 @@ Version 1.14.0 introduces fine-grained incremental updates:
 - **Call hash**: detects changes to function call patterns
 - **Import hash**: detects changes to import dependencies
 
+## Call-graph analysis and metrics (v1.17.0)
+
+ContextGraph provides sophisticated call-graph analysis for understanding codebase architecture:
+
+### Cycle Detection
+
+```python
+# Detect circular dependencies (A → B → C → A)
+cycles = cg.detect_cycles()
+# Returns: List of cyclic symbols
+```
+
+### Fan-in/Fan-out Analysis
+
+```python
+# How many symbols call this symbol? (dependencies)
+fan_in = cg.compute_symbol_fan_in("myapp.core.process")
+# Returns: ["caller1", "caller2", "caller3"]
+
+# How many symbols does this symbol call? (dependencies it creates)
+fan_out = cg.compute_symbol_fan_out("myapp.core.process")
+# Returns: ["util.log", "util.cache", "db.query"]
+```
+
+### Critical Function Ranking
+
+```python
+# Find most important functions (high fan-in + central)
+critical = cg.find_critical_functions(top_n=15)
+# Returns: [(qualified_name, symbol_type, fan_in, fan_out, importance_score), ...]
+```
+
+Score = (fan_in * 0.6) + (normalized_fan_out * 0.4)
+
+### Use Cases for Agents
+
+- **Risk assessment**: Find cyclic dependencies that create maintenance risk
+- **API design**: Identify functions with high fan-in (stable interfaces)
+- **Refactoring**: Locate high-coupling points that are hard to change
+- **Call-path optimization**: Understand call depths and potential bottlenecks
+
 ## Multi-language support (v1.16.0)
 
 ContextGraph now supports **Go**, **Rust**, and **Java** in addition to Python and TypeScript/JavaScript:
