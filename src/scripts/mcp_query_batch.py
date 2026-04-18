@@ -141,16 +141,34 @@ async def run_batch(
     request_timeout_sec: float,
     fail_fast: bool,
     max_errors: int,
+    resume_from_output: bool,
 ) -> dict[str, Any]:
     endpoint = _read_message_endpoint(base_url)
     started = time.time()
 
     tasks: list[tuple[int, str, dict[str, Any], str]] = []
+    previous_results: dict[int, dict[str, Any]] = {}
+
+    if resume_from_output and output_path.exists():
+        with output_path.open("r", encoding="utf-8") as prev:
+            for raw in prev:
+                raw = raw.strip()
+                if not raw:
+                    continue
+                try:
+                    obj = json.loads(raw)
+                    line_no = int(obj.get("line"))
+                    previous_results[line_no] = obj
+                except Exception:
+                    # Ignore malformed prior records and keep moving.
+                    continue
 
     with input_path.open("r", encoding="utf-8") as src:
         for line_no, raw in enumerate(src, start=1):
             raw = raw.strip()
             if not raw:
+                continue
+            if line_no in previous_results:
                 continue
             try:
                 obj = json.loads(raw)
@@ -161,7 +179,7 @@ async def run_batch(
             except Exception:
                 tasks.append((line_no, "", {}, raw))
 
-    total = len(tasks)
+    total = len(tasks) + len(previous_results)
     ok_count = 0
     fail_count = 0
     retry_count = 0
@@ -242,10 +260,12 @@ async def run_batch(
                             cancelled_count += 1
                 pending = []
 
-    results.sort(key=lambda x: x["line"])
+    # Merge resumed records and newly executed records.
+    merged_results = list(previous_results.values()) + results
+    merged_results.sort(key=lambda x: x["line"])
 
     with output_path.open("w", encoding="utf-8") as out:
-        for item in results:
+        for item in merged_results:
             if item.get("cancelled"):
                 cancelled_count += 1
                 out.write(json.dumps(item, ensure_ascii=True) + "\n")
@@ -266,6 +286,8 @@ async def run_batch(
     return {
         "endpoint": endpoint,
         "total": total,
+        "resumed_skipped": len(previous_results),
+        "executed_now": len(tasks),
         "ok": ok_count,
         "failed": fail_count,
         "cancelled": cancelled_count,
@@ -273,6 +295,7 @@ async def run_batch(
         "concurrency": max(1, concurrency),
         "fail_fast": fail_fast,
         "max_errors": max_errors,
+        "resume_from_output": resume_from_output,
         "duration_sec": round(duration_sec, 3),
         "qps": qps,
         "output": str(output_path),
@@ -289,6 +312,7 @@ def main() -> int:
     parser.add_argument("--request-timeout-sec", type=float, default=30.0, help="Per-request timeout")
     parser.add_argument("--fail-fast", action="store_true", help="Stop scheduling once first error is seen")
     parser.add_argument("--max-errors", type=int, default=0, help="Stop when failures reach this number (0=disabled)")
+    parser.add_argument("--resume-from-output", action="store_true", help="Reuse existing output file and skip already completed line numbers")
     args = parser.parse_args()
 
     input_path = Path(args.input)
@@ -307,6 +331,7 @@ def main() -> int:
             request_timeout_sec=args.request_timeout_sec,
             fail_fast=args.fail_fast,
             max_errors=max(0, args.max_errors),
+            resume_from_output=args.resume_from_output,
         )
     )
     print(json.dumps(summary, indent=2, ensure_ascii=True))

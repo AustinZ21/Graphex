@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.2.8  
+**Version:** 1.2.9  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-17 (MCP batch fail-control: fail-fast + max-errors)
+**Date:** 2026-04-17 (MCP batch resume mode: --resume-from-output)
 
 ## 1. Introduction
 
