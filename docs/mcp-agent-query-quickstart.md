@@ -50,6 +50,21 @@ The script:
 2. Reads first endpoint payload (with session context).
 3. Sends `tools/call` for `find_symbol`.
 
+## 4.1) Run batch query client (for evaluation loops)
+
+Sample input file:
+- `docs/mcp-query-batch.sample.jsonl`
+
+Run:
+
+```powershell
+python src/scripts/mcp_query_batch.py --base-url http://127.0.0.1:8011 --input docs/mcp-query-batch.sample.jsonl --output docs/mcp-query-batch.result.jsonl
+```
+
+Output format:
+- JSONL, one result per input line.
+- Includes `ok`, `tool`, `arguments`, and either `result` or `error`.
+
 ## 5) Available graph query tools
 
 Read/query tools:

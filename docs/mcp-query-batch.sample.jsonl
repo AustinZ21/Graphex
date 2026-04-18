@@ -1,0 +1,4 @@
+{"tool":"find_symbol","arguments":{"name":"IndexPipeline","limit":5}}
+{"tool":"find_symbol","arguments":{"name":"GraphClient","limit":5}}
+{"tool":"retrieve_context","arguments":{"query":"Redis Streams producer","limit":5}}
+{"query":"PythonParser"}
