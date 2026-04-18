@@ -197,6 +197,51 @@ This enables agents to answer:
 - "Which input parameter influences this local variable?"
 - "What intermediate variables exist inside this function?"
 
+## Return influence analysis (v1.19.0)
+
+On top of variable-flow indexing, ContextGraph can now answer which parameters influence a function's return value.
+
+Available tool:
+
+- `analyze_return_influence(scope_qname, limit)` - Find parameter-to-return influence chains inside a function or method
+
+Usage example:
+
+```python
+# Agent wants to know which inputs affect a returned value
+influence = cg.analyze_return_influence("backend.service.render", limit=10)
+```
+
+Example result shape:
+
+```python
+{
+    "scope_qname": "backend.service.render",
+    "influenced_by_parameters": [
+        "backend.service.render:input",
+        "backend.service.render:suffix",
+    ],
+    "paths": [
+        {
+            "parameter": "backend.service.render:input",
+            "path": [
+                "backend.service.render:input",
+                "backend.service.render:label",
+                "backend.service.render:result",
+                "backend.service.render:__return__",
+            ],
+            "path_length": 3,
+        }
+    ],
+}
+```
+
+This lets agents answer:
+
+- "这个返回值受哪些参数影响？"
+- "输入参数经过哪些中间变量后进入返回值？"
+- "是否存在未参与返回值计算的参数？"
+
 ## Call-graph analysis and metrics (v1.17.0)
 
 ContextGraph provides sophisticated call-graph analysis for understanding codebase architecture:

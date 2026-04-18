@@ -322,6 +322,36 @@ def trace_variable_lineage(qualified_name: str) -> dict:
 
 
 @mcp.tool()
+def analyze_return_influence(scope_qname: str, limit: int = 20) -> dict:
+    """Analyze which parameters influence a function or method return value."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+
+    def _fetch():
+        result = _graph.query(S.QUERY_RETURN_INFLUENCE, {"scope_qname": scope_qname, "limit": limit})
+        influences: list[dict] = []
+        seen_parameters: set[str] = set()
+        for row in result.result_set:
+            parameter = row[0]
+            flow_path = [item for item in (row[1] or []) if item]
+            influences.append(
+                {
+                    "parameter": parameter,
+                    "path": flow_path,
+                    "path_length": max(0, len(flow_path) - 1),
+                }
+            )
+            seen_parameters.add(parameter)
+        return {
+            "scope_qname": scope_qname,
+            "influenced_by_parameters": sorted(seen_parameters),
+            "paths": influences,
+        }
+
+    return _cached_read("analyze_return_influence", {"scope_qname": scope_qname, "limit": limit}, _fetch)
+
+
+@mcp.tool()
 def retrieve_context(query: str, limit: int = 10) -> list[dict]:
     """Retrieve relevant code context for an agent query string."""
     if not _graph:

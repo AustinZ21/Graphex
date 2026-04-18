@@ -106,6 +106,37 @@ def test_trace_variable_lineage():
     assert result["downstream"] == ["backend.service.render:result"]
 
 
+def test_analyze_return_influence():
+    mcp_srv._graph = _mock_graph(
+        [
+            [
+                "backend.service.render:input",
+                [
+                    "backend.service.render:input",
+                    "backend.service.render:label",
+                    "backend.service.render:result",
+                    "backend.service.render:__return__",
+                ],
+            ],
+            [
+                "backend.service.render:suffix",
+                [
+                    "backend.service.render:suffix",
+                    "backend.service.render:result",
+                    "backend.service.render:__return__",
+                ],
+            ],
+        ]
+    )
+    result = mcp_srv.analyze_return_influence("backend.service.render", limit=10)
+    assert result["scope_qname"] == "backend.service.render"
+    assert result["influenced_by_parameters"] == [
+        "backend.service.render:input",
+        "backend.service.render:suffix",
+    ]
+    assert result["paths"][0]["path_length"] >= 1
+
+
 def test_retrieve_context():
     mcp_srv._graph = _mock_graph(
         [["backend.indexer.parser.PythonParser.parse", "method", "src/backend/indexer/parser.py", 40, 70]]

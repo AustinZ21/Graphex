@@ -258,6 +258,12 @@ OPTIONAL MATCH (v)-[out_rel:FLOWS_TO]->(downstream:Variable)
 RETURN collect(DISTINCT upstream.qualified_name), collect(DISTINCT downstream.qualified_name)
 """
 
+QUERY_RETURN_INFLUENCE = """
+MATCH path = (param:Variable {scope_qname: $scope_qname, role: 'parameter'})-[:FLOWS_TO*1..]->(ret:Variable {scope_qname: $scope_qname, name: '__return__'})
+RETURN param.qualified_name, [node IN nodes(path) | node.qualified_name] AS flow_path
+LIMIT $limit
+"""
+
 # ---------------------------------------------------------------------------
 # Import tracking queries
 # ---------------------------------------------------------------------------
