@@ -39,6 +39,9 @@ Build a Python-first indexing platform that uses Graph DB + MCP server client + 
 
 ## 5. Graph Data Model
 
+- Graph backend: FalkorDB (Redis-native, Cypher-compatible, in-memory graph engine).
+- Python driver: falkordb (official Python SDK).
+- Docker image: falkordb/falkordb:latest.
 - Primary nodes:
   - Repository
   - File
