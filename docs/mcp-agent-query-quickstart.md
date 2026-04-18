@@ -39,6 +39,12 @@ Current transport:
 python src/scripts/mcp_query_example.py --base-url http://127.0.0.1:8011 --name IndexPipeline --limit 5
 ```
 
+Node.js version:
+
+```powershell
+node src/scripts/mcp_query_example_node.mjs --base-url http://127.0.0.1:8011 --name IndexPipeline --limit 5
+```
+
 The script:
 1. Opens SSE stream at `/mcp/sse`.
 2. Reads first endpoint payload (with session context).

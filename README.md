@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.2.4  
+**Version:** 1.2.5  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-17 (MCP agent quickstart: query template + usage docs)
+**Date:** 2026-04-17 (MCP agent quickstart: Python + Node query templates)
 
 ## 1. Introduction
 
