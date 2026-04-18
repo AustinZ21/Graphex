@@ -58,12 +58,13 @@ Sample input file:
 Run:
 
 ```powershell
-python src/scripts/mcp_query_batch.py --base-url http://127.0.0.1:8011 --input docs/mcp-query-batch.sample.jsonl --output docs/mcp-query-batch.result.jsonl
+python src/scripts/mcp_query_batch.py --base-url http://127.0.0.1:8011 --input docs/mcp-query-batch.sample.jsonl --output docs/mcp-query-batch.result.jsonl --concurrency 8 --retries 2 --request-timeout-sec 20
 ```
 
 Output format:
 - JSONL, one result per input line.
-- Includes `ok`, `tool`, `arguments`, and either `result` or `error`.
+- Includes `ok`, `tool`, `arguments`, `attempts`, and either `result` or `error`.
+- CLI summary includes `qps`, `retries`, and `duration_sec` for quick throughput checks.
 
 ## 5) Available graph query tools
 

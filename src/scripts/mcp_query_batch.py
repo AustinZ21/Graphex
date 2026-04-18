@@ -16,6 +16,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import time
 import uuid
@@ -56,14 +57,19 @@ def _read_message_endpoint(base_url: str, timeout: float = 10.0) -> str:
         raise RuntimeError("Did not receive a message endpoint from SSE stream")
 
 
-def _rpc_call(endpoint: str, method: str, params: dict[str, Any]) -> dict[str, Any]:
+async def _rpc_call(
+    client: httpx.AsyncClient,
+    endpoint: str,
+    method: str,
+    params: dict[str, Any],
+) -> dict[str, Any]:
     payload = {
         "jsonrpc": "2.0",
         "id": str(uuid.uuid4()),
         "method": method,
         "params": params,
     }
-    resp = httpx.post(endpoint, json=payload, timeout=30.0)
+    resp = await client.post(endpoint, json=payload)
     try:
         body = resp.json()
     except Exception:
@@ -93,55 +99,129 @@ def _prepare_item(obj: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     return tool, {}
 
 
-def run_batch(base_url: str, input_path: Path, output_path: Path) -> dict[str, Any]:
+async def _call_with_retry(
+    client: httpx.AsyncClient,
+    endpoint: str,
+    tool: str,
+    arguments: dict[str, Any],
+    retries: int,
+) -> tuple[dict[str, Any], int]:
+    attempts = 0
+    while True:
+        attempts += 1
+        response = await _rpc_call(
+            client,
+            endpoint,
+            "tools/call",
+            {"name": tool, "arguments": arguments},
+        )
+        if response.get("ok"):
+            return response, attempts
+
+        # Retry only for transient cases.
+        transient = False
+        status = response.get("http_status")
+        if isinstance(status, int) and status in {408, 429, 500, 502, 503, 504}:
+            transient = True
+        if "raw" in response.get("error", {}):
+            transient = True
+
+        if transient and attempts <= retries + 1:
+            await asyncio.sleep(min(0.25 * attempts, 1.5))
+            continue
+        return response, attempts
+
+
+async def run_batch(
+    base_url: str,
+    input_path: Path,
+    output_path: Path,
+    concurrency: int,
+    retries: int,
+    request_timeout_sec: float,
+) -> dict[str, Any]:
     endpoint = _read_message_endpoint(base_url)
     started = time.time()
 
-    total = 0
-    ok_count = 0
-    fail_count = 0
+    tasks: list[tuple[int, str, dict[str, Any], str]] = []
 
-    with input_path.open("r", encoding="utf-8") as src, output_path.open("w", encoding="utf-8") as out:
+    with input_path.open("r", encoding="utf-8") as src:
         for line_no, raw in enumerate(src, start=1):
             raw = raw.strip()
             if not raw:
                 continue
-            total += 1
             try:
                 obj = json.loads(raw)
                 if not isinstance(obj, dict):
                     raise ValueError("JSON line must be an object")
-            except Exception as exc:
-                fail_count += 1
-                out.write(json.dumps({
+                tool, arguments = _prepare_item(obj)
+                tasks.append((line_no, tool, arguments, raw))
+            except Exception:
+                tasks.append((line_no, "", {}, raw))
+
+    total = len(tasks)
+    ok_count = 0
+    fail_count = 0
+    retry_count = 0
+
+    semaphore = asyncio.Semaphore(max(1, concurrency))
+    timeout = httpx.Timeout(request_timeout_sec)
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        async def worker(item: tuple[int, str, dict[str, Any], str]) -> dict[str, Any]:
+            line_no, tool, arguments, raw = item
+            if not tool:
+                return {
                     "line": line_no,
                     "ok": False,
-                    "error": f"invalid_input: {exc}",
+                    "error": "invalid_input: JSON line must be an object",
                     "raw": raw,
-                }, ensure_ascii=True) + "\n")
-                continue
+                }
 
-            tool, arguments = _prepare_item(obj)
-            response = _rpc_call(endpoint, "tools/call", {"name": tool, "arguments": arguments})
+            async with semaphore:
+                response, attempts = await _call_with_retry(
+                    client,
+                    endpoint,
+                    tool,
+                    arguments,
+                    retries=retries,
+                )
 
-            if response.get("ok"):
-                ok_count += 1
-            else:
-                fail_count += 1
-
-            out.write(json.dumps({
+            return {
                 "line": line_no,
                 "tool": tool,
                 "arguments": arguments,
+                "attempts": attempts,
                 **response,
-            }, ensure_ascii=True) + "\n")
+            }
+
+        results = await asyncio.gather(*(worker(item) for item in tasks))
+
+    results.sort(key=lambda x: x["line"])
+
+    with output_path.open("w", encoding="utf-8") as out:
+        for item in results:
+            if item.get("ok"):
+                ok_count += 1
+            else:
+                fail_count += 1
+            attempts = int(item.get("attempts", 1))
+            if attempts > 1:
+                retry_count += attempts - 1
+            out.write(json.dumps(item, ensure_ascii=True) + "\n")
+
+    duration_sec = time.time() - started
+    qps = round(total / duration_sec, 3) if duration_sec > 0 else 0.0
 
     return {
         "endpoint": endpoint,
         "total": total,
         "ok": ok_count,
         "failed": fail_count,
-        "duration_sec": round(time.time() - started, 3),
+        "retries": retry_count,
+        "concurrency": max(1, concurrency),
+        "duration_sec": round(duration_sec, 3),
+        "qps": qps,
         "output": str(output_path),
     }
 
@@ -151,6 +231,9 @@ def main() -> int:
     parser.add_argument("--base-url", default="http://127.0.0.1:8011")
     parser.add_argument("--input", required=True, help="Input JSONL path")
     parser.add_argument("--output", default="mcp_batch_output.jsonl", help="Output JSONL path")
+    parser.add_argument("--concurrency", type=int, default=4, help="Max in-flight MCP calls")
+    parser.add_argument("--retries", type=int, default=1, help="Retries for transient failures")
+    parser.add_argument("--request-timeout-sec", type=float, default=30.0, help="Per-request timeout")
     args = parser.parse_args()
 
     input_path = Path(args.input)
@@ -159,7 +242,16 @@ def main() -> int:
     if not input_path.exists():
         raise SystemExit(f"Input file not found: {input_path}")
 
-    summary = run_batch(args.base_url, input_path, output_path)
+    summary = asyncio.run(
+        run_batch(
+            args.base_url,
+            input_path,
+            output_path,
+            concurrency=args.concurrency,
+            retries=args.retries,
+            request_timeout_sec=args.request_timeout_sec,
+        )
+    )
     print(json.dumps(summary, indent=2, ensure_ascii=True))
     return 0
 
