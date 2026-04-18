@@ -1,4 +1,49 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Local dev profile (Docker Desktop)
+#   docker compose --profile dev up
+#   Starts: falkordb (port 16379) + redis (port 6380) only.
+#   App runs natively: uvicorn src/backend/main.py (set env vars below).
+# ──────────────────────────────────────────────────────────────────────────────
 services:
+
+  falkordb-dev:
+    image: 'falkordb/falkordb:latest'
+    container_name: contextgraph-falkordb-dev
+    profiles: [dev]
+    restart: unless-stopped
+    ports:
+      - '16379:6379'
+      - '13000:3000'
+    volumes:
+      - 'falkordb_dev_data:/data'
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2g
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+  redis-dev:
+    image: 'redis:7-alpine'
+    container_name: contextgraph-redis-dev
+    profiles: [dev]
+    restart: unless-stopped
+    ports:
+      - '6380:6379'
+    volumes:
+      - 'redis_dev_data:/data'
+    command: 'redis-server --appendonly yes'
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
   gateway:
     build:
       context: .
@@ -190,6 +235,10 @@ volumes:
   redis_data:
     driver: local
   falkordb_data:
+    driver: local
+  falkordb_dev_data:
+    driver: local
+  redis_dev_data:
     driver: local
 networks:
   your-app-network:
