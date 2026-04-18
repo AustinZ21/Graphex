@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.14.0  
+**Version:** 1.15.0  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-18 (symbol-level incremental indexing)
+**Date:** 2026-04-18 (performance benchmarking framework)
 
 ## 1. Introduction
 

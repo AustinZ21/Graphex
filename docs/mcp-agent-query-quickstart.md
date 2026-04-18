@@ -163,6 +163,43 @@ Version 1.14.0 introduces fine-grained incremental updates:
 - **Call hash**: detects changes to function call patterns
 - **Import hash**: detects changes to import dependencies
 
+## Performance benchmarking (v1.15.0)
+
+ContextGraph includes a comprehensive performance testing framework:
+
+```powershell
+python -m src.scripts.run_benchmark --repo /path/to/project --output report.json
+```
+
+Measures:
+- **Throughput**: files/sec, symbols/sec, calls/sec, imports/sec
+- **Latency**: total indexing duration
+- **Granularity**: per-tool and aggregate statistics
+
+Example output:
+```
+=== ContextGraph Performance Benchmark ===
+
+Repository: /path/to/project
+Files indexed: 1250
+Total symbols: 8945
+Total calls: 42123
+Total imports: 3421
+Duration: 3245.67 ms
+Throughput: 385.16 files/sec
+Symbol indexing: 2754.92 symbols/sec
+Call indexing: 12979.41 calls/sec
+Import indexing: 1054.23 imports/sec
+
+Report saved to: benchmark_report.json
+```
+
+The framework enables:
+- Baseline measurements on any project
+- Comparative analysis before/after optimization
+- Capacity planning for large monorepos
+- Performance regression detection
+
 Benefit: Small edits (comments, whitespace, method bodies) won't retrigger expensive symbol/call/import updates.
 
 Example performance gain: editing method body in a 200-function file only re-indexes that one method, not the entire file's symbol table.
