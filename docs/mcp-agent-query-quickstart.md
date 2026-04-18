@@ -354,6 +354,18 @@ What changed:
 
 This keeps fast failure semantics while providing a single place to inspect failure context without manual log hunting.
 
+## CI lane artifact upload (v1.28.0)
+
+Policy CI now uploads lane logs as a downloadable artifact on every run.
+
+What changed:
+
+- `.ci-logs/coverage.log`, `.ci-logs/live_graph_smoke.log`, and `.ci-logs/live_graph_e2e.log` are uploaded with `actions/upload-artifact`
+- Upload runs with `if: always()` so logs are available for both pass and fail runs
+- Artifact name is `ci-lane-logs` with a 7-day retention window
+
+This complements `GITHUB_STEP_SUMMARY`: summary gives quick tails, artifact gives full raw logs for deep troubleshooting.
+
 These tools let agents answer:
 
 - "哪些参数根本没有参与函数内部的数据流？"

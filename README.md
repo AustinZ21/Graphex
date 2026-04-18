@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.27.0  
+**Version:** 1.28.0  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-18 (CI lane failure summary aggregation)
+**Date:** 2026-04-18 (CI lane artifact upload)
 
 ## 1. Introduction
 

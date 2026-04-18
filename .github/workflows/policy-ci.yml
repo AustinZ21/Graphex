@@ -106,6 +106,15 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Upload lane logs artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-lane-logs
+          path: .ci-logs/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Enforce test lane success
         if: always()
         run: |
