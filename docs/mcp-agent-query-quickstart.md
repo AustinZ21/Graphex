@@ -341,6 +341,19 @@ What changed:
 
 This allows quick identification of whether a regression is in graph write/query foundations or in MCP retrieval behavior.
 
+## CI lane failure summary (v1.27.0)
+
+Policy CI now publishes an aggregated lane summary even when tests fail.
+
+What changed:
+
+- Coverage, smoke, and e2e lanes run with result capture (`continue-on-error`)
+- Each lane writes logs to `.ci-logs/*.log`
+- A dedicated summary step writes lane outcomes and failed log tails to `GITHUB_STEP_SUMMARY`
+- A final gate step fails the job if any lane failed
+
+This keeps fast failure semantics while providing a single place to inspect failure context without manual log hunting.
+
 These tools let agents answer:
 
 - "哪些参数根本没有参与函数内部的数据流？"

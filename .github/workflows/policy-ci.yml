@@ -35,31 +35,84 @@ jobs:
           pip install pip-audit
 
       - name: Run tests with coverage gate
+        id: coverage
+        continue-on-error: true
         env:
           FALKORDB_HOST: localhost
           FALKORDB_PORT: "16379"
           QUEUE_REDIS_URL: redis://localhost:6380/1
           CACHE_REDIS_URL: redis://localhost:6380
         run: |
-          pytest --cov=src --cov-report=term-missing --cov-fail-under=75
+          mkdir -p .ci-logs
+          set -o pipefail
+          pytest --cov=src --cov-report=term-missing --cov-fail-under=75 2>&1 | tee .ci-logs/coverage.log
 
       - name: Run live graph smoke tests
+        id: smoke
+        continue-on-error: true
         env:
           FALKORDB_HOST: localhost
           FALKORDB_PORT: "16379"
           QUEUE_REDIS_URL: redis://localhost:6380/1
           CACHE_REDIS_URL: redis://localhost:6380
         run: |
-          pytest -m live_graph_smoke -q
+          mkdir -p .ci-logs
+          set -o pipefail
+          pytest -m live_graph_smoke -q 2>&1 | tee .ci-logs/live_graph_smoke.log
 
       - name: Run live graph end-to-end tests
+        id: e2e
+        continue-on-error: true
         env:
           FALKORDB_HOST: localhost
           FALKORDB_PORT: "16379"
           QUEUE_REDIS_URL: redis://localhost:6380/1
           CACHE_REDIS_URL: redis://localhost:6380
         run: |
-          pytest -m live_graph_e2e -q
+          mkdir -p .ci-logs
+          set -o pipefail
+          pytest -m live_graph_e2e -q 2>&1 | tee .ci-logs/live_graph_e2e.log
+
+      - name: Summarize test lanes
+        if: always()
+        run: |
+          {
+            echo "## Test Lane Summary"
+            echo ""
+            echo "- coverage: ${{ steps.coverage.outcome }}"
+            echo "- live_graph_smoke: ${{ steps.smoke.outcome }}"
+            echo "- live_graph_e2e: ${{ steps.e2e.outcome }}"
+            echo ""
+            if [[ "${{ steps.coverage.outcome }}" != "success" ]]; then
+              echo "### coverage failure (tail)"
+              echo '```text'
+              tail -n 80 .ci-logs/coverage.log || true
+              echo '```'
+              echo ""
+            fi
+            if [[ "${{ steps.smoke.outcome }}" != "success" ]]; then
+              echo "### live_graph_smoke failure (tail)"
+              echo '```text'
+              tail -n 80 .ci-logs/live_graph_smoke.log || true
+              echo '```'
+              echo ""
+            fi
+            if [[ "${{ steps.e2e.outcome }}" != "success" ]]; then
+              echo "### live_graph_e2e failure (tail)"
+              echo '```text'
+              tail -n 80 .ci-logs/live_graph_e2e.log || true
+              echo '```'
+              echo ""
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Enforce test lane success
+        if: always()
+        run: |
+          if [[ "${{ steps.coverage.outcome }}" != "success" || "${{ steps.smoke.outcome }}" != "success" || "${{ steps.e2e.outcome }}" != "success" ]]; then
+            echo "One or more test lanes failed. See Test Lane Summary above."
+            exit 1
+          fi
 
       - name: Enforce vulnerability exception expiry
         env:

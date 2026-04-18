@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.26.0  
+**Version:** 1.27.0  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-18 (live graph smoke/e2e split in CI)
+**Date:** 2026-04-18 (CI lane failure summary aggregation)
 
 ## 1. Introduction
 
