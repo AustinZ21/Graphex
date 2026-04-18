@@ -139,6 +139,8 @@ async def run_batch(
     concurrency: int,
     retries: int,
     request_timeout_sec: float,
+    fail_fast: bool,
+    max_errors: int,
 ) -> dict[str, Any]:
     endpoint = _read_message_endpoint(base_url)
     started = time.time()
@@ -163,13 +165,24 @@ async def run_batch(
     ok_count = 0
     fail_count = 0
     retry_count = 0
+    cancelled_count = 0
 
     semaphore = asyncio.Semaphore(max(1, concurrency))
     timeout = httpx.Timeout(request_timeout_sec)
+    stop_event = asyncio.Event()
 
     async with httpx.AsyncClient(timeout=timeout) as client:
         async def worker(item: tuple[int, str, dict[str, Any], str]) -> dict[str, Any]:
             line_no, tool, arguments, raw = item
+
+            if stop_event.is_set():
+                return {
+                    "line": line_no,
+                    "ok": False,
+                    "cancelled": True,
+                    "error": "cancelled: fail-fast or max-errors reached",
+                }
+
             if not tool:
                 return {
                     "line": line_no,
@@ -195,16 +208,53 @@ async def run_batch(
                 **response,
             }
 
-        results = await asyncio.gather(*(worker(item) for item in tasks))
+        pending = [asyncio.create_task(worker(item)) for item in tasks]
+        results: list[dict[str, Any]] = []
+
+        while pending:
+            done, pending_set = await asyncio.wait(
+                pending,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            pending = list(pending_set)
+
+            for task in done:
+                item = task.result()
+                results.append(item)
+
+                if item.get("cancelled"):
+                    continue
+
+                if not item.get("ok"):
+                    fail_count += 1
+                    if fail_fast or (max_errors > 0 and fail_count >= max_errors):
+                        stop_event.set()
+
+            if stop_event.is_set():
+                for task in pending:
+                    task.cancel()
+                if pending:
+                    cancelled = await asyncio.gather(*pending, return_exceptions=True)
+                    for c in cancelled:
+                        if isinstance(c, dict):
+                            results.append(c)
+                        else:
+                            cancelled_count += 1
+                pending = []
 
     results.sort(key=lambda x: x["line"])
 
     with output_path.open("w", encoding="utf-8") as out:
         for item in results:
+            if item.get("cancelled"):
+                cancelled_count += 1
+                out.write(json.dumps(item, ensure_ascii=True) + "\n")
+                continue
             if item.get("ok"):
                 ok_count += 1
             else:
-                fail_count += 1
+                # fail_count was already tracked in the concurrent collection loop
+                pass
             attempts = int(item.get("attempts", 1))
             if attempts > 1:
                 retry_count += attempts - 1
@@ -218,8 +268,11 @@ async def run_batch(
         "total": total,
         "ok": ok_count,
         "failed": fail_count,
+        "cancelled": cancelled_count,
         "retries": retry_count,
         "concurrency": max(1, concurrency),
+        "fail_fast": fail_fast,
+        "max_errors": max_errors,
         "duration_sec": round(duration_sec, 3),
         "qps": qps,
         "output": str(output_path),
@@ -234,6 +287,8 @@ def main() -> int:
     parser.add_argument("--concurrency", type=int, default=4, help="Max in-flight MCP calls")
     parser.add_argument("--retries", type=int, default=1, help="Retries for transient failures")
     parser.add_argument("--request-timeout-sec", type=float, default=30.0, help="Per-request timeout")
+    parser.add_argument("--fail-fast", action="store_true", help="Stop scheduling once first error is seen")
+    parser.add_argument("--max-errors", type=int, default=0, help="Stop when failures reach this number (0=disabled)")
     args = parser.parse_args()
 
     input_path = Path(args.input)
@@ -250,6 +305,8 @@ def main() -> int:
             concurrency=args.concurrency,
             retries=args.retries,
             request_timeout_sec=args.request_timeout_sec,
+            fail_fast=args.fail_fast,
+            max_errors=max(0, args.max_errors),
         )
     )
     print(json.dumps(summary, indent=2, ensure_ascii=True))
