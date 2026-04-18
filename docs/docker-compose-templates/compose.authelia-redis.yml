@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  authelia:
+    image: authelia/authelia:latest
+    container_name: authelia-auth
+    restart: unless-stopped
+    ports:
+      - '9091:9091'
+    environment:
+      - TZ=UTC
+    volumes:
+      - ./authelia:/config
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - auth-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: authelia-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - authelia_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - auth-network
+
+volumes:
+  authelia_redis_data:
+    driver: local
+
+networks:
+  auth-network:
+    driver: bridge

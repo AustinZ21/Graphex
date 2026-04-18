@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  app-under-test:
+    image: your-node-app-image:latest
+    container_name: jest-app
+    restart: unless-stopped
+    expose:
+      - '3000'
+    environment:
+      - NODE_ENV=test
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:3000/health']
+      interval: 20s
+      timeout: 10s
+      retries: 6
+      start_period: 30s
+    networks:
+      - test-network
+
+  jest:
+    image: node:22-alpine
+    container_name: jest-coverage-runner
+    working_dir: /work
+    volumes:
+      - ./:/work
+      - jest_coverage:/work/coverage
+    depends_on:
+      app-under-test:
+        condition: service_healthy
+    command: ['sh', '-c', 'npm ci && npm run test -- --coverage']
+    networks:
+      - test-network
+
+volumes:
+  jest_coverage:
+    driver: local
+
+networks:
+  test-network:
+    driver: bridge

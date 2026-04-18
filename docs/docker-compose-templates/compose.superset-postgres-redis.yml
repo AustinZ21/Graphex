@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  superset:
+    image: apache/superset:latest
+    container_name: superset-dashboard
+    restart: unless-stopped
+    ports:
+      - '8089:8088'
+    environment:
+      - SUPERSET_ENV=production
+      - SUPERSET_SECRET_KEY=change-me-superset-secret
+      - SQLALCHEMY_DATABASE_URI=postgresql+psycopg2://superset:superset@postgres:5432/superset
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - superset-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: superset-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=superset
+      - POSTGRES_USER=superset
+      - POSTGRES_PASSWORD=superset
+    volumes:
+      - superset_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U superset -d superset']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - superset-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: superset-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - superset_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - superset-network
+
+volumes:
+  superset_postgres_data:
+    driver: local
+  superset_redis_data:
+    driver: local
+
+networks:
+  superset-network:
+    driver: bridge

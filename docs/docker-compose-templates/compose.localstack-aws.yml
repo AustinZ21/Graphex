@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  localstack:
+    image: localstack/localstack:latest
+    container_name: localstack-aws
+    restart: unless-stopped
+    ports:
+      - '4566:4566'
+      - '4510-4559:4510-4559'
+    environment:
+      - SERVICES=s3,sqs,sns,dynamodb,lambda,apigateway,iam,sts,cloudwatch,logs
+      - DEBUG=0
+      - AWS_DEFAULT_REGION=us-east-1
+      - DATA_DIR=/var/lib/localstack
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:4566/_localstack/health']
+      interval: 20s
+      timeout: 10s
+      retries: 6
+    networks:
+      - cloud-emulator-network
+
+volumes:
+  localstack_data:
+    driver: local
+
+networks:
+  cloud-emulator-network:
+    driver: bridge

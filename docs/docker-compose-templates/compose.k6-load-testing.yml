@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  app-under-test:
+    image: your-api-image:latest
+    container_name: k6-app
+    restart: unless-stopped
+    ports:
+      - '8010:8000'
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:8000/health']
+      interval: 20s
+      timeout: 10s
+      retries: 6
+      start_period: 30s
+    networks:
+      - perf-network
+
+  k6:
+    image: grafana/k6:latest
+    container_name: k6-runner
+    working_dir: /scripts
+    volumes:
+      - ./tests/performance:/scripts
+      - k6_results:/results
+    depends_on:
+      app-under-test:
+        condition: service_healthy
+    command: ['run', '--out', 'json=/results/k6.json', '/scripts/load-test.js']
+    networks:
+      - perf-network
+
+volumes:
+  k6_results:
+    driver: local
+
+networks:
+  perf-network:
+    driver: bridge

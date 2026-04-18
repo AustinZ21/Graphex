@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  flask:
+    image: your-flask-image:latest
+    container_name: flask-app
+    restart: unless-stopped
+    ports:
+      - '5000:5000'
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://app:app@postgres:5432/appdb
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:5000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - flask-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: flask-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=appdb
+      - POSTGRES_USER=app
+      - POSTGRES_PASSWORD=app
+    volumes:
+      - flask_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U app -d appdb']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - flask-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: flask-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - flask_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - flask-network
+
+volumes:
+  flask_postgres_data:
+    driver: local
+  flask_redis_data:
+    driver: local
+
+networks:
+  flask-network:
+    driver: bridge

@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: admin-postgres-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=appdb
+      - POSTGRES_USER=app
+      - POSTGRES_PASSWORD=app
+    volumes:
+      - admin_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U app -d appdb']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - admin-network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin-ui
+    restart: unless-stopped
+    ports:
+      - '5050:80'
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@example.com
+      - PGADMIN_DEFAULT_PASSWORD=change-me-pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - admin-network
+
+volumes:
+  admin_postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  admin-network:
+    driver: bridge

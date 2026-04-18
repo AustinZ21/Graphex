@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  node-red:
+    image: nodered/node-red:latest
+    container_name: node-red-automation
+    restart: unless-stopped
+    ports:
+      - '1880:1880'
+    volumes:
+      - node_red_data:/data
+    depends_on:
+      - mosquitto
+    networks:
+      - rpa-network
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mqtt-broker
+    restart: unless-stopped
+    ports:
+      - '1883:1883'
+      - '9001:9001'
+    volumes:
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    networks:
+      - rpa-network
+
+volumes:
+  node_red_data:
+    driver: local
+  mosquitto_data:
+    driver: local
+  mosquitto_log:
+    driver: local
+
+networks:
+  rpa-network:
+    driver: bridge

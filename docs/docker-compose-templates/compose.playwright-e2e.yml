@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  app-under-test:
+    image: your-app-image:latest
+    container_name: e2e-app
+    restart: unless-stopped
+    ports:
+      - '3005:3000'
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:3000']
+      interval: 20s
+      timeout: 10s
+      retries: 6
+      start_period: 30s
+    networks:
+      - e2e-network
+
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.52.0-jammy
+    container_name: e2e-playwright
+    working_dir: /work
+    volumes:
+      - ./:/work
+    depends_on:
+      app-under-test:
+        condition: service_healthy
+    command: ['sh', '-c', 'npm ci && npx playwright test']
+    networks:
+      - e2e-network
+
+networks:
+  e2e-network:
+    driver: bridge

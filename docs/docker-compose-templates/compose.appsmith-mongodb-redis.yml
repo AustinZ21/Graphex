@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  appsmith:
+    image: appsmith/appsmith-ce:v1.58
+    container_name: appsmith-admin
+    restart: unless-stopped
+    ports:
+      - '8084:80'
+    environment:
+      - APPSMITH_DISABLE_TELEMETRY=true
+      - APPSMITH_ENCRYPTION_PASSWORD=change-me-appsmith-password
+      - APPSMITH_ENCRYPTION_SALT=change-me-appsmith-salt
+      - APPSMITH_MONGODB_URI=mongodb://mongodb:27017/appsmith
+      - APPSMITH_REDIS_URL=redis://redis:6379
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - appsmith_stacks:/appsmith-stacks
+    networks:
+      - appsmith-network
+
+  mongodb:
+    image: mongo:7
+    container_name: appsmith-mongodb
+    restart: unless-stopped
+    command: ['--bind_ip_all']
+    volumes:
+      - appsmith_mongodb_data:/data/db
+    healthcheck:
+      test: ['CMD-SHELL', 'mongosh --quiet --eval "db.adminCommand({ ping: 1 }).ok" localhost:27017/test | grep 1']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks:
+      - appsmith-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: appsmith-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - appsmith_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - appsmith-network
+
+volumes:
+  appsmith_stacks:
+    driver: local
+  appsmith_mongodb_data:
+    driver: local
+  appsmith_redis_data:
+    driver: local
+
+networks:
+  appsmith-network:
+    driver: bridge

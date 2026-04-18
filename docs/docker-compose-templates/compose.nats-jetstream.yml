@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  nats:
+    image: nats:2.10-alpine
+    container_name: nats-jetstream
+    restart: unless-stopped
+    command: ['-js', '-m', '8222']
+    ports:
+      - '4222:4222'
+      - '8222:8222'
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:8222/healthz']
+      interval: 20s
+      timeout: 10s
+      retries: 5
+    networks:
+      - messaging-network
+
+volumes:
+  nats_data:
+    driver: local
+
+networks:
+  messaging-network:
+    driver: bridge

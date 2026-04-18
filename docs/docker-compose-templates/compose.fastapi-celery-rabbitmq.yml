@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  api:
+    image: your-fastapi-image:latest
+    container_name: fastapi-celery-api
+    restart: unless-stopped
+    ports:
+      - '8000:8000'
+    environment:
+      - ENVIRONMENT=production
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ['uvicorn', 'app.main:app', '--host', '0.0.0.0', '--port', '8000']
+    networks:
+      - fastapi-worker-network
+
+  celery-worker:
+    image: your-fastapi-image:latest
+    container_name: fastapi-celery-worker
+    restart: unless-stopped
+    command: ['celery', '-A', 'app.celery_app', 'worker', '--loglevel=info']
+    environment:
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - fastapi-worker-network
+
+  flower:
+    image: your-fastapi-image:latest
+    container_name: fastapi-celery-flower
+    restart: unless-stopped
+    command: ['celery', '-A', 'app.celery_app', 'flower', '--port=5555']
+    ports:
+      - '5555:5555'
+    environment:
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - fastapi-worker-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: fastapi-rabbitmq
+    restart: unless-stopped
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - fastapi_rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - fastapi-worker-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: fastapi-worker-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    volumes:
+      - fastapi_worker_redis_data:/data
+    networks:
+      - fastapi-worker-network
+
+volumes:
+  fastapi_rabbitmq_data:
+    driver: local
+  fastapi_worker_redis_data:
+    driver: local
+
+networks:
+  fastapi-worker-network:
+    driver: bridge

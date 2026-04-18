@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  app-under-test:
+    image: your-python-app-image:latest
+    container_name: pytest-app
+    restart: unless-stopped
+    expose:
+      - '8000'
+    environment:
+      - ENVIRONMENT=test
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:8000/health']
+      interval: 20s
+      timeout: 10s
+      retries: 6
+      start_period: 30s
+    networks:
+      - test-network
+
+  pytest:
+    image: python:3.12-slim
+    container_name: pytest-coverage-runner
+    working_dir: /work
+    volumes:
+      - ./:/work
+      - pytest_coverage:/work/htmlcov
+    depends_on:
+      app-under-test:
+        condition: service_healthy
+    command: ['sh', '-c', 'pip install -r requirements.txt && pip install pytest pytest-cov && pytest --cov=src --cov-report=term-missing --cov-report=xml --cov-report=html']
+    networks:
+      - test-network
+
+volumes:
+  pytest_coverage:
+    driver: local
+
+networks:
+  test-network:
+    driver: bridge

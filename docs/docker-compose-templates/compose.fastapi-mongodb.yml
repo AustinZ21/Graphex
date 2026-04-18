@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  api:
+    image: your-fastapi-image:latest
+    container_name: fastapi-mongo-api
+    restart: unless-stopped
+    ports:
+      - '8000:8000'
+    environment:
+      - ENVIRONMENT=production
+      - MONGODB_URI=mongodb://mongo:27017/appdb
+    depends_on:
+      mongo:
+        condition: service_healthy
+    command: ['uvicorn', 'app.main:app', '--host', '0.0.0.0', '--port', '8000']
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - fastapi-mongo-network
+
+  mongo:
+    image: mongo:7
+    container_name: fastapi-mongo
+    restart: unless-stopped
+    volumes:
+      - fastapi_mongo_data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', 'db.adminCommand("ping")']
+      interval: 20s
+      timeout: 10s
+      retries: 5
+    networks:
+      - fastapi-mongo-network
+
+volumes:
+  fastapi_mongo_data:
+    driver: local
+
+networks:
+  fastapi-mongo-network:
+    driver: bridge

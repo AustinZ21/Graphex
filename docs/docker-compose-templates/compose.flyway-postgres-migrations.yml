@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: flyway-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=appdb
+      - POSTGRES_USER=app
+      - POSTGRES_PASSWORD=app
+    volumes:
+      - flyway_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U app -d appdb']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - migration-network
+
+  flyway:
+    image: flyway/flyway:latest
+    container_name: flyway-runner
+    profiles: ['migrate']
+    command: ['-url=jdbc:postgresql://postgres:5432/appdb', '-user=app', '-password=app', '-locations=filesystem:/flyway/sql', 'migrate']
+    volumes:
+      - ./db/migrations:/flyway/sql:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - migration-network
+
+volumes:
+  flyway_postgres_data:
+    driver: local
+
+networks:
+  migration-network:
+    driver: bridge

@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  traefik:
+    image: traefik:v3.1
+    container_name: react-traefik
+    restart: unless-stopped
+    command:
+      - '--api.dashboard=true'
+      - '--providers.docker=true'
+      - '--providers.docker.exposedbydefault=false'
+      - '--entrypoints.web.address=:80'
+    ports:
+      - '80:80'
+      - '8080:8080'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - react-proxy-network
+
+  react:
+    image: your-react-build-image:latest
+    container_name: react-spa
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.react.rule=Host(`app.localhost`)
+      - traefik.http.routers.react.entrypoints=web
+      - traefik.http.services.react.loadbalancer.server.port=80
+    expose:
+      - '80'
+    networks:
+      - react-proxy-network
+
+networks:
+  react-proxy-network:
+    driver: bridge

@@ -1,18 +1,94 @@
-# Sensitive local keys
-deploy_key
-deploy_key.pub
-
-# OS files
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# Editor
+# IDEs and Editors
+.idea/
 .vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
 
-# Python
+# Node / JS / TS ecosystem
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn.log
+.pnpm-debug.log
+src/dist/
+build/
+coverage/
+.nyc_output/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+
+# Python (If used for scripts)
 __pycache__/
 *.py[cod]
+*$py.class
 .pytest_cache/
+.coverage
+.coverage.*
+.venv/
+venv/
+env/
+.env
 
-# Node
-node_modules/
+# Python requirements policy
+# Keep canonical dependency manifests tracked in git.
+!requirements*.txt
+!pyproject.toml
+!Pipfile
+!poetry.lock
+# Ignore local or transient dependency export files.
+requirements.local.txt
+requirements-*.local.txt
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Local secrets (never commit private keys)
+.secrets/
+
+# Temp and Logs
+tmp/
+temp/
+src/log/*
+!src/log/.gitkeep
+src/logs/*
+!src/logs/.gitkeep
+*.log
+
+# Framework specifics (React/Next/Vite etc)
+.next/
+out/
+.nuxt/
+.cache/
+.Parcel-cache/
+.vuepress/dist/
+
+# Autonomous Development Constitution (ADC)
+# Note: Do not ignore .adc/ itself as it contains the constitution!
+# You should however ignore temporary AI outputs or raw generated templates if you don't track them.
+# adc-template/  # Uncomment if you want to ignore the generated template test output
+
+*.ps1
+!src/scripts/*.ps1

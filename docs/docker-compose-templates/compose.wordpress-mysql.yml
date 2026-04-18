@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  wordpress:
+    image: wordpress:6.6-apache
+    container_name: wp-app
+    restart: unless-stopped
+    ports:
+      - '8083:80'
+    environment:
+      - WORDPRESS_DB_HOST=mysql:3306
+      - WORDPRESS_DB_NAME=wordpress
+      - WORDPRESS_DB_USER=wp
+      - WORDPRESS_DB_PASSWORD=change-me-wp
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - wordpress_data:/var/www/html
+    networks:
+      - wp-network
+
+  mysql:
+    image: mysql:8.4
+    container_name: wp-mysql
+    restart: unless-stopped
+    environment:
+      - MYSQL_DATABASE=wordpress
+      - MYSQL_USER=wp
+      - MYSQL_PASSWORD=change-me-wp
+      - MYSQL_ROOT_PASSWORD=change-me-root
+    volumes:
+      - wp_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-uroot', '-pchange-me-root']
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    networks:
+      - wp-network
+
+volumes:
+  wordpress_data:
+    driver: local
+  wp_mysql_data:
+    driver: local
+
+networks:
+  wp-network:
+    driver: bridge

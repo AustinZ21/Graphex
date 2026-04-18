@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  redis-master:
+    image: redis:7-alpine
+    container_name: redis-master
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis_master_data:/data
+    networks:
+      - cache-network
+
+  redis-replica:
+    image: redis:7-alpine
+    container_name: redis-replica
+    restart: unless-stopped
+    command: ['redis-server', '--replicaof', 'redis-master', '6379']
+    depends_on:
+      - redis-master
+    networks:
+      - cache-network
+
+  redis-sentinel:
+    image: redis:7-alpine
+    container_name: redis-sentinel
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - |
+        echo "sentinel monitor mymaster redis-master 6379 1" > /tmp/sentinel.conf
+        echo "sentinel down-after-milliseconds mymaster 5000" >> /tmp/sentinel.conf
+        echo "sentinel failover-timeout mymaster 60000" >> /tmp/sentinel.conf
+        redis-sentinel /tmp/sentinel.conf
+    depends_on:
+      - redis-master
+    ports:
+      - '26379:26379'
+    networks:
+      - cache-network
+
+volumes:
+  redis_master_data:
+    driver: local
+
+networks:
+  cache-network:
+    driver: bridge

@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  vault:
+    image: hashicorp/vault:1.18
+    container_name: vault-secrets
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    ports:
+      - '8200:8200'
+    environment:
+      - VAULT_DEV_ROOT_TOKEN_ID=change-me-root-token
+      - VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200
+    command: ['server', '-dev']
+    volumes:
+      - vault_data:/vault/file
+    networks:
+      - secrets-network
+
+volumes:
+  vault_data:
+    driver: local
+
+networks:
+  secrets-network:
+    driver: bridge

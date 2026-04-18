@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: admin-mysql-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=change-me-root
+      - MYSQL_DATABASE=appdb
+      - MYSQL_USER=app
+      - MYSQL_PASSWORD=change-me-app
+    volumes:
+      - admin_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-uroot', '-pchange-me-root']
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    networks:
+      - admin-network
+
+  adminer:
+    image: adminer:latest
+    container_name: adminer-ui
+    restart: unless-stopped
+    ports:
+      - '8086:8080'
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - admin-network
+
+volumes:
+  admin_mysql_data:
+    driver: local
+
+networks:
+  admin-network:
+    driver: bridge

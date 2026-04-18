@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  waf:
+    image: owasp/modsecurity-crs:nginx
+    container_name: modsecurity-waf
+    restart: unless-stopped
+    ports:
+      - '8090:80'
+    environment:
+      - PARANOIA=1
+      - ANOMALY_INBOUND=5
+      - ANOMALY_OUTBOUND=4
+    networks:
+      - waf-network
+
+  app:
+    image: nginxdemos/hello
+    container_name: protected-app
+    restart: unless-stopped
+    expose:
+      - '80'
+    networks:
+      - waf-network
+
+networks:
+  waf-network:
+    driver: bridge

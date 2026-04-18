@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "local-postgres": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://localhost/mydb"]
+    },
+    "contextgraph-repository": {
+      "command": "node",
+      "args": ["src/contextgraph-mcp/index.js"],
+      "env": {
+        "CONTEXTGRAPH_MCP_PORT": "3001",
+        "CONTEXTGRAPH_MCP_TOKEN": "${CONTEXTGRAPH_MCP_TOKEN}",
+        "CONTEXTGRAPH_UPSTREAM_URL": "http://192.168.1.239:18080"
+      },
+      "description": "ContextGraph MCP Server (local) - provides programmatic access to artifact catalog, edge agents, and project resources"
+    }
+  }
+}
+
+

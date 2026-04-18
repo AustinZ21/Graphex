@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  allure:
+    image: frankescobar/allure-docker-service:latest
+    container_name: allure-report
+    restart: unless-stopped
+    ports:
+      - '5051:5050'
+    environment:
+      - CHECK_RESULTS_EVERY_SECONDS=3
+      - KEEP_HISTORY=1
+    volumes:
+      - ./allure-results:/app/allure-results
+      - ./allure-reports:/app/default-reports
+    networks:
+      - quality-network
+
+networks:
+  quality-network:
+    driver: bridge

@@ -1,0 +1,156 @@
+services:
+  appsmith:
+    image: appsmith/appsmith-ce:v1.58
+    container_name: appsmith-admin-pgvector
+    restart: unless-stopped
+    ports:
+      - '8085:80'
+    environment:
+      - APPSMITH_DISABLE_TELEMETRY=true
+      - APPSMITH_ENCRYPTION_PASSWORD=change-me-appsmith-password
+      - APPSMITH_ENCRYPTION_SALT=change-me-appsmith-salt
+      - APPSMITH_DB_URL=mongodb://mongodb:27017/appsmith
+      - APPSMITH_REDIS_URL=redis://redis:6379
+      - PGVECTOR_URL=postgresql://appsmith:change-me-appsmith-pg@postgres:5432/appsmith_ai
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      mongodb-init:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pgvector-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://127.0.0.1/api/v1/health | grep -qi "systems are up"']
+      interval: 20s
+      timeout: 5s
+      retries: 6
+    volumes:
+      - appsmith_pgvector_stacks:/appsmith-stacks
+    networks:
+      - appsmith-pgvector-network
+
+  mongodb:
+    image: mongo:7
+    container_name: appsmith-pgvector-mongodb
+    restart: unless-stopped
+    command: ['--replSet', 'rs0', '--bind_ip_all']
+    volumes:
+      - appsmith_pgvector_mongodb_data:/data/db
+    healthcheck:
+      test: ['CMD-SHELL', 'mongosh --quiet --eval "db.adminCommand({ ping: 1 }).ok" localhost:27017/test | grep 1']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks:
+      - appsmith-pgvector-network
+
+  mongodb-init:
+    image: mongo:7
+    container_name: appsmith-pgvector-mongodb-init
+    restart: 'no'
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        mongosh --host mongodb:27017 --quiet --eval '
+          try {
+            const status = rs.status();
+            if (status.ok === 1) {
+              print("Replica set already initialized");
+              quit(0);
+            }
+          } catch (e) {
+            // Not initialized yet.
+          }
+          rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongodb:27017" }] });
+          let ready = false;
+          for (let i = 0; i < 30; i++) {
+            try {
+              const status = rs.status();
+              if (status.ok === 1) {
+                ready = true;
+                break;
+              }
+            } catch (e) {}
+            sleep(1000);
+          }
+          if (!ready) {
+            print("Replica set initialization timed out");
+            quit(1);
+          }
+          print("Replica set initialized");
+          quit(0);
+        '
+    networks:
+      - appsmith-pgvector-network
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: appsmith-pgvector
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=appsmith_ai
+      - POSTGRES_USER=appsmith
+      - POSTGRES_PASSWORD=change-me-appsmith-pg
+    volumes:
+      - appsmith_pgvector_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U appsmith -d appsmith_ai']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks:
+      - appsmith-pgvector-network
+
+  pgvector-init:
+    image: pgvector/pgvector:pg16
+    container_name: appsmith-pgvector-init
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - PGPASSWORD=change-me-appsmith-pg
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        psql -h postgres -U appsmith -d appsmith_ai -c "CREATE EXTENSION IF NOT EXISTS vector;"
+    networks:
+      - appsmith-pgvector-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: appsmith-pgvector-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - appsmith_pgvector_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - appsmith-pgvector-network
+
+volumes:
+  appsmith_pgvector_stacks:
+    driver: local
+  appsmith_pgvector_mongodb_data:
+    driver: local
+  appsmith_pgvector_data:
+    driver: local
+  appsmith_pgvector_redis_data:
+    driver: local
+
+networks:
+  appsmith-pgvector-network:
+    driver: bridge

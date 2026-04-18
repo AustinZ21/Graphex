@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: mysql-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=change-me-root
+      - MYSQL_DATABASE=appdb
+      - MYSQL_USER=app
+      - MYSQL_PASSWORD=change-me-app
+    ports:
+      - '3306:3306'
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-uroot', '-pchange-me-root']
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    networks:
+      - db-network
+
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: mysql-admin
+    restart: unless-stopped
+    ports:
+      - '8081:80'
+    environment:
+      - PMA_HOST=mysql
+      - PMA_PORT=3306
+      - UPLOAD_LIMIT=64M
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - db-network
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  db-network:
+    driver: bridge

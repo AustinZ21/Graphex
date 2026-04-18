@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  app-under-test:
+    image: your-web-app-image:latest
+    container_name: cypress-app
+    restart: unless-stopped
+    ports:
+      - '3010:3000'
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:3000']
+      interval: 20s
+      timeout: 10s
+      retries: 6
+      start_period: 30s
+    networks:
+      - e2e-network
+
+  cypress:
+    image: cypress/included:13.13.2
+    container_name: cypress-runner
+    working_dir: /e2e
+    volumes:
+      - ./:/e2e
+      - cypress_results:/e2e/cypress/results
+    depends_on:
+      app-under-test:
+        condition: service_healthy
+    environment:
+      - CYPRESS_baseUrl=http://app-under-test:3000
+    command: ['cypress', 'run']
+    networks:
+      - e2e-network
+
+volumes:
+  cypress_results:
+    driver: local
+
+networks:
+  e2e-network:
+    driver: bridge

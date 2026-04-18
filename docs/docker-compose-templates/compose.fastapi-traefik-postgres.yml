@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  traefik:
+    image: traefik:v3.1
+    container_name: fastapi-traefik
+    restart: unless-stopped
+    command:
+      - '--api.dashboard=true'
+      - '--providers.docker=true'
+      - '--providers.docker.exposedbydefault=false'
+      - '--entrypoints.web.address=:80'
+    ports:
+      - '80:80'
+      - '8080:8080'
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - fastapi-proxy-network
+
+  api:
+    image: your-fastapi-image:latest
+    container_name: fastapi-traefik-api
+    restart: unless-stopped
+    expose:
+      - '8000'
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.fastapi.rule=Host(`api.localhost`)
+      - traefik.http.routers.fastapi.entrypoints=web
+      - traefik.http.services.fastapi.loadbalancer.server.port=8000
+    environment:
+      - DATABASE_URL=postgresql://app:app@postgres:5432/appdb
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ['uvicorn', 'app.main:app', '--host', '0.0.0.0', '--port', '8000']
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - fastapi-proxy-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: fastapi-traefik-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=appdb
+      - POSTGRES_USER=app
+      - POSTGRES_PASSWORD=app
+    volumes:
+      - fastapi_traefik_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U app -d appdb']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fastapi-proxy-network
+
+volumes:
+  fastapi_traefik_postgres_data:
+    driver: local
+
+networks:
+  fastapi-proxy-network:
+    driver: bridge

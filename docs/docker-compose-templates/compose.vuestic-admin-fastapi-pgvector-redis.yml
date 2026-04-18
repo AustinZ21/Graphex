@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  frontend:
+    image: your-vuestic-admin-image:latest
+    container_name: vuestic-admin-frontend
+    restart: unless-stopped
+    ports:
+      - '3040:3000'
+    environment:
+      - NODE_ENV=production
+      - VITE_API_BASE_URL=http://api:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --no-verbose --tries=1 --spider http://127.0.0.1:3000 || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - vuestic-stack-network
+
+  api:
+    image: your-fastapi-image:latest
+    container_name: vuestic-fastapi-api
+    restart: unless-stopped
+    expose:
+      - '8000'
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=postgresql://app:app@postgres:5432/vuesticdb
+      - REDIS_URL=redis://redis:6379/0
+      - VECTOR_DB_URL=postgresql://app:app@postgres:5432/vuesticdb
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      pgvector-init:
+        condition: service_completed_successfully
+    command: ['uvicorn', 'app.main:app', '--host', '0.0.0.0', '--port', '8000', '--workers', '2']
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -fsS http://localhost:8000/health || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    volumes:
+      - vuestic_fastapi_data:/app/data
+    networks:
+      - vuestic-stack-network
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: vuestic-pgvector
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=vuesticdb
+      - POSTGRES_USER=app
+      - POSTGRES_PASSWORD=app
+    volumes:
+      - vuestic_pgvector_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U app -d vuesticdb']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    networks:
+      - vuestic-stack-network
+
+  pgvector-init:
+    image: pgvector/pgvector:pg16
+    container_name: vuestic-pgvector-init
+    restart: 'no'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - PGPASSWORD=app
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        psql -h postgres -U app -d vuesticdb -c "CREATE EXTENSION IF NOT EXISTS vector;"
+    networks:
+      - vuestic-stack-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: vuestic-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - vuestic_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - vuestic-stack-network
+
+volumes:
+  vuestic_fastapi_data:
+    driver: local
+  vuestic_pgvector_data:
+    driver: local
+  vuestic_redis_data:
+    driver: local
+
+networks:
+  vuestic-stack-network:
+    driver: bridge

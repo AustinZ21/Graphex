@@ -1,0 +1,12 @@
+node_modules/
+src/dist/
+build/
+.env
+.git/
+coverage/
+tmp/
+src/log/
+contextgraph-edge-agent/scratchpad/
+contextgraph-edge-agent/tasks/
+
+

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ADC Admin</title>
+  <style>
+    :root {
+      --bg: #1f242f;
+      --panel: #2c3342;
+      --panel-elevated: #353f52;
+      --text: #e7ebf3;
+      --muted: #9aa8bd;
+      --accent: #4ae387;
+      --accent-soft: #274a38;
+      --border: #465068;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at 20% 10%, #2f394d 0%, var(--bg) 45%, #191d27 100%);
+      color: var(--text);
+      font-family: "Segoe UI", "Noto Sans", sans-serif;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .shell {
+      width: min(1080px, 100%);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: linear-gradient(180deg, var(--panel-elevated), var(--panel));
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+      overflow: hidden;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      padding: 20px;
+    }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      background: rgba(0, 0, 0, 0.16);
+    }
+    .label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+    .value {
+      font-size: 26px;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid rgba(74, 227, 135, 0.35);
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <strong>ADC Admin Dashboard</strong>
+      <span class="status">System Online</span>
+    </header>
+    <section class="grid">
+      <article class="card">
+        <div class="label">Theme</div>
+        <div class="value">Dark Default</div>
+      </article>
+      <article class="card">
+        <div class="label">Frontend</div>
+        <div class="value">Vuestic-style</div>
+      </article>
+      <article class="card">
+        <div class="label">Backend Health</div>
+        <div class="value">/api/health</div>
+      </article>
+      <article class="card">
+        <div class="label">Gateway</div>
+        <div class="value">/_gateway_health</div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

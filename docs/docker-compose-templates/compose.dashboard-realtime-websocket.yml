@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  frontend:
+    image: your-realtime-dashboard-frontend:latest
+    container_name: realtime-dashboard-frontend
+    restart: unless-stopped
+    ports:
+      - '3021:3000'
+    environment:
+      - NODE_ENV=production
+      - VITE_API_BASE_URL=http://api:8000
+      - VITE_WS_URL=ws://localhost:8001
+    depends_on:
+      - api
+      - websocket
+    networks:
+      - realtime-dashboard-network
+
+  api:
+    image: your-dashboard-api-image:latest
+    container_name: realtime-dashboard-api
+    restart: unless-stopped
+    expose:
+      - '8000'
+    environment:
+      - DATABASE_URL=postgresql://app:app@postgres:5432/realtime
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:8000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - realtime-dashboard-network
+
+  websocket:
+    image: your-websocket-gateway-image:latest
+    container_name: realtime-dashboard-websocket
+    restart: unless-stopped
+    ports:
+      - '8001:8001'
+    environment:
+      - PORT=8001
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '--no-verbose', '--tries=1', '--spider', 'http://127.0.0.1:8001/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - realtime-dashboard-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: realtime-dashboard-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=realtime
+      - POSTGRES_USER=app
+      - POSTGRES_PASSWORD=app
+    volumes:
+      - realtime_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U app -d realtime']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - realtime-dashboard-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: realtime-dashboard-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - realtime_redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - realtime-dashboard-network
+
+volumes:
+  realtime_postgres_data:
+    driver: local
+  realtime_redis_data:
+    driver: local
+
+networks:
+  realtime-dashboard-network:
+    driver: bridge

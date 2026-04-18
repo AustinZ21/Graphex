@@ -1,0 +1,163 @@
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway.prod
+    container_name: your-app-gateway
+    restart: unless-stopped
+    expose:
+      - '8080'
+    labels:
+      - coolify.managed=true
+      - traefik.enable=true
+      - traefik.docker.network=z00ws84oc40g48wo0kk844ws
+      - traefik.http.routers.your-app-gateway-https.entryPoints=https
+      - traefik.http.routers.your-app-gateway-https.rule=Host(`your-domain.com`)
+      - traefik.http.routers.your-app-gateway-https.tls=true
+      - traefik.http.services.your-app-gateway.loadbalancer.server.port=8080
+      - traefik.http.routers.your-app-gateway-http.entryPoints=http
+      - traefik.http.routers.your-app-gateway-http.rule=Host(`your-domain.com`)
+      - traefik.http.routers.your-app-gateway-http.middlewares=redirect-to-https
+    depends_on:
+      - api
+      - frontend
+    networks:
+      - your-app-network
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '--no-verbose'
+        - '--tries=1'
+        - '--spider'
+        - 'http://127.0.0.1:8080/_gateway_health'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: your-app-api
+    restart: unless-stopped
+    expose:
+      - '8000'
+    labels:
+      - coolify.managed=true
+      - traefik.enable=false
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - 'REDIS_URL=redis://redis:6379/0'
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_PORT=5432
+      - 'POSTGRES_DB=${POSTGRES_DB:-appdb}'
+      - 'POSTGRES_USER=${POSTGRES_USER:-app}'
+      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-app}'
+      - 'SECRET_KEY=${SECRET_KEY:-change-me-secret-key}'
+      - 'JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-jwt-secret-key}'
+      - 'AD_BASE_URL=${AD_BASE_URL:-http://localhost:8002}'
+      - 'AD_OPERATOR_TOKEN=${AD_OPERATOR_TOKEN:-}'
+      - 'AD_AGENCY_ROUTES=${AD_AGENCY_ROUTES:-}'
+      - 'OPENAI_API_KEY=${OPENAI_API_KEY:-dummy-openai-key}'
+      - 'OPENAI_EMBEDDING_MODEL=${OPENAI_EMBEDDING_MODEL:-text-embedding-3-small}'
+      - 'CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}'
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - your-app-network
+    command: 'uvicorn src.backend.main:app --host 0.0.0.0 --port 8000 --workers 4'
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://localhost:8000/health'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend.prod
+      args:
+        - 'VUESTIC_ADMIN_REPO=https://github.com/epicmaxco/vuestic-admin'
+        - 'VUESTIC_ADMIN_REF=master'
+        - 'NEXT_PUBLIC_API_URL=https://your-domain.com'
+        - 'API_URL=https://your-domain.com'
+    container_name: your-app-frontend
+    restart: unless-stopped
+    expose:
+      - '3000'
+    environment:
+      - 'NEXT_PUBLIC_API_URL=https://your-domain.com'
+      - NODE_ENV=production
+      - 'API_URL=https://your-domain.com'
+    labels:
+      - coolify.managed=true
+      - traefik.enable=false
+    depends_on:
+      - api
+    networks:
+      - your-app-network
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - '--no-verbose'
+        - '--tries=1'
+        - '--spider'
+        - 'http://127.0.0.1:3000'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+  redis:
+    image: 'redis:7-alpine'
+    container_name: your-app-redis
+    restart: unless-stopped
+    volumes:
+      - 'redis_data:/data'
+    networks:
+      - your-app-network
+    command: 'redis-server --appendonly yes'
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      interval: 10s
+      timeout: 3s
+      retries: 3
+  postgres:
+    image: 'pgvector/pgvector:pg16'
+    container_name: your-app-postgres
+    restart: unless-stopped
+    environment:
+      - 'POSTGRES_DB=${POSTGRES_DB:-appdb}'
+      - 'POSTGRES_USER=${POSTGRES_USER:-app}'
+      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-app}'
+    volumes:
+      - 'postgres_data:/var/lib/postgresql/data'
+    networks:
+      - your-app-network
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-appdb}'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+networks:
+  your-app-network:
+    driver: bridge
