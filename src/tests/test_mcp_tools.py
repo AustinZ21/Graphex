@@ -137,6 +137,50 @@ def test_analyze_return_influence():
     assert result["paths"][0]["path_length"] >= 1
 
 
+def test_analyze_scope_variables():
+    mcp_srv._graph = _mock_graph(
+        [
+            ["backend.service.render:input", "input", "parameter", 0, 1],
+            ["backend.service.render:suffix", "suffix", "parameter", 0, 0],
+            ["backend.service.render:label", "label", "local", 1, 1],
+            ["backend.service.render:result", "result", "local", 2, 1],
+            ["backend.service.render:__return__", "__return__", "return", 2, 0],
+        ]
+    )
+    result = mcp_srv.analyze_scope_variables("backend.service.render", limit=10)
+    assert result["unused_parameters"] == ["backend.service.render:suffix"]
+    assert result["key_intermediates"][0]["qualified_name"] == "backend.service.render:result"
+
+
+def test_explain_data_flow():
+    graph = MagicMock()
+    flow_result = MagicMock()
+    flow_result.result_set = [
+        ["backend.service.render:input", "backend.service.render:label", "assignment", 10],
+        ["backend.service.render:label", "backend.service.render:result", "assignment", 11],
+        ["backend.service.render:result", "backend.service.render:__return__", "return", 12],
+    ]
+    metrics_result = MagicMock()
+    metrics_result.result_set = [
+        ["backend.service.render:input", "input", "parameter", 0, 1],
+        ["backend.service.render:suffix", "suffix", "parameter", 0, 0],
+        ["backend.service.render:label", "label", "local", 1, 1],
+        ["backend.service.render:result", "result", "local", 1, 1],
+        ["backend.service.render:__return__", "__return__", "return", 1, 0],
+    ]
+    return_result = MagicMock()
+    return_result.result_set = [
+        ["backend.service.render:input", ["backend.service.render:input", "backend.service.render:label", "backend.service.render:result", "backend.service.render:__return__"]]
+    ]
+    graph.query.side_effect = [flow_result, metrics_result, return_result]
+    mcp_srv._graph = graph
+    result = mcp_srv.explain_data_flow("backend.service.render", limit=10)
+    assert result["scope_qname"] == "backend.service.render"
+    assert "backend.service.render:suffix" in result["unused_parameters"]
+    assert "backend.service.render:label" in result["key_intermediates"]
+    assert any("返回值受这些参数影响" in line for line in result["summary"])
+
+
 def test_retrieve_context():
     mcp_srv._graph = _mock_graph(
         [["backend.indexer.parser.PythonParser.parse", "method", "src/backend/indexer/parser.py", 40, 70]]

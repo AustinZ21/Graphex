@@ -640,9 +640,11 @@ class GoParser:
 
     _PACKAGE_RE = re.compile(r"package\s+(\w+)")
     _FUNC_RE = re.compile(r"func\s+(\w+)\s*\(")
+    _FUNC_SCOPE_RE = re.compile(r"func\s+(\w+)\s*\(([^\)]*)\)")
     _STRUCT_RE = re.compile(r"type\s+(\w+)\s+struct\s*\{")
     _INTERFACE_RE = re.compile(r"type\s+(\w+)\s+interface\s*\{")
     _METHOD_RE = re.compile(r"func\s*\(\s*(\w+)\s+\*?(\w+)\s*\)\s+(\w+)\s*\(")
+    _METHOD_SCOPE_RE = re.compile(r"func\s*\(\s*(\w+)\s+\*?(\w+)\s*\)\s+(\w+)\s*\(([^\)]*)\)")
     _IMPORT_RE = re.compile(r'import\s+(?:"([^"]+)"|(?:\(\s*(?:[^)]+)\s*\)))')
     _IMPORT_BLOCK_RE = re.compile(r'import\s*\(\s*((?:[^)]+)+)\s*\)')
 
@@ -673,6 +675,7 @@ class GoParser:
 
         # Extract imports
         self._extract_imports(result, source)
+        self._extract_variable_flows(result, lines, module_qname)
 
         return result
 
@@ -749,6 +752,54 @@ class GoParser:
                             ParsedImport(source_path=result.path, imported_module=import_path)
                         )
 
+    def _extract_variable_flows(self, result: ParsedFile, lines: list[str], module_qname: str) -> None:
+        scope_stack: list[tuple[str, int, set[str]]] = []
+        brace_depth = 0
+        assign_re = re.compile(r"^\s*(\w+)\s*(?::=|=)\s*(.+)$")
+        for lineno, line in enumerate(lines, start=1):
+            method_match = self._METHOD_SCOPE_RE.search(line)
+            func_match = self._FUNC_SCOPE_RE.search(line) if not method_match else None
+            if method_match:
+                receiver_type = method_match.group(2)
+                method_name = method_match.group(3)
+                params = self._extract_go_params(method_match.group(4))
+                scope_qname = f"{module_qname}.{receiver_type}.{method_name}"
+                scope_stack.append((scope_qname, brace_depth + max(1, line.count("{")), params))
+                _seed_scope_variables(result, scope_qname, params, lineno)
+            elif func_match:
+                scope_qname = f"{module_qname}.{func_match.group(1)}"
+                params = self._extract_go_params(func_match.group(2))
+                scope_stack.append((scope_qname, brace_depth + max(1, line.count("{")), params))
+                _seed_scope_variables(result, scope_qname, params, lineno)
+
+            if scope_stack:
+                scope_qname, _, params = scope_stack[-1]
+                assign_match = assign_re.search(line.strip())
+                if assign_match and not line.strip().startswith("return "):
+                    target_name = assign_match.group(1)
+                    source_names = _extract_identifiers(assign_match.group(2), excluded={target_name}, keywords={"return", "func", "struct", "interface", "map", "range"})
+                    _append_scope_flows(result, scope_qname, target_name, source_names, lineno, "assignment", params)
+
+                if line.strip().startswith("return "):
+                    source_names = _extract_identifiers(line.strip()[7:], excluded=set(), keywords={"return"})
+                    _append_return_flows(result, scope_qname, source_names, lineno, params)
+
+            brace_depth += line.count("{") - line.count("}")
+            while scope_stack and brace_depth < scope_stack[-1][1]:
+                scope_stack.pop()
+
+    @staticmethod
+    def _extract_go_params(raw_params: str) -> set[str]:
+        params: set[str] = set()
+        for chunk in raw_params.split(","):
+            part = chunk.strip()
+            if not part:
+                continue
+            token = part.split()[0]
+            if token not in {"_"}:
+                params.add(token)
+        return params
+
 
 class RustParser:
     """Parse Rust source files."""
@@ -758,6 +809,7 @@ class RustParser:
     _TRAIT_RE = re.compile(r"trait\s+(\w+)")
     _IMPL_RE = re.compile(r"impl\s+(?:<[^>]+>)?\s*(\w+)")
     _FUNC_RE = re.compile(r"fn\s+(\w+)\s*\(")
+    _FUNC_SCOPE_RE = re.compile(r"fn\s+(\w+)\s*\(([^\)]*)\)")
     _USE_RE = re.compile(r"use\s+([^\s;]+)")
 
     def parse(self, file_path: str) -> ParsedFile:
@@ -786,6 +838,8 @@ class RustParser:
                 result.imports.append(
                     ParsedImport(source_path=result.path, imported_module=import_path)
                 )
+
+        self._extract_variable_flows(result, lines, module_qname)
 
         return result
 
@@ -818,6 +872,50 @@ class RustParser:
                 )
             )
 
+    def _extract_variable_flows(self, result: ParsedFile, lines: list[str], module_qname: str) -> None:
+        scope_stack: list[tuple[str, int, set[str]]] = []
+        brace_depth = 0
+        assign_re = re.compile(r"^\s*let\s+(?:mut\s+)?(\w+)\s*(?::[^=]+)?=\s*(.+);?$")
+        tail_expr_re = re.compile(r"^\s*([A-Za-z_][A-Za-z0-9_\s\+\-\*\./:]*)$")
+        for lineno, line in enumerate(lines, start=1):
+            func_match = self._FUNC_SCOPE_RE.search(line)
+            if func_match:
+                scope_qname = f"{module_qname}.{func_match.group(1)}"
+                params = self._extract_rust_params(func_match.group(2))
+                scope_stack.append((scope_qname, brace_depth + max(1, line.count("{")), params))
+                _seed_scope_variables(result, scope_qname, params, lineno)
+
+            if scope_stack:
+                scope_qname, _, params = scope_stack[-1]
+                stripped = line.strip()
+                assign_match = assign_re.search(line)
+                if assign_match:
+                    target_name = assign_match.group(1)
+                    source_names = _extract_identifiers(assign_match.group(2), excluded={target_name}, keywords={"let", "mut", "Some", "None", "Ok", "Err", "return"})
+                    _append_scope_flows(result, scope_qname, target_name, source_names, lineno, "assignment", params)
+                elif stripped.startswith("return "):
+                    source_names = _extract_identifiers(stripped[7:], excluded=set(), keywords={"return"})
+                    _append_return_flows(result, scope_qname, source_names, lineno, params)
+                elif stripped and not stripped.endswith(";") and stripped not in {"{", "}"} and tail_expr_re.match(stripped):
+                    source_names = _extract_identifiers(stripped, excluded=set(), keywords={"if", "else", "match", "loop", "while", "for"})
+                    _append_return_flows(result, scope_qname, source_names, lineno, params)
+
+            brace_depth += line.count("{") - line.count("}")
+            while scope_stack and brace_depth < scope_stack[-1][1]:
+                scope_stack.pop()
+
+    @staticmethod
+    def _extract_rust_params(raw_params: str) -> set[str]:
+        params: set[str] = set()
+        for chunk in raw_params.split(","):
+            part = chunk.strip()
+            if not part or part in {"&self", "self", "&mut self"}:
+                continue
+            name = part.split(":")[0].strip().lstrip("&").replace("mut ", "").strip()
+            if name and name != "_":
+                params.add(name)
+        return params
+
 
 class JavaParser:
     """Parse Java source files."""
@@ -827,6 +925,7 @@ class JavaParser:
     _INTERFACE_RE = re.compile(r"(?:public|private|protected)?\s*interface\s+(\w+)")
     _ENUM_RE = re.compile(r"(?:public|private|protected)?\s*enum\s+(\w+)")
     _METHOD_RE = re.compile(r"(?:public|private|protected)?\s+(?:static\s+)?(?:\w+\s+)+(\w+)\s*\([^)]*\)")
+    _METHOD_SCOPE_RE = re.compile(r"(?:public|private|protected)?\s+(?:static\s+)?(?:[A-Za-z0-9_<>\[\]]+\s+)+(\w+)\s*\(([^)]*)\)")
     _IMPORT_RE = re.compile(r"import\s+([a-zA-Z0-9_.]+)\s*;")
 
     def parse(self, file_path: str) -> ParsedFile:
@@ -862,6 +961,8 @@ class JavaParser:
                 result.imports.append(
                     ParsedImport(source_path=result.path, imported_module=import_path)
                 )
+
+        self._extract_variable_flows(result, lines, module_qname)
 
         return result
 
@@ -925,6 +1026,157 @@ class JavaParser:
             brace_depth += line.count("{") - line.count("}")
             while class_stack and brace_depth < class_stack[-1][1]:
                 class_stack.pop()
+
+    def _extract_variable_flows(self, result: ParsedFile, lines: list[str], module_qname: str) -> None:
+        class_stack: list[tuple[str, int]] = []
+        scope_stack: list[tuple[str, int, set[str]]] = []
+        brace_depth = 0
+        assign_re = re.compile(r"^\s*(?:[A-Za-z0-9_<>\[\]]+\s+)?(\w+)\s*=\s*(.+);?$")
+        for lineno, line in enumerate(lines, start=1):
+            class_match = self._CLASS_RE.search(line)
+            if class_match:
+                class_name = class_match.group(1)
+                current_depth = brace_depth + line.count("{") - line.count("}")
+                class_stack.append((class_name, current_depth))
+            elif class_stack:
+                method_match = self._METHOD_SCOPE_RE.search(line)
+                if method_match:
+                    method_name = method_match.group(1)
+                    if method_name not in {"if", "for", "while", "switch", "new"}:
+                        class_name = class_stack[-1][0]
+                        params = self._extract_java_params(method_match.group(2))
+                        scope_qname = f"{module_qname}.{class_name}.{method_name}"
+                        scope_stack.append((scope_qname, brace_depth + max(1, line.count("{")), params))
+                        _seed_scope_variables(result, scope_qname, params, lineno)
+
+            if scope_stack:
+                scope_qname, _, params = scope_stack[-1]
+                stripped = line.strip()
+                assign_match = assign_re.search(line)
+                if assign_match and not stripped.startswith("return "):
+                    target_name = assign_match.group(1)
+                    source_names = _extract_identifiers(assign_match.group(2), excluded={target_name}, keywords={"return", "new", "this", "null", "true", "false"})
+                    _append_scope_flows(result, scope_qname, target_name, source_names, lineno, "assignment", params)
+                elif stripped.startswith("return "):
+                    source_names = _extract_identifiers(stripped[7:], excluded=set(), keywords={"return", "new", "this"})
+                    _append_return_flows(result, scope_qname, source_names, lineno, params)
+
+            brace_depth += line.count("{") - line.count("}")
+            while class_stack and brace_depth < class_stack[-1][1]:
+                class_stack.pop()
+            while scope_stack and brace_depth < scope_stack[-1][1]:
+                scope_stack.pop()
+
+    @staticmethod
+    def _extract_java_params(raw_params: str) -> set[str]:
+        params: set[str] = set()
+        for chunk in raw_params.split(","):
+            part = chunk.strip()
+            if not part:
+                continue
+            tokens = [token for token in part.split() if token not in {"final"}]
+            if tokens:
+                params.add(tokens[-1].replace("[]", ""))
+        return params
+
+
+def _seed_scope_variables(result: ParsedFile, scope_qname: str, params: set[str], lineno: int) -> None:
+    _ensure_scope_variable(result, scope_qname, "__return__", lineno, "return")
+    for param in sorted(params):
+        _ensure_scope_variable(result, scope_qname, param, lineno, "parameter")
+
+
+def _ensure_scope_variable(result: ParsedFile, scope_qname: str, name: str, lineno: int, role: str) -> str:
+    qualified_name = f"{scope_qname}:{name}"
+    for variable in result.variables:
+        if variable.qualified_name == qualified_name:
+            if variable.role == "local" and role == "parameter":
+                variable.role = role
+            return qualified_name
+    result.variables.append(
+        ParsedVariable(
+            name=name,
+            qualified_name=qualified_name,
+            scope_qname=scope_qname,
+            file_path=result.path,
+            line_number=lineno,
+            role=role,
+        )
+    )
+    return qualified_name
+
+
+def _append_scope_flows(
+    result: ParsedFile,
+    scope_qname: str,
+    target_name: str,
+    source_names: list[str],
+    lineno: int,
+    flow_type: str,
+    params: set[str],
+) -> None:
+    target_qname = _ensure_scope_variable(result, scope_qname, target_name, lineno, "local")
+    seen = {
+        (flow.source_qname, flow.target_qname, flow.flow_type, flow.line_number)
+        for flow in result.variable_flows
+        if flow.scope_qname == scope_qname
+    }
+    for source_name in source_names:
+        source_role = "parameter" if source_name in params else "local"
+        source_qname = _ensure_scope_variable(result, scope_qname, source_name, lineno, source_role)
+        key = (source_qname, target_qname, flow_type, lineno)
+        if key in seen or source_qname == target_qname:
+            continue
+        seen.add(key)
+        result.variable_flows.append(
+            ParsedVariableFlow(
+                source_qname=source_qname,
+                target_qname=target_qname,
+                scope_qname=scope_qname,
+                line_number=lineno,
+                flow_type=flow_type,
+            )
+        )
+
+
+def _append_return_flows(
+    result: ParsedFile,
+    scope_qname: str,
+    source_names: list[str],
+    lineno: int,
+    params: set[str],
+) -> None:
+    return_qname = _ensure_scope_variable(result, scope_qname, "__return__", lineno, "return")
+    seen = {
+        (flow.source_qname, flow.target_qname, flow.flow_type, flow.line_number)
+        for flow in result.variable_flows
+        if flow.scope_qname == scope_qname
+    }
+    for source_name in source_names:
+        source_role = "parameter" if source_name in params else "local"
+        source_qname = _ensure_scope_variable(result, scope_qname, source_name, lineno, source_role)
+        key = (source_qname, return_qname, "return", lineno)
+        if key in seen or source_qname == return_qname:
+            continue
+        seen.add(key)
+        result.variable_flows.append(
+            ParsedVariableFlow(
+                source_qname=source_qname,
+                target_qname=return_qname,
+                scope_qname=scope_qname,
+                line_number=lineno,
+                flow_type="return",
+            )
+        )
+
+
+def _extract_identifiers(expr: str, excluded: set[str], keywords: set[str]) -> list[str]:
+    identifiers = {
+        token
+        for token in re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", expr)
+        if token not in keywords and token not in excluded
+    }
+    return sorted(identifiers)
 
 
 class SourceParser:

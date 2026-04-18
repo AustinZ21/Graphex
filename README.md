@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.19.0  
+**Version:** 1.20.0  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-18 (return influence analysis)
+**Date:** 2026-04-18 (multi-language variable flow insights)
 
 ## 1. Introduction
 

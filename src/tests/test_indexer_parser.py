@@ -267,6 +267,27 @@ def test_parse_go_file(tmp_path):
     assert names["Greet"] == "method"
 
 
+def test_parse_go_variable_flows(tmp_path):
+    go_file = tmp_path / "vars.go"
+    go_file.write_text(
+        textwrap.dedent("""\
+        package main
+
+        func build(input string, suffix string) string {
+            label := input
+            result := label
+            return result
+        }
+        """),
+        encoding="utf-8",
+    )
+    result = GoParser().parse(str(go_file))
+    flows = {(flow.source_qname.split(":")[-1], flow.target_qname.split(":")[-1], flow.flow_type) for flow in result.variable_flows}
+    assert ("input", "label", "assignment") in flows
+    assert ("label", "result", "assignment") in flows
+    assert ("result", "__return__", "return") in flows
+
+
 def test_parse_rust_file(tmp_path):
     """Test Rust parser: modules, structs, traits, functions."""
     rs_file = tmp_path / "lib.rs"
@@ -296,6 +317,25 @@ def test_parse_rust_file(tmp_path):
     assert names["Config"] == "struct"
     assert names["Handler"] == "trait"
     assert names["parse"] == "function"
+
+
+def test_parse_rust_variable_flows(tmp_path):
+    rs_file = tmp_path / "vars.rs"
+    rs_file.write_text(
+        textwrap.dedent("""\
+        pub fn build(input: String, suffix: String) -> String {
+            let label = input;
+            let result = label;
+            return result;
+        }
+        """),
+        encoding="utf-8",
+    )
+    result = RustParser().parse(str(rs_file))
+    flows = {(flow.source_qname.split(":")[-1], flow.target_qname.split(":")[-1], flow.flow_type) for flow in result.variable_flows}
+    assert ("input", "label", "assignment") in flows
+    assert ("label", "result", "assignment") in flows
+    assert ("result", "__return__", "return") in flows
 
 
 def test_parse_java_file(tmp_path):
@@ -331,6 +371,29 @@ def test_parse_java_file(tmp_path):
     assert names["Runner"] == "interface"
     assert names["main"] == "method"
     assert names["greet"] == "method"
+
+
+def test_parse_java_variable_flows(tmp_path):
+    java_file = tmp_path / "Vars.java"
+    java_file.write_text(
+        textwrap.dedent("""\
+        package com.example;
+
+        public class Vars {
+            public String render(String input, String suffix) {
+                String label = input;
+                String result = label;
+                return result;
+            }
+        }
+        """),
+        encoding="utf-8",
+    )
+    result = JavaParser().parse(str(java_file))
+    flows = {(flow.source_qname.split(":")[-1], flow.target_qname.split(":")[-1], flow.flow_type) for flow in result.variable_flows}
+    assert ("input", "label", "assignment") in flows
+    assert ("label", "result", "assignment") in flows
+    assert ("result", "__return__", "return") in flows
 
 
 def test_supported_extensions_include_new_languages():

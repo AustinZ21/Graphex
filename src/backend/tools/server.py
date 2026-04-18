@@ -352,6 +352,121 @@ def analyze_return_influence(scope_qname: str, limit: int = 20) -> dict:
 
 
 @mcp.tool()
+def analyze_scope_variables(scope_qname: str, limit: int = 20) -> dict:
+    """Analyze unused parameters and key intermediary variables inside a symbol scope."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+
+    def _fetch():
+        result = _graph.query(S.QUERY_SCOPE_VARIABLE_METRICS, {"scope_qname": scope_qname})
+        unused_parameters: list[str] = []
+        key_intermediates: list[dict] = []
+        all_variables: list[dict] = []
+        for row in result.result_set:
+            variable = {
+                "qualified_name": row[0],
+                "name": row[1],
+                "role": row[2],
+                "incoming_count": row[3],
+                "outgoing_count": row[4],
+            }
+            all_variables.append(variable)
+            if variable["role"] == "parameter" and variable["outgoing_count"] == 0:
+                unused_parameters.append(variable["qualified_name"])
+            if variable["role"] == "local" and variable["incoming_count"] > 0 and variable["outgoing_count"] > 0:
+                key_intermediates.append(
+                    {
+                        **variable,
+                        "importance_score": variable["incoming_count"] + variable["outgoing_count"],
+                    }
+                )
+        key_intermediates.sort(key=lambda item: (-item["importance_score"], item["qualified_name"]))
+        return {
+            "scope_qname": scope_qname,
+            "unused_parameters": unused_parameters[:limit],
+            "key_intermediates": key_intermediates[:limit],
+            "variables": all_variables[: max(limit, 20)],
+        }
+
+    return _cached_read("analyze_scope_variables", {"scope_qname": scope_qname, "limit": limit}, _fetch)
+
+
+@mcp.tool()
+def explain_data_flow(scope_qname: str, limit: int = 20) -> dict:
+    """Explain how data moves through a function or method for agent consumption."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+
+    def _fetch():
+        flow_result = _graph.query(S.QUERY_VARIABLE_FLOWS_FOR_SCOPE, {"scope_qname": scope_qname, "limit": limit})
+        metrics_result = _graph.query(S.QUERY_SCOPE_VARIABLE_METRICS, {"scope_qname": scope_qname})
+        return_result = _graph.query(S.QUERY_RETURN_INFLUENCE, {"scope_qname": scope_qname, "limit": limit})
+
+        flows = [
+            {
+                "source": row[0],
+                "target": row[1],
+                "flow_type": row[2],
+                "line_number": row[3],
+            }
+            for row in flow_result.result_set
+        ]
+        variables = [
+            {
+                "qualified_name": row[0],
+                "name": row[1],
+                "role": row[2],
+                "incoming_count": row[3],
+                "outgoing_count": row[4],
+            }
+            for row in metrics_result.result_set
+        ]
+        return_paths = [
+            {
+                "parameter": row[0],
+                "path": [item for item in (row[1] or []) if item],
+            }
+            for row in return_result.result_set
+        ]
+
+        unused_parameters = [item["qualified_name"] for item in variables if item["role"] == "parameter" and item["outgoing_count"] == 0]
+        key_intermediates = [
+            item["qualified_name"]
+            for item in sorted(
+                (var for var in variables if var["role"] == "local" and var["incoming_count"] > 0 and var["outgoing_count"] > 0),
+                key=lambda value: (-(value["incoming_count"] + value["outgoing_count"]), value["qualified_name"]),
+            )[:limit]
+        ]
+        summary: list[str] = []
+        if return_paths:
+            params = ", ".join(sorted({item["parameter"].split(":")[-1] for item in return_paths}))
+            summary.append(f"返回值受这些参数影响: {params}")
+        else:
+            summary.append("当前没有发现参数到返回值的变量流路径")
+        if unused_parameters:
+            summary.append("未使用参数: " + ", ".join(item.split(":")[-1] for item in unused_parameters[:limit]))
+        if key_intermediates:
+            summary.append("关键中间变量: " + ", ".join(item.split(":")[-1] for item in key_intermediates[:limit]))
+        if flows:
+            preview = "; ".join(
+                f"{item['source'].split(':')[-1]} -> {item['target'].split(':')[-1]} ({item['flow_type']})"
+                for item in flows[: min(5, len(flows))]
+            )
+            summary.append("主要数据流: " + preview)
+
+        return {
+            "scope_qname": scope_qname,
+            "summary": summary,
+            "flows": flows,
+            "return_influence": return_paths,
+            "unused_parameters": unused_parameters,
+            "key_intermediates": key_intermediates,
+        }
+
+    return _cached_read("explain_data_flow", {"scope_qname": scope_qname, "limit": limit}, _fetch)
+
+
+@mcp.tool()
 def retrieve_context(query: str, limit: int = 10) -> list[dict]:
     """Retrieve relevant code context for an agent query string."""
     if not _graph:

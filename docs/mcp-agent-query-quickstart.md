@@ -242,6 +242,37 @@ This lets agents answer:
 - "输入参数经过哪些中间变量后进入返回值？"
 - "是否存在未参与返回值计算的参数？"
 
+## Multi-language data-flow insights (v1.20.0)
+
+Variable-flow tracking is now available for **Go**, **Rust**, and **Java** in addition to Python and TypeScript/JavaScript.
+
+New high-level tools:
+
+- `analyze_scope_variables(scope_qname, limit)` - 找出未使用参数和关键中间变量
+- `explain_data_flow(scope_qname, limit)` - 生成函数级数据转换解释，适合 agent 直接消费
+
+Usage example:
+
+```python
+scope = "backend.service.render"
+analysis = cg.analyze_scope_variables(scope, limit=10)
+explanation = cg.explain_data_flow(scope, limit=20)
+```
+
+These tools let agents answer:
+
+- "哪些参数根本没有参与函数内部的数据流？"
+- "哪些中间变量是数据转换链路的关键节点？"
+- "这个函数是如何把输入一步步转换成返回值的？"
+
+Language coverage for variable flow:
+
+- Python
+- TypeScript / JavaScript
+- Go
+- Rust
+- Java
+
 ## Call-graph analysis and metrics (v1.17.0)
 
 ContextGraph provides sophisticated call-graph analysis for understanding codebase architecture:
