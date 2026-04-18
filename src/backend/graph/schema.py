@@ -17,7 +17,8 @@ SET r.name = $name
 
 MERGE_FILE = """
 MERGE (f:File {path: $path})
-SET f.language = $language
+SET f.language = $language,
+    f.content_hash = $content_hash
 """
 
 MERGE_SYMBOL = """
@@ -55,6 +56,11 @@ EDGE_SYMBOL_CALLS = """
 MATCH (caller:Symbol {qualified_name: $caller_qname})
 MATCH (callee:Symbol {qualified_name: $callee_qname})
 MERGE (caller)-[:CALLS]->(callee)
+"""
+
+QUERY_FILE_HASH = """
+MATCH (f:File {path: $path})
+RETURN f.content_hash AS hash
 """
 
 # ---------------------------------------------------------------------------

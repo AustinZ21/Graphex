@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.1.9  
+**Version:** 1.2.0  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-17 (ContextGraph strategy aligned)
+**Date:** 2026-04-18 (Phase 2+3: hash dedup, call graph, P@5 eval, Redis cache, trace eval)
 
 ## 1. Introduction
 
