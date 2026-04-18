@@ -123,6 +123,12 @@ Read/query tools:
 
 `strategy_query` is the server-side default agent route. It executes the CG-first policy inside the MCP server itself: graph retrieval first, bounded token budget, local snippet fallback only when graph hits are insufficient.
 
+`retrieve_context` now returns enriched items with:
+- `summary`: compact symbol/location summary
+- `snippet`: bounded code snippet around the symbol
+
+This reduces the need for agents to perform extra file reads after initial graph retrieval.
+
 Indexing tools (queued):
 - `index_full`
 - `index_incremental`

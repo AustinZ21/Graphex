@@ -78,6 +78,32 @@ def _cached_read(tool: str, args: dict, fetch_fn):
     return result
 
 
+def _read_symbol_snippet(file_path: str, line_start: int, line_end: int, context_lines: int = 2, max_chars: int = 900) -> str:
+    path = Path(file_path)
+    if not path.is_absolute():
+        path = (_repo_root / file_path).resolve()
+    if not path.exists() or not path.is_file():
+        return ""
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except Exception:
+        return ""
+    if not lines:
+        return ""
+
+    start_idx = max(0, int(line_start) - 1 - context_lines)
+    end_idx = min(len(lines), int(line_end) + context_lines)
+    snippet = "\n".join(lines[start_idx:end_idx]).strip()
+    if len(snippet) > max_chars:
+        return snippet[: max_chars - 3] + "..."
+    return snippet
+
+
+def _summarize_symbol(symbol_type: str, qualified_name: str, file_path: str, line_start: int, line_end: int) -> str:
+    location = f"{file_path}:{line_start}-{line_end}"
+    return f"{symbol_type} {qualified_name} at {location}"
+
+
 # ---------------------------------------------------------------------------
 # Write tools (async – go through MQ)
 # ---------------------------------------------------------------------------
@@ -216,16 +242,26 @@ def retrieve_context(query: str, limit: int = 10) -> list[dict]:
 
     def _fetch():
         result = _graph.query(S.QUERY_RETRIEVE_CONTEXT, {"query": query, "limit": limit})
-        return [
-            {
-                "qualified_name": row[0],
-                "symbol_type": row[1],
-                "file_path": row[2],
-                "line_start": row[3],
-                "line_end": row[4],
-            }
-            for row in result.result_set
-        ]
+        items: list[dict] = []
+        for row in result.result_set:
+            qualified_name = row[0]
+            symbol_type = row[1]
+            file_path = row[2]
+            line_start = row[3]
+            line_end = row[4]
+            snippet = _read_symbol_snippet(file_path, line_start, line_end)
+            items.append(
+                {
+                    "qualified_name": qualified_name,
+                    "symbol_type": symbol_type,
+                    "file_path": file_path,
+                    "line_start": line_start,
+                    "line_end": line_end,
+                    "summary": _summarize_symbol(symbol_type, qualified_name, file_path, line_start, line_end),
+                    "snippet": snippet,
+                }
+            )
+        return items
 
     return _cached_read("retrieve_context", {"query": query, "limit": limit}, _fetch)
 

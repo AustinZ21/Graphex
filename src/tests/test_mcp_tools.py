@@ -81,8 +81,11 @@ def test_retrieve_context():
     mcp_srv._graph = _mock_graph(
         [["backend.indexer.parser.PythonParser.parse", "method", "src/backend/indexer/parser.py", 40, 70]]
     )
-    results = mcp_srv.retrieve_context(query="parse", limit=5)
+    with patch("backend.tools.server._read_symbol_snippet", return_value="def parse(...): ..."):
+        results = mcp_srv.retrieve_context(query="parse", limit=5)
     assert results[0]["file_path"] == "src/backend/indexer/parser.py"
+    assert results[0]["snippet"] == "def parse(...): ..."
+    assert "summary" in results[0]
 
 
 @pytest.mark.asyncio
