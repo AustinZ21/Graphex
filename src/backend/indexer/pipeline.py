@@ -115,6 +115,8 @@ class IndexPipeline:
     ) -> dict:
         result = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "imports": 0, "errors": 0}
         try:
+            from backend.indexer.hasher import hash_symbols, hash_calls, hash_imports
+            
             current_hash = sha256_file(file_path)
             if not force:
                 stored = self._get_stored_hash(file_path)
@@ -126,42 +128,64 @@ class IndexPipeline:
             if parsed.parse_error:
                 log.warning("pipeline.parse_error", path=file_path, error=parsed.parse_error)
 
+            current_symbols_hash = hash_symbols(parsed)
+            current_calls_hash = hash_calls(parsed)
+            current_imports_hash = hash_imports(parsed)
+            
+            stored_hashes = self._get_stored_symbol_hashes(file_path) if not force else {}
+            symbols_changed = stored_hashes.get("symbols_hash") != current_symbols_hash
+            calls_changed = stored_hashes.get("calls_hash") != current_calls_hash
+            imports_changed = stored_hashes.get("imports_hash") != current_imports_hash
+
             self._graph.query(
                 S.MERGE_FILE,
-                {"path": file_path, "language": parsed.language, "content_hash": current_hash},
+                {
+                    "path": file_path,
+                    "language": parsed.language,
+                    "content_hash": current_hash,
+                    "symbols_hash": current_symbols_hash,
+                    "calls_hash": current_calls_hash,
+                    "imports_hash": current_imports_hash,
+                },
             )
             self._graph.query(
                 S.EDGE_REPO_CONTAINS_FILE,
                 {"repo_path": repo_path, "file_path": file_path},
             )
 
-            for sym in parsed.symbols:
-                self._graph.query(
-                    S.MERGE_SYMBOL,
-                    {
-                        "qualified_name": sym.qualified_name,
-                        "name": sym.name,
-                        "symbol_type": sym.symbol_type,
-                        "file_path": sym.file_path,
-                        "line_start": sym.line_start,
-                        "line_end": sym.line_end,
-                    },
-                )
-                self._graph.query(
-                    S.EDGE_FILE_DEFINES_SYMBOL,
-                    {"file_path": file_path, "qualified_name": sym.qualified_name},
-                )
-                symbol_map[sym.name] = sym.qualified_name
-                result["symbols"] += 1
+            if symbols_changed:
+                for sym in parsed.symbols:
+                    self._graph.query(
+                        S.MERGE_SYMBOL,
+                        {
+                            "qualified_name": sym.qualified_name,
+                            "name": sym.name,
+                            "symbol_type": sym.symbol_type,
+                            "file_path": sym.file_path,
+                            "line_start": sym.line_start,
+                            "line_end": sym.line_end,
+                        },
+                    )
+                    self._graph.query(
+                        S.EDGE_FILE_DEFINES_SYMBOL,
+                        {"file_path": file_path, "qualified_name": sym.qualified_name},
+                    )
+                    symbol_map[sym.name] = sym.qualified_name
+                    result["symbols"] += 1
 
-            if parsed.language == "python":
-                result["calls"] = self._write_python_call_edges(file_path, symbol_map)
-            elif parsed.language in {"typescript", "javascript"}:
-                result["calls"] = self._write_ts_js_call_edges(parsed.calls, symbol_map)
-            
-            result["imports"] = self._write_import_edges(file_path, parsed, repo_path)
+            if calls_changed:
+                if parsed.language == "python":
+                    result["calls"] = self._write_python_call_edges(file_path, symbol_map)
+                elif parsed.language in {"typescript", "javascript"}:
+                    result["calls"] = self._write_ts_js_call_edges(parsed.calls, symbol_map)
 
-            result["files"] = 1
+            if imports_changed:
+                result["imports"] = self._write_import_edges(file_path, parsed, repo_path)
+
+            if symbols_changed or calls_changed or imports_changed:
+                result["files"] = 1
+            else:
+                result["skipped"] = 1
         except Exception as exc:
             log.error("pipeline.file_error", path=file_path, error=str(exc))
             result["errors"] = 1
@@ -228,6 +252,22 @@ class IndexPipeline:
         if rows and rows[0][0]:
             return rows[0][0]
         return None
+
+    def _get_stored_symbol_hashes(self, file_path: str) -> dict[str, str]:
+        """Get stored symbol-level hashes for fine-grained incremental tracking."""
+        try:
+            result = self._graph.query(S.QUERY_FILE_SYMBOL_HASHES, {"path": file_path})
+            if result.result_set and len(result.result_set[0]) >= 4:
+                row = result.result_set[0]
+                return {
+                    "content_hash": row[0],
+                    "symbols_hash": row[1],
+                    "calls_hash": row[2],
+                    "imports_hash": row[3],
+                }
+        except Exception:
+            pass
+        return {}
 
     def _load_symbol_map(self) -> dict[str, str]:
         try:

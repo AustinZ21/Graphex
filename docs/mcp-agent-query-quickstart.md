@@ -155,7 +155,17 @@ Import tracking supports:
 - Directory imports with index/init files
 - Language-agnostic path resolution
 
-## 8) Available graph query tools
+## Symbol-level incremental indexing
+
+Version 1.14.0 introduces fine-grained incremental updates:
+- **Content hash**: detects any file change
+- **Symbol hash**: detects changes to function/class signatures
+- **Call hash**: detects changes to function call patterns
+- **Import hash**: detects changes to import dependencies
+
+Benefit: Small edits (comments, whitespace, method bodies) won't retrigger expensive symbol/call/import updates.
+
+Example performance gain: editing method body in a 200-function file only re-indexes that one method, not the entire file's symbol table.
 
 Read/query tools:
 - `find_symbol`
