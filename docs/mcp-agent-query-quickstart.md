@@ -102,7 +102,10 @@ python src/scripts/mcp_query_strategy.py --query "how indexing pipeline works" -
 Output fields:
 - `strategy`: always `cg-first`
 - `graph_context`: MCP graph hits with relations
+- `quality_score`: aggregate graph context quality score
+- `quality_threshold`: adaptive threshold used before fallback
 - `used_fallback`: whether local snippet fallback was triggered
+- `fallback_reason`: why fallback was triggered or skipped
 - `fallback_context`: local snippets only when needed
 - `estimated_tokens`: approximate token usage for returned context
 
@@ -122,6 +125,8 @@ Read/query tools:
 - `wait_for_index_ready`
 
 `strategy_query` is the server-side default agent route. It executes the CG-first policy inside the MCP server itself: graph retrieval first, bounded token budget, local snippet fallback only when graph hits are insufficient.
+
+Fallback is no longer based only on fixed hit count. The strategy also evaluates graph context quality using query match, snippet presence, and relation richness before deciding to fallback.
 
 `retrieve_context` now returns enriched items with:
 - `summary`: compact symbol/location summary

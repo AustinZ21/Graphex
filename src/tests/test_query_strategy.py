@@ -1,7 +1,11 @@
 from pathlib import Path
 
 from backend.agent.query_strategy import (
+    CGFirstQueryStrategy,
+    StrategyConfig,
+    decide_fallback,
     estimate_tokens,
+    evaluate_graph_quality,
     trim_items_to_budget,
     read_code_snippet,
     run_cg_first_strategy,
@@ -64,6 +68,8 @@ def test_run_cg_first_strategy_without_fallback(tmp_path: Path):
                 "file_path": "sample.py",
                 "line_start": 1,
                 "line_end": 3,
+                "summary": "function pkg.mod.fn at sample.py:1-3 sample handler",
+                "snippet": "def fn():\n    return 'sample'",
             }
         ]
 
@@ -83,3 +89,83 @@ def test_run_cg_first_strategy_without_fallback(tmp_path: Path):
     assert result["strategy"] == "cg-first"
     assert result["used_fallback"] is False
     assert len(result["graph_context"]) == 1
+    assert result["quality_score"] >= result["quality_threshold"]
+
+
+def test_decide_fallback_for_low_quality():
+    items = [
+        {
+            "qualified_name": "pkg.mod.fn",
+            "symbol_type": "function",
+            "file_path": "a.py",
+            "line_start": 1,
+            "line_end": 2,
+            "summary": "function pkg.mod.fn at a.py:1-2",
+            "snippet": "",
+            "callers": [],
+            "callees": [],
+        }
+    ]
+
+    should_fallback, reason, quality = decide_fallback(
+        trimmed_items=items,
+        query="totally unrelated search",
+        min_graph_hits=1,
+        quality_threshold=0.55,
+    )
+
+    assert should_fallback is True
+    assert reason == "low_graph_quality"
+    assert quality["quality_score"] < 0.55
+
+
+def test_evaluate_graph_quality_with_snippet_and_relations():
+    items = [
+        {
+            "qualified_name": "backend.indexer.pipeline.IndexPipeline.index_full",
+            "symbol_type": "method",
+            "summary": "method backend.indexer.pipeline.IndexPipeline.index_full at file.py:1-3",
+            "snippet": "def index_full(self): pass",
+            "callers": ["a"],
+            "callees": ["b"],
+        }
+    ]
+    quality = evaluate_graph_quality(items, "index pipeline")
+    assert quality["quality_score"] > 0.55
+    assert quality["matched_items"] == 1
+
+
+def test_cg_first_query_strategy_class_run(monkeypatch, tmp_path: Path):
+    strategy = CGFirstQueryStrategy(
+        StrategyConfig(
+            repo_root=tmp_path,
+            base_url="http://127.0.0.1:8011",
+            min_graph_hits=1,
+        )
+    )
+
+    monkeypatch.setattr(strategy, "_read_message_endpoint", lambda base_url: "http://fake-endpoint")
+    monkeypatch.setattr(
+        strategy,
+        "_retrieve_graph_hits",
+        lambda endpoint, query, limit: [
+            {
+                "qualified_name": "pkg.mod.fn",
+                "symbol_type": "function",
+                "file_path": "sample.py",
+                "line_start": 1,
+                "line_end": 2,
+                "summary": "function pkg.mod.fn at sample.py:1-2",
+                "snippet": "def fn(): pass",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        strategy,
+        "_get_call_graph",
+        lambda endpoint, qualified_name, depth: {"callers": ["a"], "callees": ["b"]},
+    )
+
+    result = strategy.run("pkg fn")
+    assert result["source"] == "contextgraph-client"
+    assert result["used_fallback"] is False

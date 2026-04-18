@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.7.0  
+**Version:** 1.8.0  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-18 (snippet-aware retrieve_context for lower-token agent routing)
+**Date:** 2026-04-18 (adaptive quality scoring for CG-first routing + class path fix)
 
 ## 1. Introduction
 
