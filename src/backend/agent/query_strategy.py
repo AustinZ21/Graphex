@@ -68,8 +68,8 @@ def read_code_snippet(
 
 @dataclass
 class StrategyConfig:
-    base_url: str
     repo_root: Path
+    base_url: str | None = None
     graph_top_k: int = 8
     min_graph_hits: int = 3
     token_budget: int = 1800
@@ -111,6 +111,151 @@ class CGFirstQueryStrategy:
             "used_fallback": used_fallback,
             "fallback_context": fallback_items,
         }
+
+
+def run_cg_first_strategy(
+    query: str,
+    repo_root: Path,
+    retrieve_graph_hits,
+    get_call_graph,
+    graph_top_k: int = 8,
+    min_graph_hits: int = 3,
+    token_budget: int = 1800,
+    relation_depth: int = 1,
+    include_relations: bool = True,
+    fallback_max_files: int = 3,
+    fallback_context_lines: int = 3,
+    source_label: str = "contextgraph-mcp",
+) -> dict[str, Any]:
+    """Run CG-first strategy using injected graph retrieval callables."""
+    graph_hits_raw = retrieve_graph_hits(query=query, limit=graph_top_k)
+    graph_hits = [item for item in graph_hits_raw if isinstance(item, dict)]
+
+    graph_items: list[dict[str, Any]] = []
+    for hit in graph_hits:
+        qname = str(hit.get("qualified_name") or "")
+        item = {
+            "qualified_name": qname,
+            "symbol_type": hit.get("symbol_type"),
+            "file_path": hit.get("file_path"),
+            "line_start": hit.get("line_start"),
+            "line_end": hit.get("line_end"),
+        }
+        if include_relations and qname:
+            try:
+                graph = get_call_graph(qualified_name=qname, depth=relation_depth)
+                if isinstance(graph, dict):
+                    item["callers"] = graph.get("callers", [])
+                    item["callees"] = graph.get("callees", [])
+            except Exception as exc:
+                item["relation_error"] = str(exc)
+        graph_items.append(item)
+
+    graph_items_trimmed, graph_tokens = trim_items_to_budget(graph_items, token_budget)
+    used_fallback = len(graph_items_trimmed) < min_graph_hits
+
+    fallback_items: list[dict[str, Any]] = []
+    fallback_tokens = 0
+    if used_fallback:
+        remaining = max(0, token_budget - graph_tokens)
+        fallback_items = _build_local_fallback_snippets(
+            query=query,
+            repo_root=repo_root,
+            graph_hits=graph_hits,
+            fallback_max_files=fallback_max_files,
+            fallback_context_lines=fallback_context_lines,
+        )
+        fallback_items, fallback_tokens = trim_items_to_budget(fallback_items, remaining)
+
+    return {
+        "strategy": "cg-first",
+        "query": query,
+        "source": source_label,
+        "token_budget": token_budget,
+        "estimated_tokens": graph_tokens + fallback_tokens,
+        "graph_hits_total": len(graph_hits),
+        "graph_context": graph_items_trimmed,
+        "used_fallback": used_fallback,
+        "fallback_context": fallback_items,
+    }
+
+
+def _build_local_fallback_snippets(
+    query: str,
+    repo_root: Path,
+    graph_hits: list[dict[str, Any]],
+    fallback_max_files: int,
+    fallback_context_lines: int,
+) -> list[dict[str, Any]]:
+    fallback: list[dict[str, Any]] = []
+
+    for hit in graph_hits[:fallback_max_files]:
+        file_path = str(hit.get("file_path") or "")
+        if not file_path:
+            continue
+        snippet = read_code_snippet(
+            repo_root,
+            file_path,
+            int(hit.get("line_start") or 1),
+            int(hit.get("line_end") or 1),
+            context_lines=fallback_context_lines,
+        )
+        if snippet:
+            fallback.append(
+                {
+                    "source": "symbol-snippet",
+                    "file_path": file_path,
+                    "line_start": int(hit.get("line_start") or 1),
+                    "line_end": int(hit.get("line_end") or 1),
+                    "snippet": snippet,
+                }
+            )
+
+    if fallback:
+        return fallback
+
+    needle = query.strip().lower()
+    if not needle:
+        return fallback
+
+    scanned = 0
+    for pattern in ("*.py", "*.ts", "*.tsx", "*.js", "*.jsx"):
+        for path in repo_root.rglob(pattern):
+            scanned += 1
+            if scanned > 300:
+                return fallback
+            try:
+                text = path.read_text(encoding="utf-8", errors="replace")
+            except Exception:
+                continue
+            idx = text.lower().find(needle)
+            if idx < 0:
+                continue
+
+            line_start = text[:idx].count("\n") + 1
+            line_end = min(line_start + 20, line_start + text[idx:].count("\n"))
+            rel = str(path.relative_to(repo_root)).replace("\\", "/")
+            snippet = read_code_snippet(
+                repo_root,
+                rel,
+                line_start,
+                line_end,
+                context_lines=fallback_context_lines,
+            )
+            if snippet:
+                fallback.append(
+                    {
+                        "source": "keyword-fallback",
+                        "file_path": rel,
+                        "line_start": line_start,
+                        "line_end": line_end,
+                        "snippet": snippet,
+                    }
+                )
+            if len(fallback) >= fallback_max_files:
+                return fallback
+
+    return fallback
 
     def _read_message_endpoint(self, base_url: str, timeout: float = 10.0) -> str:
         sse_url = f"{base_url.rstrip('/')}/mcp/sse"
@@ -207,72 +352,10 @@ class CGFirstQueryStrategy:
         return items
 
     def _build_fallback_snippets(self, query: str, graph_hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        fallback: list[dict[str, Any]] = []
-
-        for hit in graph_hits[: self._cfg.fallback_max_files]:
-            file_path = str(hit.get("file_path") or "")
-            if not file_path:
-                continue
-            snippet = read_code_snippet(
-                self._cfg.repo_root,
-                file_path,
-                int(hit.get("line_start") or 1),
-                int(hit.get("line_end") or 1),
-                context_lines=self._cfg.fallback_context_lines,
-            )
-            if snippet:
-                fallback.append(
-                    {
-                        "source": "symbol-snippet",
-                        "file_path": file_path,
-                        "line_start": int(hit.get("line_start") or 1),
-                        "line_end": int(hit.get("line_end") or 1),
-                        "snippet": snippet,
-                    }
-                )
-
-        if fallback:
-            return fallback
-
-        # Last-resort fallback: keyword search in Python files only.
-        needle = query.strip().lower()
-        if not needle:
-            return fallback
-
-        scanned = 0
-        for path in self._cfg.repo_root.rglob("*.py"):
-            scanned += 1
-            if scanned > 300:
-                break
-            try:
-                text = path.read_text(encoding="utf-8", errors="replace")
-            except Exception:
-                continue
-            idx = text.lower().find(needle)
-            if idx < 0:
-                continue
-
-            line_start = text[:idx].count("\n") + 1
-            line_end = min(line_start + 20, line_start + text[idx:].count("\n"))
-            rel = str(path.relative_to(self._cfg.repo_root)).replace("\\", "/")
-            snippet = read_code_snippet(
-                self._cfg.repo_root,
-                rel,
-                line_start,
-                line_end,
-                context_lines=self._cfg.fallback_context_lines,
-            )
-            if snippet:
-                fallback.append(
-                    {
-                        "source": "keyword-fallback",
-                        "file_path": rel,
-                        "line_start": line_start,
-                        "line_end": line_end,
-                        "snippet": snippet,
-                    }
-                )
-            if len(fallback) >= self._cfg.fallback_max_files:
-                break
-
-        return fallback
+        return _build_local_fallback_snippets(
+            query=query,
+            repo_root=self._cfg.repo_root,
+            graph_hits=graph_hits,
+            fallback_max_files=self._cfg.fallback_max_files,
+            fallback_context_lines=self._cfg.fallback_context_lines,
+        )

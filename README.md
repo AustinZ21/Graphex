@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.5.0  
+**Version:** 1.6.0  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-18 (CG-first agent query strategy client + token-budget fallback routing)
+**Date:** 2026-04-18 (server-side strategy_query MCP tool + reusable CG-first strategy core)
 
 ## 1. Introduction
 

@@ -198,3 +198,18 @@ def test_clear_cache_with_cache():
     assert result["deleted"] == 5
     assert result["status"] == "ok"
 
+
+def test_strategy_query_uses_server_strategy():
+    mcp_srv._graph = MagicMock()
+    with patch("backend.tools.server.run_cg_first_strategy") as mocked:
+        mocked.return_value = {
+            "strategy": "cg-first",
+            "source": "contextgraph-server",
+            "used_fallback": False,
+            "graph_context": [{"qualified_name": "pkg.mod.fn"}],
+        }
+        result = mcp_srv.strategy_query(query="index flow")
+
+    assert result["strategy"] == "cg-first"
+    mocked.assert_called_once()
+

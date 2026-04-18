@@ -21,11 +21,14 @@ All read tool calls are trace-recorded for hallucination-proxy scoring.
 
 from __future__ import annotations
 
+import os
 import time
+from pathlib import Path
 
 import structlog
 from mcp.server.fastmcp import FastMCP
 
+from backend.agent.query_strategy import run_cg_first_strategy
 from backend.graph.client import GraphClient
 from backend.graph import schema as S
 from backend.tools.producer import MCPProducer
@@ -38,6 +41,7 @@ _graph: GraphClient | None = None
 _producer: MCPProducer | None = None
 _cache = None           # QueryCache | None  – set via init()
 _recorder = None        # TraceRecorder | None  – set via init()
+_repo_root = Path(os.getenv("CONTEXTGRAPH_REPO_ROOT", ".")).resolve()
 
 
 def init(
@@ -295,4 +299,30 @@ def clear_cache() -> dict:
     deleted = _cache.invalidate_all()
     log.info("cache.cleared", keys_deleted=deleted)
     return {"status": "ok", "deleted": deleted}
+
+
+@mcp.tool()
+def strategy_query(
+    query: str,
+    graph_top_k: int = 8,
+    min_graph_hits: int = 3,
+    token_budget: int = 1800,
+    relation_depth: int = 1,
+    fallback_max_files: int = 3,
+) -> dict:
+    """Run the default CG-first agent routing strategy through MCP itself."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+    return run_cg_first_strategy(
+        query=query,
+        repo_root=_repo_root,
+        retrieve_graph_hits=retrieve_context,
+        get_call_graph=find_call_graph,
+        graph_top_k=max(1, graph_top_k),
+        min_graph_hits=max(1, min_graph_hits),
+        token_budget=max(200, token_budget),
+        relation_depth=max(1, relation_depth),
+        fallback_max_files=max(1, fallback_max_files),
+        source_label="contextgraph-server",
+    )
 

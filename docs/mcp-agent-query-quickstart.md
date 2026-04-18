@@ -114,11 +114,14 @@ Read/query tools:
 - `find_callees`
 - `retrieve_context`
 - `find_call_graph`
+- `strategy_query`
 - `get_stats`
 - `run_eval`
 - `clear_cache`
 - `get_index_job_status`
 - `wait_for_index_ready`
+
+`strategy_query` is the server-side default agent route. It executes the CG-first policy inside the MCP server itself: graph retrieval first, bounded token budget, local snippet fallback only when graph hits are insufficient.
 
 Indexing tools (queued):
 - `index_full`
