@@ -67,6 +67,7 @@ pip-delete-this-directory.txt
 
 # Local secrets (never commit private keys)
 .secrets/
+.deploy-keys/
 
 # Temp and Logs
 tmp/

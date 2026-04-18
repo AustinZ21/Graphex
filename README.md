@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.1.8  
+**Version:** 1.1.9  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-17
+**Date:** 2026-04-17 (ContextGraph strategy aligned)
 
 ## 1. Introduction
 
