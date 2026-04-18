@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.2.3  
+**Version:** 1.2.4  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-17 (MCP transport fix: stable /mcp/sse + trace Redis import fix)
+**Date:** 2026-04-17 (MCP agent quickstart: query template + usage docs)
 
 ## 1. Introduction
 
