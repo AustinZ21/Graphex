@@ -73,6 +73,8 @@ Retry-only-failed mode (extract failed items from output and retry only those):
 python src/scripts/mcp_query_batch.py --base-url http://127.0.0.1:8011 --input docs/mcp-query-batch.sample.jsonl --output docs/mcp-query-batch.result.jsonl --only-failed-from-output --retries 3
 ```
 
+This mode preserves original `line` mapping from previous output and replaces prior failed entries with fresh retry results.
+
 Fail-control options:
 - `--fail-fast`: stop at first failure.
 - `--max-errors N`: stop when failure count reaches `N` (`0` means disabled).
@@ -95,10 +97,17 @@ Read/query tools:
 - `get_stats`
 - `run_eval`
 - `clear_cache`
+- `get_index_job_status`
+- `wait_for_index_ready`
 
 Indexing tools (queued):
 - `index_full`
 - `index_incremental`
+
+Index status workflow:
+1. Call `index_full` or `index_incremental` and keep returned `job_id`.
+2. Call `get_index_job_status(job_id)` for polling status.
+3. Or call `wait_for_index_ready(job_id, timeout_sec, poll_interval_sec)` to block until `done`/`failed`.
 
 ## Troubleshooting
 

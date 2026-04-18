@@ -13,6 +13,8 @@ Consumer ID : indexer-worker-{instance}
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import redis.asyncio as aioredis
 import structlog
 
@@ -23,6 +25,50 @@ log = structlog.get_logger()
 STREAM_KEY = "contextgraph:jobs"
 CONSUMER_GROUP = "indexer-group"
 CONSUMER_NAME = "indexer-worker"
+STATUS_KEY_PREFIX = "contextgraph:job:status:"
+STATUS_TTL_SEC = 7 * 24 * 60 * 60
+
+
+def _status_key(job_id: str) -> str:
+    return f"{STATUS_KEY_PREFIX}{job_id}"
+
+
+async def _set_job_status(
+    client: aioredis.Redis,
+    job: IndexJob,
+    status: str,
+    stream_id: str | None = None,
+    error: str | None = None,
+    extra: dict | None = None,
+) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    payload = {
+        "job_id": job.job_id,
+        "job_type": job.job_type.value,
+        "repo_path": job.repo_path,
+        "status": status,
+        "created_at": job.created_at,
+        "updated_at": now,
+    }
+    if stream_id is not None:
+        payload["stream_id"] = stream_id
+    if error is not None:
+        payload["error"] = error
+    if extra:
+        for k, v in extra.items():
+            payload[k] = str(v)
+
+    key = _status_key(job.job_id)
+    await client.hset(key, mapping=payload)
+    await client.expire(key, STATUS_TTL_SEC)
+
+
+async def _get_job_status(client: aioredis.Redis, job_id: str) -> dict | None:
+    key = _status_key(job_id)
+    data = await client.hgetall(key)
+    if not data:
+        return None
+    return dict(data)
 
 
 class JobProducer:
@@ -50,8 +96,19 @@ class JobProducer:
             maxlen=10_000,
             approximate=True,
         )
+        await _set_job_status(
+            self._client,
+            job,
+            status="pending",
+            stream_id=stream_id,
+        )
         log.info("mq.published", job_id=job.job_id, type=job.job_type, stream_id=stream_id)
         return stream_id
+
+    async def get_job_status(self, job_id: str) -> dict | None:
+        if not self._client:
+            raise RuntimeError("JobProducer not connected")
+        return await _get_job_status(self._client, job_id)
 
 
 class JobConsumer:
@@ -99,6 +156,21 @@ class JobConsumer:
             raise RuntimeError("JobConsumer not connected")
         await self._client.xack(STREAM_KEY, CONSUMER_GROUP, message_id)
         log.info("mq.acked", stream_id=message_id)
+
+    async def set_job_processing(self, job: IndexJob) -> None:
+        if not self._client:
+            raise RuntimeError("JobConsumer not connected")
+        await _set_job_status(self._client, job, status="processing")
+
+    async def set_job_done(self, job: IndexJob, stats: dict) -> None:
+        if not self._client:
+            raise RuntimeError("JobConsumer not connected")
+        await _set_job_status(self._client, job, status="done", extra=stats)
+
+    async def set_job_failed(self, job: IndexJob, error: str) -> None:
+        if not self._client:
+            raise RuntimeError("JobConsumer not connected")
+        await _set_job_status(self._client, job, status="failed", error=error)
 
     async def _ensure_group(self) -> None:
         try:

@@ -155,9 +155,12 @@ def _reconstruct_input_jsonl(failed_items: list[dict[str, Any]]) -> str:
     """Reconstruct JSONL input format from failed items."""
     lines = []
     for item in failed_items:
+        original_line = int(item.get("line", 0) or 0)
+        if original_line <= 0:
+            continue
         tool = item.get("tool", "find_symbol")
         arguments = item.get("arguments", {})
-        query_obj = {"tool": tool, "arguments": arguments}
+        query_obj = {"tool": tool, "arguments": arguments, "__line": original_line}
         lines.append(json.dumps(query_obj, ensure_ascii=True))
     return "\n".join(lines)
 
@@ -172,6 +175,7 @@ async def run_batch(
     fail_fast: bool,
     max_errors: int,
     resume_from_output: bool,
+    retry_failed_from_resume: bool = False,
 ) -> dict[str, Any]:
     endpoint = _read_message_endpoint(base_url)
     started = time.time()
@@ -194,19 +198,30 @@ async def run_batch(
                     continue
 
     with input_path.open("r", encoding="utf-8") as src:
-        for line_no, raw in enumerate(src, start=1):
+        for source_line_no, raw in enumerate(src, start=1):
             raw = raw.strip()
             if not raw:
-                continue
-            if line_no in previous_results:
                 continue
             try:
                 obj = json.loads(raw)
                 if not isinstance(obj, dict):
                     raise ValueError("JSON line must be an object")
+
+                line_no = int(obj.get("__line") or source_line_no)
+                if line_no in previous_results:
+                    prev = previous_results[line_no]
+                    should_retry = retry_failed_from_resume and not bool(prev.get("ok"))
+                    if should_retry:
+                        previous_results.pop(line_no, None)
+                    else:
+                        continue
+
                 tool, arguments = _prepare_item(obj)
                 tasks.append((line_no, tool, arguments, raw))
             except Exception:
+                line_no = source_line_no
+                if line_no in previous_results:
+                    continue
                 tasks.append((line_no, "", {}, raw))
 
     total = len(tasks) + len(previous_results)
@@ -377,7 +392,8 @@ def main() -> int:
                 request_timeout_sec=args.request_timeout_sec,
                 fail_fast=args.fail_fast,
                 max_errors=max(0, args.max_errors),
-                resume_from_output=args.only_failed_from_output,
+                resume_from_output=args.resume_from_output or args.only_failed_from_output,
+                retry_failed_from_resume=args.only_failed_from_output,
             )
         )
         print(json.dumps(summary, indent=2, ensure_ascii=True))

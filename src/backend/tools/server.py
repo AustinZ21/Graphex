@@ -83,11 +83,16 @@ async def index_full(repo_path: str) -> dict:
     """Enqueue a full index job for the given repository path."""
     if not _producer:
         raise RuntimeError("MCP server not initialized")
-    stream_id = await _producer.submit_full_index(repo_path)
+    submitted = await _producer.submit_full_index(repo_path)
     # Invalidate cache so stale reads are avoided after re-index
     if _cache:
         _cache.invalidate_all()
-    return {"status": "queued", "stream_id": stream_id, "repo_path": repo_path}
+    return {
+        "status": "queued",
+        "stream_id": submitted["stream_id"],
+        "job_id": submitted["job_id"],
+        "repo_path": repo_path,
+    }
 
 
 @mcp.tool()
@@ -95,14 +100,42 @@ async def index_incremental(repo_path: str, changed_paths: list[str]) -> dict:
     """Enqueue an incremental index job for a list of changed files."""
     if not _producer:
         raise RuntimeError("MCP server not initialized")
-    stream_id = await _producer.submit_incremental_index(repo_path, changed_paths)
+    submitted = await _producer.submit_incremental_index(repo_path, changed_paths)
     if _cache:
         _cache.invalidate_all()
     return {
         "status": "queued",
-        "stream_id": stream_id,
+        "stream_id": submitted["stream_id"],
+        "job_id": submitted["job_id"],
         "changed_count": len(changed_paths),
     }
+
+
+@mcp.tool()
+async def get_index_job_status(job_id: str) -> dict:
+    """Get status for an indexing job id."""
+    if not _producer:
+        raise RuntimeError("MCP server not initialized")
+    status = await _producer.get_job_status(job_id)
+    if status is None:
+        return {"job_id": job_id, "status": "not_found"}
+    return status
+
+
+@mcp.tool()
+async def wait_for_index_ready(
+    job_id: str,
+    timeout_sec: float = 120.0,
+    poll_interval_sec: float = 1.0,
+) -> dict:
+    """Wait until an indexing job reaches terminal state (done or failed)."""
+    if not _producer:
+        raise RuntimeError("MCP server not initialized")
+    return await _producer.wait_for_job_status(
+        job_id,
+        timeout_sec=timeout_sec,
+        poll_interval_sec=poll_interval_sec,
+    )
 
 
 # ---------------------------------------------------------------------------

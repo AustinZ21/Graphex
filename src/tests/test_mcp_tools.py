@@ -33,8 +33,8 @@ def _mock_graph(rows: list[list]) -> MagicMock:
 
 def _mock_producer(stream_id: str = "1234-0") -> AsyncMock:
     producer = AsyncMock()
-    producer.submit_full_index.return_value = stream_id
-    producer.submit_incremental_index.return_value = stream_id
+    producer.submit_full_index.return_value = {"job_id": "job-1", "stream_id": stream_id}
+    producer.submit_incremental_index.return_value = {"job_id": "job-2", "stream_id": stream_id}
     return producer
 
 
@@ -91,6 +91,7 @@ async def test_index_full_queues_job():
     result = await mcp_srv.index_full(repo_path="/repo/myproject")
     assert result["status"] == "queued"
     assert result["stream_id"] == "5000-0"
+    assert result["job_id"] == "job-1"
     mcp_srv._producer.submit_full_index.assert_awaited_once_with("/repo/myproject")
 
 
@@ -101,7 +102,39 @@ async def test_index_incremental_queues_job():
         repo_path="/repo", changed_paths=["a.py", "b.py"]
     )
     assert result["changed_count"] == 2
+    assert result["job_id"] == "job-2"
     mcp_srv._producer.submit_incremental_index.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_get_index_job_status():
+    producer = _mock_producer("5002-0")
+    producer.get_job_status.return_value = {"job_id": "job-2", "status": "processing"}
+    mcp_srv._producer = producer
+
+    result = await mcp_srv.get_index_job_status("job-2")
+    assert result["status"] == "processing"
+    producer.get_job_status.assert_awaited_once_with("job-2")
+
+
+@pytest.mark.asyncio
+async def test_wait_for_index_ready():
+    producer = _mock_producer("5003-0")
+    producer.wait_for_job_status.return_value = {
+        "job_id": "job-3",
+        "status": "done",
+        "ready": True,
+        "timeout": False,
+    }
+    mcp_srv._producer = producer
+
+    result = await mcp_srv.wait_for_index_ready("job-3", timeout_sec=5.0, poll_interval_sec=0.2)
+    assert result["ready"] is True
+    producer.wait_for_job_status.assert_awaited_once_with(
+        "job-3",
+        timeout_sec=5.0,
+        poll_interval_sec=0.2,
+    )
 
 
 @pytest.mark.asyncio

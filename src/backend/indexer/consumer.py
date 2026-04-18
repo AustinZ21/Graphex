@@ -54,6 +54,7 @@ class IndexerConsumer:
     async def _process(self, msg_id: str, job: IndexJob) -> None:
         log.info("indexer.job.start", job_id=job.job_id, type=job.job_type)
         try:
+            await self._consumer.set_job_processing(job)
             if job.job_type == JobType.INDEX_FULL:
                 stats = await asyncio.to_thread(
                     self._pipeline.index_full, job.repo_path
@@ -68,7 +69,9 @@ class IndexerConsumer:
                 log.warning("indexer.job.unknown_type", type=job.job_type)
                 stats = {}
             await self._consumer.ack(msg_id)
+            await self._consumer.set_job_done(job, stats)
             log.info("indexer.job.done", job_id=job.job_id, **stats)
         except Exception as exc:
+            await self._consumer.set_job_failed(job, str(exc))
             log.error("indexer.job.failed", job_id=job.job_id, error=str(exc))
             # Do NOT ack – message stays in PEL for manual inspection / retry
