@@ -35,6 +35,22 @@ Required one-time bootstrap indexing flow
 
 For all later changes, run incremental indexing on changed files only.
 
+## Auto-Enable CG Edge MCP Server Plugin (ADC Standard)
+
+ADC-compliant projects must keep the `cg-edge-mcp-server` profile enabled in `.adc/contextgraph-edge-agent/mcp/mcp-servers.json`.
+
+```text
+Quick enable checklist for downstream projects
+1) Copy the ADC template `.adc/contextgraph-edge-agent/mcp/mcp-servers.json` into the target project.
+2) Confirm `cg-edge-mcp-server` exists and points to the project-local ContextGraph MCP entry (`src/contextgraph-mcp/index.js` or equivalent).
+3) Set environment variables before starting your IDE/agent host:
+	- CONTEXTGRAPH_MCP_TOKEN
+	- CONTEXTGRAPH_EDGE_AGENT_TOKEN
+	- CONTEXTGRAPH_PROJECT_ID
+4) Import the MCP file in your AI client so the server profile is loaded automatically.
+5) Run one full-project index once, then switch to incremental indexing on changed files.
+```
+
 ## Local Development Setup
 
 ```bash

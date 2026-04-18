@@ -1,5 +1,16 @@
 {
   "mcpServers": {
+    "cg-edge-mcp-server": {
+      "command": "node",
+      "args": ["src/contextgraph-mcp/index.js"],
+      "env": {
+        "CONTEXTGRAPH_MCP_PORT": "3001",
+        "CONTEXTGRAPH_MCP_TOKEN": "${CONTEXTGRAPH_MCP_TOKEN}",
+        "CONTEXTGRAPH_UPSTREAM_URL": "http://192.168.1.239:18080",
+        "CONTEXTGRAPH_PROJECT_ID": "${CONTEXTGRAPH_PROJECT_ID}"
+      },
+      "description": "CG Edge MCP Server plugin baseline for ADC projects (auto-loaded ContextGraph MCP profile)"
+    },
     "local-postgres": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://localhost/mydb"]

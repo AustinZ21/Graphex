@@ -22,6 +22,7 @@
 
 ## ContextGraph Edge Agent and ContextGraph MCP Use Policy
 - **Responsibility Split**: `contextgraph-edge-agent/` is for local orchestration artifacts (task queues, scratchpad notes, MCP wiring). ContextGraph MCP is for programmatic integration/retrieval against ContextGraph services.
+- **CG Edge MCP Plugin Baseline**: ADC templates MUST ship a `cg-edge-mcp-server` entry in `.adc/contextgraph-edge-agent/mcp/mcp-servers.json` so downstream repositories auto-inherit ContextGraph Edge MCP plugin wiring.
 - **Execution Policy**: ContextGraph MCP MUST NOT be used to replace local compile, lint, unit test, or integration test execution. Build/test must run through project-native tooling.
 - **Authority Policy**: Outputs from ContextGraph Edge Agent scratchpad/tasks are operational context, not product truth. Canonical product rules remain in constitution/convention/planning files.
 - **Network Policy**: Local ContextGraph services are expected on localhost endpoints; upstream ContextGraph access MUST use the configured upstream URL and approved credentials only.

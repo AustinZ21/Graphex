@@ -20,6 +20,7 @@ This file defines all domain-specific terminology, abbreviations, and shortcuts 
 | **ContextGraph** | Central artifact catalog, project registry, and orchestration service (upstream at `http://192.168.1.239:18080`) |
 | **ContextGraph MCP Server** | Model Context Protocol server for programmatic ContextGraph access; implemented locally in `src/contextgraph-mcp` |
 | **ContextGraph Edge Agent** | Local execution and orchestration agent; workspace stored in `.adc/contextgraph-edge-agent`, implementation in `src/contextgraph-edge-agent` |
+| **CG Edge MCP Server Plugin** | Standard MCP server profile name (`cg-edge-mcp-server`) used by ADC templates for auto-loading ContextGraph Edge MCP wiring |
 | **ContextGraph Getstarted** | Bootstrap endpoint for ContextGraph registration at `http://192.168.1.239:18080/getstarted` |
 
 ## Project Structure Terms
