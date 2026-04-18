@@ -67,10 +67,17 @@ Resume mode (skip already completed lines from existing output):
 python src/scripts/mcp_query_batch.py --base-url http://127.0.0.1:8011 --input docs/mcp-query-batch.sample.jsonl --output docs/mcp-query-batch.result.jsonl --resume-from-output
 ```
 
+Retry-only-failed mode (extract failed items from output and retry only those):
+
+```powershell
+python src/scripts/mcp_query_batch.py --base-url http://127.0.0.1:8011 --input docs/mcp-query-batch.sample.jsonl --output docs/mcp-query-batch.result.jsonl --only-failed-from-output --retries 3
+```
+
 Fail-control options:
 - `--fail-fast`: stop at first failure.
 - `--max-errors N`: stop when failure count reaches `N` (`0` means disabled).
 - `--resume-from-output`: load existing output JSONL and skip previously processed `line` entries.
+- `--only-failed-from-output`: extract failed items (ok==false) from output JSONL, reconstruct input, and retry only those queries (merges old successes with new retry results).
 
 Output format:
 - JSONL, one result per input line.

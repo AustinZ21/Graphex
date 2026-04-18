@@ -132,6 +132,36 @@ async def _call_with_retry(
         return response, attempts
 
 
+def _extract_failed_items(output_path: Path) -> list[dict[str, Any]]:
+    """Extract failed items from output JSONL (ok==False)."""
+    failed: list[dict[str, Any]] = []
+    if not output_path.exists():
+        return failed
+    with output_path.open("r", encoding="utf-8") as f:
+        for raw in f:
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                obj = json.loads(raw)
+                if not obj.get("ok") and not obj.get("cancelled"):
+                    failed.append(obj)
+            except Exception:
+                continue
+    return failed
+
+
+def _reconstruct_input_jsonl(failed_items: list[dict[str, Any]]) -> str:
+    """Reconstruct JSONL input format from failed items."""
+    lines = []
+    for item in failed_items:
+        tool = item.get("tool", "find_symbol")
+        arguments = item.get("arguments", {})
+        query_obj = {"tool": tool, "arguments": arguments}
+        lines.append(json.dumps(query_obj, ensure_ascii=True))
+    return "\n".join(lines)
+
+
 async def run_batch(
     base_url: str,
     input_path: Path,
@@ -313,6 +343,7 @@ def main() -> int:
     parser.add_argument("--fail-fast", action="store_true", help="Stop scheduling once first error is seen")
     parser.add_argument("--max-errors", type=int, default=0, help="Stop when failures reach this number (0=disabled)")
     parser.add_argument("--resume-from-output", action="store_true", help="Reuse existing output file and skip already completed line numbers")
+    parser.add_argument("--only-failed-from-output", action="store_true", help="Extract failed items from output file and retry only those queries")
     args = parser.parse_args()
 
     input_path = Path(args.input)
@@ -321,21 +352,39 @@ def main() -> int:
     if not input_path.exists():
         raise SystemExit(f"Input file not found: {input_path}")
 
-    summary = asyncio.run(
-        run_batch(
-            args.base_url,
-            input_path,
-            output_path,
-            concurrency=args.concurrency,
-            retries=args.retries,
-            request_timeout_sec=args.request_timeout_sec,
-            fail_fast=args.fail_fast,
-            max_errors=max(0, args.max_errors),
-            resume_from_output=args.resume_from_output,
+    # If --only-failed-from-output is set, extract failed items and create temp input file
+    effective_input_path = input_path
+    temp_input_path: Path | None = None
+    if args.only_failed_from_output:
+        failed_items = _extract_failed_items(output_path)
+        if not failed_items:
+            print(json.dumps({"message": "No failed items found in output file", "output": str(output_path)}, indent=2, ensure_ascii=True))
+            return 0
+        reconstructed = _reconstruct_input_jsonl(failed_items)
+        temp_input_path = Path(f".mcp_batch_failed_items_{int(time.time())}.jsonl")
+        temp_input_path.write_text(reconstructed, encoding="utf-8")
+        effective_input_path = temp_input_path
+        print(f"Retrying {len(failed_items)} failed items from {output_path}")
+
+    try:
+        summary = asyncio.run(
+            run_batch(
+                args.base_url,
+                effective_input_path,
+                output_path,
+                concurrency=args.concurrency,
+                retries=args.retries,
+                request_timeout_sec=args.request_timeout_sec,
+                fail_fast=args.fail_fast,
+                max_errors=max(0, args.max_errors),
+                resume_from_output=args.only_failed_from_output,
+            )
         )
-    )
-    print(json.dumps(summary, indent=2, ensure_ascii=True))
-    return 0
+        print(json.dumps(summary, indent=2, ensure_ascii=True))
+        return 0
+    finally:
+        if temp_input_path and temp_input_path.exists():
+            temp_input_path.unlink()
 
 
 if __name__ == "__main__":
