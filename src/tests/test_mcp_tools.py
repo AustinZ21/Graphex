@@ -291,3 +291,48 @@ def test_find_dependency_chain_no_path():
     assert result["closest_distance"] is None
     assert result["chains"] == []
 
+
+# ---------------------------------------------------------------------------
+# Import tracking tools
+# ---------------------------------------------------------------------------
+
+def test_get_file_imports():
+    rows = [["src/utils.py", "python"], ["src/helpers.py", "python"]]
+    mcp_srv._graph = _mock_graph(rows)
+    result = mcp_srv.get_file_imports("src/main.py")
+    assert len(result) == 2
+    assert result[0]["target_file"] == "src/utils.py"
+
+
+def test_get_file_dependents():
+    rows = [["src/handler.py", "python"], ["src/service.py", "python"]]
+    mcp_srv._graph = _mock_graph(rows)
+    result = mcp_srv.get_file_dependents("src/core.py")
+    assert len(result) == 2
+    assert result[0]["dependent_file"] == "src/handler.py"
+
+
+def test_get_dependency_overview():
+    rows = [
+        ["src/main.py", "src/utils.py", "python", "python"],
+        ["src/main.py", "src/helpers.py", "python", "python"],
+        ["src/app.ts", "src/utils.ts", "typescript", "typescript"],
+    ]
+    mcp_srv._graph = _mock_graph(rows)
+    result = mcp_srv.get_dependency_overview(limit=30)
+    assert len(result) == 3
+    assert result[0]["from_file"] == "src/main.py"
+
+
+def test_analyze_import_surface():
+    rows = [
+        ["src/core.py", "python", 5, 8],
+        ["src/utils.py", "python", 2, 3],
+    ]
+    mcp_srv._graph = _mock_graph(rows)
+    result = mcp_srv.analyze_import_surface(limit=15)
+    assert len(result) == 2
+    assert result[0]["file_path"] == "src/core.py"
+    assert result[0]["internal_imports"] == 5
+    assert result[0]["incoming_imports"] == 8
+

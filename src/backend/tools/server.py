@@ -489,6 +489,84 @@ def find_dependency_chain(source_path: str, target_path: str) -> dict:
     )
 
 
+# ---------------------------------------------------------------------------
+# Import tracking & external dependencies
+# ---------------------------------------------------------------------------
+
+@mcp.tool()
+def get_file_imports(file_path: str) -> list[dict]:
+    """Get all local imports from a specific file."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+    
+    def _fetch():
+        result = _graph.query(S.QUERY_FILE_IMPORTS, {"file_path": file_path})
+        return [
+            {"target_file": row[0], "language": row[1]}
+            for row in result.result_set
+        ]
+    
+    return _cached_read("get_file_imports", {"file_path": file_path}, _fetch)
+
+
+@mcp.tool()
+def get_file_dependents(file_path: str) -> list[dict]:
+    """Get all files that import this file."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+    
+    def _fetch():
+        result = _graph.query(S.QUERY_IMPORT_DEPENDENTS, {"file_path": file_path})
+        return [
+            {"dependent_file": row[0], "language": row[1]}
+            for row in result.result_set
+        ]
+    
+    return _cached_read("get_file_dependents", {"file_path": file_path}, _fetch)
+
+
+@mcp.tool()
+def get_dependency_overview(limit: int = 30) -> list[dict]:
+    """Get dependency graph: which files import which (top by count)."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+    
+    def _fetch():
+        result = _graph.query(S.QUERY_DEPENDENCY_GRAPH, {"limit": limit})
+        return [
+            {
+                "from_file": row[0],
+                "to_file": row[1],
+                "from_language": row[2],
+                "to_language": row[3],
+            }
+            for row in result.result_set
+        ]
+    
+    return _cached_read("get_dependency_overview", {"limit": limit}, _fetch)
+
+
+@mcp.tool()
+def analyze_import_surface(limit: int = 15) -> list[dict]:
+    """Analyze files by import dependencies: most imported, most importing."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+    
+    def _fetch():
+        result = _graph.query(S.QUERY_EXTERNAL_DEPENDENCIES, {"limit": limit})
+        return [
+            {
+                "file_path": row[0],
+                "language": row[1],
+                "internal_imports": row[2],
+                "incoming_imports": row[3],
+            }
+            for row in result.result_set
+        ]
+    
+    return _cached_read("analyze_import_surface", {"limit": limit}, _fetch)
+
+
 @mcp.tool()
 def strategy_query(
     query: str,

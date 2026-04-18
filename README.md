@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.12.0  
+**Version:** 1.13.0  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-18 (module/file-level architecture analysis + aggregation queries)
+**Date:** 2026-04-18 (import tracking + dependency resolution)
 
 ## 1. Introduction
 

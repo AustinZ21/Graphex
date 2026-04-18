@@ -6,6 +6,8 @@ Incremental  : re-index only the changed file paths, skipping hash-unchanged fil
 Python supports CALLS edge extraction.
 TS/JS support currently indexes files, symbols, and imports for repository-wide lookup.
 
+Import tracking: resolve local imports (./utils, ../core) to actual file paths and write IMPORTS edges.
+
 All graph writes use MERGE so re-indexing is safe and idempotent.
 """
 
@@ -25,6 +27,48 @@ from backend.indexer.parser import ParsedFile, SUPPORTED_EXTENSIONS, SourceParse
 log = structlog.get_logger()
 
 
+def _resolve_import_path(source_file: str, imported_module: str, repo_path: str) -> str | None:
+    """Resolve relative import to actual file path (best effort).
+    
+    Handles:
+    - Relative paths like "./utils", "../core"
+    - Directory imports like "./handlers/auth"
+    - Language-specific extensions
+    
+    Returns the resolved file path if found, None otherwise (e.g., external packages).
+    """
+    source_path = Path(source_file)
+    source_dir = source_path.parent
+    repo = Path(repo_path)
+    
+    if imported_module.startswith("."):
+        if imported_module.startswith("./"):
+            rel = imported_module[2:]
+        elif imported_module.startswith("../"):
+            rel = imported_module
+        else:
+            rel = imported_module[1:]
+        
+        candidate = (source_dir / rel).resolve()
+        
+        if candidate.is_file():
+            return str(candidate)
+        
+        for ext in [".py", ".ts", ".tsx", ".js", ".jsx"]:
+            file_candidate = Path(str(candidate) + ext)
+            if file_candidate.is_file():
+                return str(file_candidate)
+        
+        if candidate.is_dir():
+            for ext in [".py", ".ts", ".tsx", ".js", ".jsx"]:
+                init_file = candidate / f"__init__{ext}" if ext == ".py" else candidate / f"index{ext}"
+                if init_file.is_file():
+                    return str(init_file)
+    
+    return None
+
+
+
 class IndexPipeline:
     def __init__(self, graph: GraphClient) -> None:
         self._graph = graph
@@ -35,7 +79,7 @@ class IndexPipeline:
         files = list(discover_files(repo_path))
         log.info("pipeline.full.start", repo_path=repo_path, files=len(files))
         self._upsert_repo(repo_path)
-        stats: dict = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "errors": 0}
+        stats: dict = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "imports": 0, "errors": 0}
         symbol_map: dict[str, str] = {}
         for fpath in files:
             result = self._index_file(repo_path, fpath, symbol_map, force=True)
@@ -47,7 +91,7 @@ class IndexPipeline:
     def index_incremental(self, repo_path: str, changed_paths: list[str]) -> dict:
         log.info("pipeline.incremental.start", changed=len(changed_paths))
         self._upsert_repo(repo_path)
-        stats: dict = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "errors": 0}
+        stats: dict = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "imports": 0, "errors": 0}
         symbol_map = self._load_symbol_map()
         for fpath in changed_paths:
             if Path(fpath).suffix.lower() not in SUPPORTED_EXTENSIONS:
@@ -69,7 +113,7 @@ class IndexPipeline:
         symbol_map: dict[str, str],
         force: bool,
     ) -> dict:
-        result = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "errors": 0}
+        result = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "imports": 0, "errors": 0}
         try:
             current_hash = sha256_file(file_path)
             if not force:
@@ -114,6 +158,8 @@ class IndexPipeline:
                 result["calls"] = self._write_python_call_edges(file_path, symbol_map)
             elif parsed.language in {"typescript", "javascript"}:
                 result["calls"] = self._write_ts_js_call_edges(parsed.calls, symbol_map)
+            
+            result["imports"] = self._write_import_edges(file_path, parsed, repo_path)
 
             result["files"] = 1
         except Exception as exc:
@@ -154,6 +200,22 @@ class IndexPipeline:
                     self._graph.query(
                         S.EDGE_SYMBOL_CALLS,
                         {"caller_qname": rc.caller_qname, "callee_qname": callee_qname},
+                    )
+                    written += 1
+                except Exception:
+                    pass
+        return written
+
+    def _write_import_edges(self, file_path: str, parsed: ParsedFile, repo_path: str) -> int:
+        """Resolve and write IMPORTS edges for local imports."""
+        written = 0
+        for imp in parsed.imports:
+            target_path = _resolve_import_path(file_path, imp.imported_module, repo_path)
+            if target_path:
+                try:
+                    self._graph.query(
+                        S.EDGE_FILE_IMPORTS,
+                        {"src_path": file_path, "target_path": target_path},
                     )
                     written += 1
                 except Exception:

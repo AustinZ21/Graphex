@@ -133,7 +133,29 @@ These tools enable agents to answer:
 - "How are these files related?"
 - "What is the dependency flow?"
 
-## 7) Available graph query tools
+## 7) Import tracking & dependency analysis
+
+These tools expose file-level import relationships:
+
+- `get_file_imports(file_path)` - What files does this file import?
+- `get_file_dependents(file_path)` - What files import this file?
+- `get_dependency_overview(limit)` - Full import graph (file-to-file edges)
+- `analyze_import_surface(limit)` - Files ranked by import connectivity
+
+Usage example:
+```python
+# Agent wants to understand external dependencies
+core_imports = cg.get_file_imports("src/core.py")
+core_dependents = cg.get_file_dependents("src/core.py")
+all_imports = cg.get_dependency_overview(limit=30)
+```
+
+Import tracking supports:
+- Local relative imports (`./utils`, `../core`)
+- Directory imports with index/init files
+- Language-agnostic path resolution
+
+## 8) Available graph query tools
 
 Read/query tools:
 - `find_symbol`

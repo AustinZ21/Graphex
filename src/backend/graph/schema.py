@@ -166,3 +166,34 @@ RETURN length(edges) AS hops, count(*) AS paths
 ORDER BY hops
 LIMIT 10
 """
+
+# ---------------------------------------------------------------------------
+# Import tracking queries
+# ---------------------------------------------------------------------------
+
+QUERY_FILE_IMPORTS = """
+MATCH (f:File {path: $file_path})-[:IMPORTS]->(target:File)
+RETURN target.path AS target_file, target.language AS language
+"""
+
+QUERY_IMPORT_DEPENDENTS = """
+MATCH (dependent:File)-[:IMPORTS]->(f:File {path: $file_path})
+RETURN dependent.path AS dependent_file, dependent.language AS language
+"""
+
+QUERY_DEPENDENCY_GRAPH = """
+MATCH (f:File)-[r:IMPORTS]->(target:File)
+RETURN f.path AS from_file, target.path AS to_file, f.language AS from_language, target.language AS to_language
+LIMIT $limit
+"""
+
+QUERY_EXTERNAL_DEPENDENCIES = """
+MATCH (f:File)
+WITH f
+OPTIONAL MATCH (f)-[r:IMPORTS]->(target:File)
+WITH f, count(target) AS internal_imports
+OPTIONAL MATCH (f)<-[r2:IMPORTS]-(dependent:File)
+RETURN f.path AS file_path, f.language AS language, internal_imports, count(DISTINCT dependent) AS incoming_imports
+ORDER BY internal_imports DESC, incoming_imports DESC
+LIMIT $limit
+"""
