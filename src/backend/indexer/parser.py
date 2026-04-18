@@ -42,12 +42,33 @@ class RawCall:
 
 
 @dataclass
+class ParsedVariable:
+    name: str
+    qualified_name: str
+    scope_qname: str
+    file_path: str
+    line_number: int
+    role: str
+
+
+@dataclass
+class ParsedVariableFlow:
+    source_qname: str
+    target_qname: str
+    scope_qname: str
+    line_number: int
+    flow_type: str
+
+
+@dataclass
 class ParsedFile:
     path: str
     language: str
     symbols: list[ParsedSymbol] = field(default_factory=list)
     imports: list[ParsedImport] = field(default_factory=list)
     calls: list[RawCall] = field(default_factory=list)
+    variables: list[ParsedVariable] = field(default_factory=list)
+    variable_flows: list[ParsedVariableFlow] = field(default_factory=list)
     parse_error: str | None = None
 
 
@@ -128,7 +149,188 @@ class PythonParser:
                 if node.module:
                     result.imports.append(ParsedImport(source_path=file_path, imported_module=node.module))
 
+        self._extract_variable_flows(tree, result, module_qname)
+
         return result
+
+    def _extract_variable_flows(self, tree: ast.AST, result: ParsedFile, module_qname: str) -> None:
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                class_qname = f"{module_qname}.{node.name}"
+                for item in node.body:
+                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        self._collect_function_variable_flows(item, f"{class_qname}.{item.name}", result)
+            elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                parent = self._get_parent(tree, node)
+                if isinstance(parent, ast.ClassDef):
+                    continue
+                self._collect_function_variable_flows(node, f"{module_qname}.{node.name}", result)
+
+    def _collect_function_variable_flows(
+        self,
+        func_node: ast.FunctionDef | ast.AsyncFunctionDef,
+        scope_qname: str,
+        result: ParsedFile,
+    ) -> None:
+        variables_by_name: dict[str, ParsedVariable] = {}
+        seen_flows: set[tuple[str, str, str, int]] = set()
+
+        return_var = self._ensure_variable(result, variables_by_name, scope_qname, "__return__", func_node.lineno, "return")
+        param_names: set[str] = set()
+        for arg in self._iter_python_args(func_node.args):
+            if arg.arg in {"self", "cls"}:
+                continue
+            param_names.add(arg.arg)
+            self._ensure_variable(result, variables_by_name, scope_qname, arg.arg, arg.lineno or func_node.lineno, "parameter")
+
+        for node in ast.walk(func_node):
+            if isinstance(node, ast.Assign):
+                target_names = self._extract_python_target_names(node.targets)
+                source_names = self._extract_python_source_names(node.value)
+                self._append_python_flows(
+                    result,
+                    variables_by_name,
+                    scope_qname,
+                    target_names,
+                    source_names,
+                    node.lineno,
+                    "assignment",
+                    param_names,
+                    seen_flows,
+                )
+            elif isinstance(node, ast.AnnAssign):
+                target_names = self._extract_python_target_names([node.target])
+                source_names = self._extract_python_source_names(node.value)
+                self._append_python_flows(
+                    result,
+                    variables_by_name,
+                    scope_qname,
+                    target_names,
+                    source_names,
+                    node.lineno,
+                    "assignment",
+                    param_names,
+                    seen_flows,
+                )
+            elif isinstance(node, ast.AugAssign):
+                target_names = self._extract_python_target_names([node.target])
+                source_names = sorted(set(target_names + self._extract_python_source_names(node.value)))
+                self._append_python_flows(
+                    result,
+                    variables_by_name,
+                    scope_qname,
+                    target_names,
+                    source_names,
+                    node.lineno,
+                    "assignment",
+                    param_names,
+                    seen_flows,
+                )
+            elif isinstance(node, ast.Return) and node.value is not None:
+                source_names = self._extract_python_source_names(node.value)
+                for source_name in source_names:
+                    source_role = "parameter" if source_name in param_names else "local"
+                    source_var = self._ensure_variable(
+                        result,
+                        variables_by_name,
+                        scope_qname,
+                        source_name,
+                        node.lineno,
+                        source_role,
+                    )
+                    key = (source_var.qualified_name, return_var.qualified_name, "return", node.lineno)
+                    if key in seen_flows or source_var.qualified_name == return_var.qualified_name:
+                        continue
+                    seen_flows.add(key)
+                    result.variable_flows.append(
+                        ParsedVariableFlow(
+                            source_qname=source_var.qualified_name,
+                            target_qname=return_var.qualified_name,
+                            scope_qname=scope_qname,
+                            line_number=node.lineno,
+                            flow_type="return",
+                        )
+                    )
+
+    @staticmethod
+    def _iter_python_args(args: ast.arguments) -> list[ast.arg]:
+        return list(args.posonlyargs) + list(args.args) + list(args.kwonlyargs)
+
+    def _append_python_flows(
+        self,
+        result: ParsedFile,
+        variables_by_name: dict[str, ParsedVariable],
+        scope_qname: str,
+        target_names: list[str],
+        source_names: list[str],
+        line_number: int,
+        flow_type: str,
+        param_names: set[str],
+        seen_flows: set[tuple[str, str, str, int]],
+    ) -> None:
+        for target_name in target_names:
+            target_var = self._ensure_variable(result, variables_by_name, scope_qname, target_name, line_number, "local")
+            for source_name in source_names:
+                source_role = "parameter" if source_name in param_names else "local"
+                source_var = self._ensure_variable(result, variables_by_name, scope_qname, source_name, line_number, source_role)
+                key = (source_var.qualified_name, target_var.qualified_name, flow_type, line_number)
+                if key in seen_flows or source_var.qualified_name == target_var.qualified_name:
+                    continue
+                seen_flows.add(key)
+                result.variable_flows.append(
+                    ParsedVariableFlow(
+                        source_qname=source_var.qualified_name,
+                        target_qname=target_var.qualified_name,
+                        scope_qname=scope_qname,
+                        line_number=line_number,
+                        flow_type=flow_type,
+                    )
+                )
+
+    def _ensure_variable(
+        self,
+        result: ParsedFile,
+        variables_by_name: dict[str, ParsedVariable],
+        scope_qname: str,
+        var_name: str,
+        line_number: int,
+        role: str,
+    ) -> ParsedVariable:
+        existing = variables_by_name.get(var_name)
+        if existing is not None:
+            if existing.role == "local" and role == "parameter":
+                existing.role = role
+            return existing
+        variable = ParsedVariable(
+            name=var_name,
+            qualified_name=f"{scope_qname}:{var_name}",
+            scope_qname=scope_qname,
+            file_path=result.path,
+            line_number=line_number,
+            role=role,
+        )
+        variables_by_name[var_name] = variable
+        result.variables.append(variable)
+        return variable
+
+    @staticmethod
+    def _extract_python_target_names(targets: list[ast.AST]) -> list[str]:
+        names: set[str] = set()
+        for target in targets:
+            for node in ast.walk(target):
+                if isinstance(node, ast.Name):
+                    names.add(node.id)
+        return sorted(name for name in names if name not in {"self", "cls"})
+
+    @staticmethod
+    def _extract_python_source_names(node: ast.AST | None) -> list[str]:
+        if node is None:
+            return []
+        names: set[str] = set()
+        for child in ast.walk(node):
+            if isinstance(child, ast.Name) and child.id not in {"self", "cls"}:
+                names.add(child.id)
+        return sorted(names)
 
     @staticmethod
     def _get_parent(tree: ast.AST, target: ast.AST) -> ast.AST | None:
@@ -150,10 +352,16 @@ class TypeScriptJavaScriptParser:
     _TYPE_RE = re.compile(r"^\s*(?:export\s+)?type\s+(\w+)\s*=", re.MULTILINE)
     _ENUM_RE = re.compile(r"^\s*(?:export\s+)?enum\s+(\w+)", re.MULTILINE)
     _FUNCTION_RE = re.compile(r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+(\w+)\s*\(", re.MULTILINE)
+    _FUNCTION_SCOPE_RE = re.compile(r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+(\w+)\s*\(([^\)]*)\)")
     _ARROW_RE = re.compile(
         r"^\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?(?:\([^\)]*\)|\w+)\s*=>",
         re.MULTILINE,
     )
+    _ARROW_SCOPE_RE = re.compile(
+        r"^\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?(?:\(([^\)]*)\)|(\w+))\s*=>",
+        re.MULTILINE,
+    )
+    _RETURN_RE = re.compile(r"\breturn\s+(.+?);?$")
 
     def parse(self, file_path: str) -> ParsedFile:
         path = Path(file_path)
@@ -177,6 +385,7 @@ class TypeScriptJavaScriptParser:
         self._append_matches(result, lines, module_qname, self._ARROW_RE, "function")
         self._append_class_methods(result, lines, module_qname)
         self._extract_calls(result, source, lines, module_qname)
+        self._extract_variable_flows(result, lines, module_qname)
         return result
 
     def _append_matches(
@@ -271,6 +480,153 @@ class TypeScriptJavaScriptParser:
                             result.calls.append(
                                 RawCall(caller_qname=caller_sym.qualified_name, callee_name=callee_name)
                             )
+
+    def _extract_variable_flows(self, result: ParsedFile, lines: list[str], module_qname: str) -> None:
+        class_stack: list[tuple[str, int]] = []
+        scope_stack: list[tuple[str, int, set[str]]] = []
+        brace_depth = 0
+        method_re = re.compile(r"^\s*(?:async\s+)?(\w+)\s*\(([^\)]*)\)\s*\{")
+        assign_re = re.compile(r"^\s*(?:(?:const|let|var)\s+)?(\w+)\s*=\s*(.+?);?$")
+
+        for lineno, line in enumerate(lines, start=1):
+            class_match = self._CLASS_RE.search(line)
+            if class_match:
+                class_name = class_match.group(1)
+                current_depth = brace_depth + line.count("{") - line.count("}")
+                class_stack.append((class_name, max(1, current_depth)))
+
+            function_match = self._FUNCTION_SCOPE_RE.search(line)
+            arrow_match = self._ARROW_SCOPE_RE.search(line)
+            method_match = method_re.search(line) if class_stack else None
+            if function_match:
+                scope_qname = f"{module_qname}.{function_match.group(1)}"
+                params = self._extract_js_params(function_match.group(2))
+                scope_stack.append((scope_qname, brace_depth + max(1, line.count("{")), params))
+                self._seed_js_scope_variables(result, scope_qname, params, lineno)
+            elif arrow_match:
+                scope_qname = f"{module_qname}.{arrow_match.group(1)}"
+                param_blob = arrow_match.group(2) or arrow_match.group(3) or ""
+                params = self._extract_js_params(param_blob)
+                scope_stack.append((scope_qname, brace_depth + max(1, line.count("{")), params))
+                self._seed_js_scope_variables(result, scope_qname, params, lineno)
+            elif method_match and method_match.group(1) != "constructor":
+                class_name = class_stack[-1][0]
+                scope_qname = f"{module_qname}.{class_name}.{method_match.group(1)}"
+                params = self._extract_js_params(method_match.group(2))
+                scope_stack.append((scope_qname, brace_depth + max(1, line.count("{")), params))
+                self._seed_js_scope_variables(result, scope_qname, params, lineno)
+
+            if scope_stack:
+                scope_qname, _, params = scope_stack[-1]
+                assign_match = assign_re.search(line)
+                if assign_match and "=>" not in line and not line.lstrip().startswith("return "):
+                    target_name = assign_match.group(1)
+                    source_names = self._extract_js_identifiers(assign_match.group(2), excluded={target_name})
+                    self._append_js_flows(result, scope_qname, target_name, source_names, lineno, "assignment", params)
+
+                return_match = self._RETURN_RE.search(line)
+                if return_match:
+                    source_names = self._extract_js_identifiers(return_match.group(1), excluded=set())
+                    for source_name in source_names:
+                        source_role = "parameter" if source_name in params else "local"
+                        source_qname = self._ensure_js_variable(result, scope_qname, source_name, lineno, source_role)
+                        return_qname = self._ensure_js_variable(result, scope_qname, "__return__", lineno, "return")
+                        if source_qname == return_qname:
+                            continue
+                        result.variable_flows.append(
+                            ParsedVariableFlow(
+                                source_qname=source_qname,
+                                target_qname=return_qname,
+                                scope_qname=scope_qname,
+                                line_number=lineno,
+                                flow_type="return",
+                            )
+                        )
+
+            brace_depth += line.count("{") - line.count("}")
+            while class_stack and brace_depth < class_stack[-1][1]:
+                class_stack.pop()
+            while scope_stack and brace_depth < scope_stack[-1][1]:
+                scope_stack.pop()
+
+    def _seed_js_scope_variables(self, result: ParsedFile, scope_qname: str, params: set[str], lineno: int) -> None:
+        self._ensure_js_variable(result, scope_qname, "__return__", lineno, "return")
+        for param in sorted(params):
+            self._ensure_js_variable(result, scope_qname, param, lineno, "parameter")
+
+    def _append_js_flows(
+        self,
+        result: ParsedFile,
+        scope_qname: str,
+        target_name: str,
+        source_names: list[str],
+        lineno: int,
+        flow_type: str,
+        params: set[str],
+    ) -> None:
+        target_qname = self._ensure_js_variable(result, scope_qname, target_name, lineno, "local")
+        seen: set[tuple[str, str, str, int]] = {
+            (flow.source_qname, flow.target_qname, flow.flow_type, flow.line_number)
+            for flow in result.variable_flows
+            if flow.scope_qname == scope_qname
+        }
+        for source_name in source_names:
+            source_role = "parameter" if source_name in params else "local"
+            source_qname = self._ensure_js_variable(result, scope_qname, source_name, lineno, source_role)
+            key = (source_qname, target_qname, flow_type, lineno)
+            if key in seen or source_qname == target_qname:
+                continue
+            seen.add(key)
+            result.variable_flows.append(
+                ParsedVariableFlow(
+                    source_qname=source_qname,
+                    target_qname=target_qname,
+                    scope_qname=scope_qname,
+                    line_number=lineno,
+                    flow_type=flow_type,
+                )
+            )
+
+    def _ensure_js_variable(self, result: ParsedFile, scope_qname: str, name: str, lineno: int, role: str) -> str:
+        qualified_name = f"{scope_qname}:{name}"
+        for variable in result.variables:
+            if variable.qualified_name == qualified_name:
+                if variable.role == "local" and role == "parameter":
+                    variable.role = role
+                return qualified_name
+        result.variables.append(
+            ParsedVariable(
+                name=name,
+                qualified_name=qualified_name,
+                scope_qname=scope_qname,
+                file_path=result.path,
+                line_number=lineno,
+                role=role,
+            )
+        )
+        return qualified_name
+
+    @staticmethod
+    def _extract_js_params(raw_params: str) -> set[str]:
+        return {
+            token.strip()
+            for token in raw_params.split(",")
+            if token.strip() and token.strip() not in {"this"}
+        }
+
+    @staticmethod
+    def _extract_js_identifiers(expr: str, excluded: set[str]) -> list[str]:
+        keywords = {
+            "return", "new", "await", "true", "false", "null", "undefined", "if", "for", "while",
+            "switch", "case", "catch", "try", "const", "let", "var", "function", "class", "async",
+            "this",
+        }
+        identifiers = {
+            token
+            for token in re.findall(r"\b[A-Za-z_][A-Za-z0-9_]*\b", expr)
+            if token not in keywords and token not in excluded
+        }
+        return sorted(identifiers)
 
     @staticmethod
     def _language_for(path: Path) -> str:

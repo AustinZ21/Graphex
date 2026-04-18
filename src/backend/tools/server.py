@@ -257,6 +257,71 @@ def find_callees(qualified_name: str, limit: int = 20) -> list[dict]:
 
 
 @mcp.tool()
+def find_variable(name: str, limit: int = 20) -> list[dict]:
+    """Find variables by simple name or qualified name fragment."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+
+    def _fetch():
+        result = _graph.query(S.QUERY_FIND_VARIABLE, {"name": name, "limit": limit})
+        return [
+            {
+                "qualified_name": row[0],
+                "scope_qname": row[1],
+                "file_path": row[2],
+                "line_number": row[3],
+                "role": row[4],
+            }
+            for row in result.result_set
+        ]
+
+    return _cached_read("find_variable", {"name": name, "limit": limit}, _fetch)
+
+
+@mcp.tool()
+def get_variable_flows(scope_qname: str, limit: int = 50) -> list[dict]:
+    """Get variable-to-variable flows inside a symbol scope."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+
+    def _fetch():
+        result = _graph.query(S.QUERY_VARIABLE_FLOWS_FOR_SCOPE, {"scope_qname": scope_qname, "limit": limit})
+        return [
+            {
+                "source": row[0],
+                "target": row[1],
+                "flow_type": row[2],
+                "line_number": row[3],
+            }
+            for row in result.result_set
+        ]
+
+    return _cached_read("get_variable_flows", {"scope_qname": scope_qname, "limit": limit}, _fetch)
+
+
+@mcp.tool()
+def trace_variable_lineage(qualified_name: str) -> dict:
+    """Get one-hop upstream and downstream lineage for a variable."""
+    if not _graph:
+        raise RuntimeError("MCP server not initialized")
+
+    def _fetch():
+        result = _graph.query(S.QUERY_VARIABLE_LINEAGE, {"qualified_name": qualified_name})
+        if not result.result_set:
+            return {"qualified_name": qualified_name, "upstream": [], "downstream": []}
+        row = result.result_set[0]
+        upstream = [item for item in (row[0] or []) if item]
+        downstream = [item for item in (row[1] or []) if item]
+        return {
+            "qualified_name": qualified_name,
+            "upstream": upstream,
+            "downstream": downstream,
+        }
+
+    return _cached_read("trace_variable_lineage", {"qualified_name": qualified_name}, _fetch)
+
+
+@mcp.tool()
 def retrieve_context(query: str, limit: int = 10) -> list[dict]:
     """Retrieve relevant code context for an agent query string."""
     if not _graph:
@@ -320,18 +385,22 @@ def find_call_graph(qualified_name: str, depth: int = 2) -> dict:
 
 @mcp.tool()
 def get_stats() -> dict:
-    """Return graph statistics: symbol count, file count, CALLS edge count."""
+    """Return graph statistics for files, symbols, variables, and relationship counts."""
     if not _graph:
         raise RuntimeError("MCP server not initialized")
 
     def _fetch():
         sym = _graph.query("MATCH (s:Symbol) RETURN count(s)").result_set
         fil = _graph.query("MATCH (f:File) RETURN count(f)").result_set
+        var = _graph.query("MATCH (v:Variable) RETURN count(v)").result_set
         calls = _graph.query("MATCH ()-[c:CALLS]->() RETURN count(c)").result_set
+        flows = _graph.query("MATCH ()-[f:FLOWS_TO]->() RETURN count(f)").result_set
         return {
             "symbols": sym[0][0] if sym else 0,
             "files": fil[0][0] if fil else 0,
+            "variables": var[0][0] if var else 0,
             "call_edges": calls[0][0] if calls else 0,
+            "variable_flow_edges": flows[0][0] if flows else 0,
         }
 
     return _cached_read("get_stats", {}, _fetch)

@@ -4,8 +4,8 @@ import hashlib
 import os
 import tempfile
 
-from backend.indexer.hasher import sha256_file, file_changed, hash_symbols, hash_calls, hash_imports
-from backend.indexer.parser import ParsedFile, ParsedSymbol, RawCall, ParsedImport
+from backend.indexer.hasher import sha256_file, file_changed, hash_symbols, hash_calls, hash_imports, hash_variable_flows
+from backend.indexer.parser import ParsedFile, ParsedSymbol, ParsedVariable, ParsedVariableFlow, RawCall, ParsedImport
 
 
 def test_sha256_stable(tmp_path):
@@ -99,6 +99,32 @@ def test_hash_imports_dedupes():
     parsed2.imports.append(ParsedImport("test.py", "utils"))
     
     assert hash_imports(parsed1) == hash_imports(parsed2)
+
+
+def test_hash_variable_flows_order_independent():
+    parsed1 = ParsedFile(path="test.py", language="python")
+    parsed1.variables.extend(
+        [
+            ParsedVariable("arg", "mod.fn:arg", "mod.fn", "test.py", 1, "parameter"),
+            ParsedVariable("value", "mod.fn:value", "mod.fn", "test.py", 2, "local"),
+        ]
+    )
+    parsed1.variable_flows.append(
+        ParsedVariableFlow("mod.fn:arg", "mod.fn:value", "mod.fn", 2, "assignment")
+    )
+
+    parsed2 = ParsedFile(path="test.py", language="python")
+    parsed2.variables.extend(
+        [
+            ParsedVariable("value", "mod.fn:value", "mod.fn", "test.py", 2, "local"),
+            ParsedVariable("arg", "mod.fn:arg", "mod.fn", "test.py", 1, "parameter"),
+        ]
+    )
+    parsed2.variable_flows.append(
+        ParsedVariableFlow("mod.fn:arg", "mod.fn:value", "mod.fn", 2, "assignment")
+    )
+
+    assert hash_variable_flows(parsed1) == hash_variable_flows(parsed2)
 
 
 def test_file_changed_same():

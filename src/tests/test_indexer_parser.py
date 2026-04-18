@@ -80,6 +80,22 @@ def test_parse_imports(tmp_py):
     assert "pathlib" in modules
 
 
+def test_parse_python_variable_flows(tmp_py):
+    path = tmp_py("""\
+        def build(user_id, prefix):
+            label = prefix
+            result = label
+            return result
+    """)
+    result = PythonParser().parse(path)
+    variable_names = {variable.name for variable in result.variables}
+    assert {"user_id", "prefix", "label", "result", "__return__"}.issuperset(variable_names)
+    flows = {(flow.source_qname.split(":")[-1], flow.target_qname.split(":")[-1], flow.flow_type) for flow in result.variable_flows}
+    assert ("prefix", "label", "assignment") in flows
+    assert ("label", "result", "assignment") in flows
+    assert ("result", "__return__", "return") in flows
+
+
 def test_parse_syntax_error(tmp_py):
     path = tmp_py("def broken(:\n    pass\n")
     result = PythonParser().parse(path)
@@ -176,6 +192,30 @@ def test_parse_javascript_symbols_and_requires(tmp_path):
     assert names["boot"] == "function"
     assert names["render"] == "function"
     assert "path" in [i.imported_module for i in result.imports]
+
+
+def test_parse_typescript_variable_flows(tmp_path):
+    path = tmp_path / "vars.ts"
+    path.write_text(
+        textwrap.dedent(
+            """\
+            export function render(input, suffix) {
+                const label = input;
+                const finalValue = label;
+                return finalValue;
+            }
+            """
+        ),
+        encoding="utf-8",
+    )
+
+    result = TypeScriptJavaScriptParser().parse(str(path))
+    variable_names = {variable.name for variable in result.variables}
+    assert {"input", "suffix", "label", "finalValue", "__return__"}.issuperset(variable_names)
+    flows = {(flow.source_qname.split(":")[-1], flow.target_qname.split(":")[-1], flow.flow_type) for flow in result.variable_flows}
+    assert ("input", "label", "assignment") in flows
+    assert ("label", "finalValue", "assignment") in flows
+    assert ("finalValue", "__return__", "return") in flows
 
 
 def test_source_parser_dispatches_by_extension(tmp_path):

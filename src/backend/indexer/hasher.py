@@ -5,7 +5,7 @@ against the last-indexed digest stored on the File node in FalkorDB.
 If the digest is unchanged the file is skipped entirely, saving graph writes
 and keeping indexing throughput high.
 
-Symbol-level hashing: tracks separate digests for symbols and calls,
+Symbol-level hashing: tracks separate digests for symbols, calls, and variable flows,
 enabling fine-grained incremental updates when function signatures change
 but the file mostly stays the same.
 """
@@ -62,4 +62,21 @@ def hash_imports(parsed: ParsedFile) -> str:
     h = hashlib.sha256()
     for imp in sorted(set(imp.imported_module for imp in parsed.imports)):
         h.update(f"{imp}\n".encode("utf-8"))
+    return h.hexdigest()
+
+
+def hash_variable_flows(parsed: ParsedFile) -> str:
+    """Hash variable nodes and flows for data-flow tracking changes."""
+    h = hashlib.sha256()
+    for variable in sorted(parsed.variables, key=lambda item: item.qualified_name):
+        h.update(
+            f"var:{variable.qualified_name}:{variable.role}:{variable.line_number}\n".encode("utf-8")
+        )
+    for flow in sorted(
+        parsed.variable_flows,
+        key=lambda item: (item.scope_qname, item.source_qname, item.target_qname, item.flow_type, item.line_number),
+    ):
+        h.update(
+            f"flow:{flow.scope_qname}:{flow.source_qname}->{flow.target_qname}:{flow.flow_type}:{flow.line_number}\n".encode("utf-8")
+        )
     return h.hexdigest()

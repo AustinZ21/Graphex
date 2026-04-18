@@ -21,7 +21,7 @@ import structlog
 from backend.graph.client import GraphClient
 from backend.graph import schema as S
 from backend.indexer.call_analyzer import CallAnalyzer, RawCall
-from backend.indexer.hasher import file_changed, sha256_file
+from backend.indexer.hasher import file_changed, hash_variable_flows, sha256_file
 from backend.indexer.parser import ParsedFile, SUPPORTED_EXTENSIONS, SourceParser, discover_files, path_to_module
 
 log = structlog.get_logger()
@@ -79,7 +79,7 @@ class IndexPipeline:
         files = list(discover_files(repo_path))
         log.info("pipeline.full.start", repo_path=repo_path, files=len(files))
         self._upsert_repo(repo_path)
-        stats: dict = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "imports": 0, "errors": 0}
+        stats: dict = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "imports": 0, "variables": 0, "variable_flows": 0, "errors": 0}
         symbol_map: dict[str, str] = {}
         for fpath in files:
             result = self._index_file(repo_path, fpath, symbol_map, force=True)
@@ -91,7 +91,7 @@ class IndexPipeline:
     def index_incremental(self, repo_path: str, changed_paths: list[str]) -> dict:
         log.info("pipeline.incremental.start", changed=len(changed_paths))
         self._upsert_repo(repo_path)
-        stats: dict = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "imports": 0, "errors": 0}
+        stats: dict = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "imports": 0, "variables": 0, "variable_flows": 0, "errors": 0}
         symbol_map = self._load_symbol_map()
         for fpath in changed_paths:
             if Path(fpath).suffix.lower() not in SUPPORTED_EXTENSIONS:
@@ -131,11 +131,13 @@ class IndexPipeline:
             current_symbols_hash = hash_symbols(parsed)
             current_calls_hash = hash_calls(parsed)
             current_imports_hash = hash_imports(parsed)
+            current_variables_hash = hash_variable_flows(parsed)
             
             stored_hashes = self._get_stored_symbol_hashes(file_path) if not force else {}
             symbols_changed = stored_hashes.get("symbols_hash") != current_symbols_hash
             calls_changed = stored_hashes.get("calls_hash") != current_calls_hash
             imports_changed = stored_hashes.get("imports_hash") != current_imports_hash
+            variables_changed = stored_hashes.get("variables_hash") != current_variables_hash
 
             self._graph.query(
                 S.MERGE_FILE,
@@ -146,6 +148,7 @@ class IndexPipeline:
                     "symbols_hash": current_symbols_hash,
                     "calls_hash": current_calls_hash,
                     "imports_hash": current_imports_hash,
+                    "variables_hash": current_variables_hash,
                 },
             )
             self._graph.query(
@@ -182,7 +185,12 @@ class IndexPipeline:
             if imports_changed:
                 result["imports"] = self._write_import_edges(file_path, parsed, repo_path)
 
-            if symbols_changed or calls_changed or imports_changed:
+            if variables_changed:
+                variable_stats = self._write_variable_flow_edges(parsed)
+                result["variables"] = variable_stats["variables"]
+                result["variable_flows"] = variable_stats["variable_flows"]
+
+            if symbols_changed or calls_changed or imports_changed or variables_changed:
                 result["files"] = 1
             else:
                 result["skipped"] = 1
@@ -246,6 +254,46 @@ class IndexPipeline:
                     pass
         return written
 
+    def _write_variable_flow_edges(self, parsed: ParsedFile) -> dict[str, int]:
+        stats = {"variables": 0, "variable_flows": 0}
+        for variable in parsed.variables:
+            try:
+                self._graph.query(
+                    S.MERGE_VARIABLE,
+                    {
+                        "qualified_name": variable.qualified_name,
+                        "name": variable.name,
+                        "scope_qname": variable.scope_qname,
+                        "file_path": variable.file_path,
+                        "line_number": variable.line_number,
+                        "role": variable.role,
+                    },
+                )
+                self._graph.query(
+                    S.EDGE_SYMBOL_HAS_VARIABLE,
+                    {"scope_qname": variable.scope_qname, "variable_qname": variable.qualified_name},
+                )
+                stats["variables"] += 1
+            except Exception:
+                pass
+
+        for flow in parsed.variable_flows:
+            try:
+                self._graph.query(
+                    S.EDGE_VARIABLE_FLOWS,
+                    {
+                        "source_qname": flow.source_qname,
+                        "target_qname": flow.target_qname,
+                        "scope_qname": flow.scope_qname,
+                        "line_number": flow.line_number,
+                        "flow_type": flow.flow_type,
+                    },
+                )
+                stats["variable_flows"] += 1
+            except Exception:
+                pass
+        return stats
+
     def _get_stored_hash(self, file_path: str) -> str | None:
         result = self._graph.query(S.QUERY_FILE_HASH, {"path": file_path})
         rows = result.result_set
@@ -257,13 +305,14 @@ class IndexPipeline:
         """Get stored symbol-level hashes for fine-grained incremental tracking."""
         try:
             result = self._graph.query(S.QUERY_FILE_SYMBOL_HASHES, {"path": file_path})
-            if result.result_set and len(result.result_set[0]) >= 4:
+            if result.result_set and len(result.result_set[0]) >= 5:
                 row = result.result_set[0]
                 return {
                     "content_hash": row[0],
                     "symbols_hash": row[1],
                     "calls_hash": row[2],
                     "imports_hash": row[3],
+                    "variables_hash": row[4],
                 }
         except Exception:
             pass

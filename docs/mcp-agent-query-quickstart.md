@@ -163,6 +163,39 @@ Version 1.14.0 introduces fine-grained incremental updates:
 - **Symbol hash**: detects changes to function/class signatures
 - **Call hash**: detects changes to function call patterns
 - **Import hash**: detects changes to import dependencies
+- **Variable-flow hash**: detects assignment and return data-flow changes
+
+## Variable flow tracking (v1.18.0)
+
+ContextGraph now tracks lightweight intra-function data flow for Python and TypeScript/JavaScript.
+
+Available tools:
+
+- `find_variable(name, limit)` - Find variables by name or qualified name fragment
+- `get_variable_flows(scope_qname, limit)` - Inspect assignment/return flows inside a function or method
+- `trace_variable_lineage(qualified_name)` - Get one-hop upstream/downstream lineage for a variable
+
+Usage example:
+
+```python
+# Agent wants to understand how data moves through a function
+variables = cg.find_variable("result", limit=10)
+flows = cg.get_variable_flows("backend.service.render", limit=20)
+lineage = cg.trace_variable_lineage("backend.service.render:label")
+```
+
+What gets indexed:
+
+- **Parameters**: function inputs are modeled as variable nodes
+- **Assignments**: `x = y` becomes `y -> x`
+- **Returns**: `return x` becomes `x -> __return__`
+- **Roles**: variables are tagged as `parameter`, `local`, or `return`
+
+This enables agents to answer:
+
+- "Where does this returned value come from?"
+- "Which input parameter influences this local variable?"
+- "What intermediate variables exist inside this function?"
 
 ## Call-graph analysis and metrics (v1.17.0)
 

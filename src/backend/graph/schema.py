@@ -21,7 +21,8 @@ SET f.language = $language,
     f.content_hash = $content_hash,
     f.symbols_hash = $symbols_hash,
     f.calls_hash = $calls_hash,
-    f.imports_hash = $imports_hash
+  f.imports_hash = $imports_hash,
+  f.variables_hash = $variables_hash
 """
 
 MERGE_SYMBOL = """
@@ -31,6 +32,15 @@ SET s.name           = $name,
     s.file_path      = $file_path,
     s.line_start     = $line_start,
     s.line_end       = $line_end
+"""
+
+MERGE_VARIABLE = """
+MERGE (v:Variable {qualified_name: $qualified_name})
+SET v.name        = $name,
+    v.scope_qname = $scope_qname,
+    v.file_path   = $file_path,
+    v.line_number = $line_number,
+    v.role        = $role
 """
 
 # ---------------------------------------------------------------------------
@@ -61,6 +71,18 @@ MATCH (callee:Symbol {qualified_name: $callee_qname})
 MERGE (caller)-[:CALLS]->(callee)
 """
 
+EDGE_SYMBOL_HAS_VARIABLE = """
+MATCH (s:Symbol {qualified_name: $scope_qname})
+MATCH (v:Variable {qualified_name: $variable_qname})
+MERGE (s)-[:USES_VARIABLE]->(v)
+"""
+
+EDGE_VARIABLE_FLOWS = """
+MATCH (source:Variable {qualified_name: $source_qname})
+MATCH (target:Variable {qualified_name: $target_qname})
+MERGE (source)-[:FLOWS_TO {scope_qname: $scope_qname, line_number: $line_number, flow_type: $flow_type}]->(target)
+"""
+
 QUERY_FILE_HASH = """
 MATCH (f:File {path: $path})
 RETURN f.content_hash AS hash
@@ -68,7 +90,7 @@ RETURN f.content_hash AS hash
 
 QUERY_FILE_SYMBOL_HASHES = """
 MATCH (f:File {path: $path})
-RETURN f.content_hash, f.symbols_hash, f.calls_hash, f.imports_hash
+RETURN f.content_hash, f.symbols_hash, f.calls_hash, f.imports_hash, f.variables_hash
 """
 
 # ---------------------------------------------------------------------------
@@ -106,6 +128,10 @@ LIMIT $limit
 
 QUERY_COUNT_SYMBOLS = """
 MATCH (s:Symbol) RETURN count(s) AS cnt
+"""
+
+QUERY_COUNT_VARIABLES = """
+MATCH (v:Variable) RETURN count(v) AS cnt
 """
 
 # ---------------------------------------------------------------------------
@@ -204,6 +230,32 @@ LIMIT $limit
 QUERY_CYCLIC_DEPENDENCIES = """
 MATCH (s1:Symbol)-[:CALLS*2..]->(s2:Symbol)-[:CALLS*1..]->(s1:Symbol)
 RETURN DISTINCT s1.qualified_name AS symbol
+"""
+
+# ---------------------------------------------------------------------------
+# Variable-flow queries
+# ---------------------------------------------------------------------------
+
+QUERY_FIND_VARIABLE = """
+MATCH (v:Variable)
+WHERE v.name = $name OR v.qualified_name CONTAINS $name
+RETURN v.qualified_name, v.scope_qname, v.file_path, v.line_number, v.role
+ORDER BY v.qualified_name
+LIMIT $limit
+"""
+
+QUERY_VARIABLE_FLOWS_FOR_SCOPE = """
+MATCH (source:Variable)-[r:FLOWS_TO {scope_qname: $scope_qname}]->(target:Variable)
+RETURN source.qualified_name, target.qualified_name, r.flow_type, r.line_number
+ORDER BY r.line_number, source.qualified_name, target.qualified_name
+LIMIT $limit
+"""
+
+QUERY_VARIABLE_LINEAGE = """
+MATCH (v:Variable {qualified_name: $qualified_name})
+OPTIONAL MATCH (upstream:Variable)-[in_rel:FLOWS_TO]->(v)
+OPTIONAL MATCH (v)-[out_rel:FLOWS_TO]->(downstream:Variable)
+RETURN collect(DISTINCT upstream.qualified_name), collect(DISTINCT downstream.qualified_name)
 """
 
 # ---------------------------------------------------------------------------

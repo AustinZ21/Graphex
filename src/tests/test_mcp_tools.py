@@ -77,6 +77,35 @@ def test_find_callees():
     assert "callee" in results[0]
 
 
+def test_find_variable_returns_results():
+    mcp_srv._graph = _mock_graph(
+        [["backend.service.render:label", "backend.service.render", "src/backend/service.py", 12, "local"]]
+    )
+    results = mcp_srv.find_variable(name="label", limit=5)
+    assert len(results) == 1
+    assert results[0]["qualified_name"] == "backend.service.render:label"
+    assert results[0]["role"] == "local"
+
+
+def test_get_variable_flows():
+    mcp_srv._graph = _mock_graph(
+        [["backend.service.render:input", "backend.service.render:label", "assignment", 12]]
+    )
+    results = mcp_srv.get_variable_flows("backend.service.render", limit=20)
+    assert results[0]["source"] == "backend.service.render:input"
+    assert results[0]["target"] == "backend.service.render:label"
+
+
+def test_trace_variable_lineage():
+    mcp_srv._graph = _mock_graph(
+        [[["backend.service.render:input"] , ["backend.service.render:result"]]]
+    )
+    result = mcp_srv.trace_variable_lineage("backend.service.render:label")
+    assert result["qualified_name"] == "backend.service.render:label"
+    assert result["upstream"] == ["backend.service.render:input"]
+    assert result["downstream"] == ["backend.service.render:result"]
+
+
 def test_retrieve_context():
     mcp_srv._graph = _mock_graph(
         [["backend.indexer.parser.PythonParser.parse", "method", "src/backend/indexer/parser.py", 40, 70]]
@@ -181,8 +210,12 @@ def test_get_stats():
             r.result_set = [[42]]
         elif "File" in cypher:
             r.result_set = [[10]]
+        elif "Variable" in cypher:
+            r.result_set = [[18]]
         elif "CALLS" in cypher:
             r.result_set = [[15]]
+        elif "FLOWS_TO" in cypher:
+            r.result_set = [[9]]
         else:
             r.result_set = [[0]]
         return r
@@ -191,7 +224,9 @@ def test_get_stats():
     stats = mcp_srv.get_stats()
     assert stats["symbols"] == 42
     assert stats["files"] == 10
+    assert stats["variables"] == 18
     assert stats["call_edges"] == 15
+    assert stats["variable_flow_edges"] == 9
 
 
 # ---------------------------------------------------------------------------
