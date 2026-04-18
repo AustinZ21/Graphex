@@ -15,7 +15,7 @@ from backend.indexer.parser import path_to_module
 import backend.tools.server as mcp_srv
 
 
-pytestmark = pytest.mark.live_graph
+pytestmark = [pytest.mark.live_graph, pytest.mark.live_graph_e2e]
 
 
 def _connect_live_graph() -> GraphClient:

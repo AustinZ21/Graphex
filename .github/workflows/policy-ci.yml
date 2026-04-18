@@ -43,14 +43,23 @@ jobs:
         run: |
           pytest --cov=src --cov-report=term-missing --cov-fail-under=75
 
-      - name: Run live graph integration tests
+      - name: Run live graph smoke tests
         env:
           FALKORDB_HOST: localhost
           FALKORDB_PORT: "16379"
           QUEUE_REDIS_URL: redis://localhost:6380/1
           CACHE_REDIS_URL: redis://localhost:6380
         run: |
-          pytest -m live_graph -q
+          pytest -m live_graph_smoke -q
+
+      - name: Run live graph end-to-end tests
+        env:
+          FALKORDB_HOST: localhost
+          FALKORDB_PORT: "16379"
+          QUEUE_REDIS_URL: redis://localhost:6380/1
+          CACHE_REDIS_URL: redis://localhost:6380
+        run: |
+          pytest -m live_graph_e2e -q
 
       - name: Enforce vulnerability exception expiry
         env:

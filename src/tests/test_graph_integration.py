@@ -14,7 +14,7 @@ from backend.indexer.parser import path_to_module
 from backend.indexer.pipeline import IndexPipeline
 
 
-pytestmark = pytest.mark.live_graph
+pytestmark = [pytest.mark.live_graph, pytest.mark.live_graph_smoke]
 
 
 def _connect_live_graph() -> GraphClient:

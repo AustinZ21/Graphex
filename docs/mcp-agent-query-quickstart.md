@@ -328,6 +328,19 @@ What changed:
 
 This makes graph-dependent validation deterministic in CI and avoids hidden drift between local and pipeline behavior.
 
+## CI live-graph smoke and e2e split (v1.26.0)
+
+The live graph stage is now split into two explicit lanes for faster failure diagnosis.
+
+What changed:
+
+- `test_graph_integration.py` is tagged as `live_graph_smoke`
+- `test_mcp_e2e.py` is tagged as `live_graph_e2e`
+- Coverage gate remains the full test command (`--cov-fail-under=75`)
+- CI executes `live_graph_smoke` and `live_graph_e2e` as separate steps
+
+This allows quick identification of whether a regression is in graph write/query foundations or in MCP retrieval behavior.
+
 These tools let agents answer:
 
 - "哪些参数根本没有参与函数内部的数据流？"
