@@ -86,6 +86,26 @@ Output format:
 - Includes `ok`, `tool`, `arguments`, `attempts`, and either `result` or `error`.
 - CLI summary includes `qps`, `retries`, `failed`, `cancelled`, `resumed_skipped`, `executed_now`, and `duration_sec` for quick throughput checks.
 
+## 4.2) Run CG-first query strategy client (agent default route)
+
+This script implements a default strategy for agents:
+1. Query ContextGraph MCP first (`retrieve_context` + `find_call_graph`).
+2. Keep graph context under a token budget.
+3. Fallback to local code snippets only when graph hits are insufficient.
+
+Run:
+
+```powershell
+python src/scripts/mcp_query_strategy.py --query "how indexing pipeline works" --base-url http://127.0.0.1:8011 --repo-root . --token-budget 1800 --graph-top-k 8 --min-graph-hits 3
+```
+
+Output fields:
+- `strategy`: always `cg-first`
+- `graph_context`: MCP graph hits with relations
+- `used_fallback`: whether local snippet fallback was triggered
+- `fallback_context`: local snippets only when needed
+- `estimated_tokens`: approximate token usage for returned context
+
 ## 5) Available graph query tools
 
 Read/query tools:

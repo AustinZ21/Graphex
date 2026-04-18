@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.4.0  
+**Version:** 1.5.0  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-18 (MCP index job status tools + retry-failed line-mapping fix)
+**Date:** 2026-04-18 (CG-first agent query strategy client + token-budget fallback routing)
 
 ## 1. Introduction
 
