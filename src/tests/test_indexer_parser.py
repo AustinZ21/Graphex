@@ -12,6 +12,9 @@ from backend.indexer.parser import (
     PythonParser,
     SourceParser,
     TypeScriptJavaScriptParser,
+    GoParser,
+    RustParser,
+    JavaParser,
     discover_files,
     SUPPORTED_EXTENSIONS,
 )
@@ -186,6 +189,117 @@ def test_source_parser_dispatches_by_extension(tmp_path):
     ts_result = parser.parse(str(ts))
     assert py_result.language == "python"
     assert ts_result.language == "typescript"
+
+
+def test_parse_go_file(tmp_path):
+    """Test Go parser: functions, structs, interfaces."""
+    go_file = tmp_path / "main.go"
+    go_file.write_text(
+        textwrap.dedent("""\
+        package main
+
+        type Person struct {
+            Name string
+        }
+
+        type Reader interface {
+            Read() []byte
+        }
+
+        func (p *Person) Greet() string {
+            return p.Name
+        }
+
+        func main() {
+            p := &Person{Name: "Alice"}
+            println(p.Greet())
+        }
+        """),
+        encoding="utf-8",
+    )
+
+    result = GoParser().parse(str(go_file))
+    assert result.language == "go"
+    names = {s.name: s.symbol_type for s in result.symbols}
+    assert names["Person"] == "struct"
+    assert names["Reader"] == "interface"
+    assert names["main"] == "function"
+    assert names["Greet"] == "method"
+
+
+def test_parse_rust_file(tmp_path):
+    """Test Rust parser: modules, structs, traits, functions."""
+    rs_file = tmp_path / "lib.rs"
+    rs_file.write_text(
+        textwrap.dedent("""\
+        pub mod utils;
+
+        pub struct Config {
+            path: String,
+        }
+
+        pub trait Handler {
+            fn handle(&self);
+        }
+
+        pub fn parse() {
+            println!("parsing");
+        }
+        """),
+        encoding="utf-8",
+    )
+
+    result = RustParser().parse(str(rs_file))
+    assert result.language == "rust"
+    names = {s.name: s.symbol_type for s in result.symbols}
+    assert names["utils"] == "module"
+    assert names["Config"] == "struct"
+    assert names["Handler"] == "trait"
+    assert names["parse"] == "function"
+
+
+def test_parse_java_file(tmp_path):
+    """Test Java parser: classes, interfaces, methods."""
+    java_file = tmp_path / "Main.java"
+    java_file.write_text(
+        textwrap.dedent("""\
+        package com.example;
+
+        import java.io.*;
+
+        public class Main {
+            public static void main(String[] args) {
+                System.out.println("Hello");
+            }
+
+            public String greet(String name) {
+                return "Hello " + name;
+            }
+        }
+
+        interface Runner {
+            void run();
+        }
+        """),
+        encoding="utf-8",
+    )
+
+    result = JavaParser().parse(str(java_file))
+    assert result.language == "java"
+    names = {s.name: s.symbol_type for s in result.symbols}
+    assert names["Main"] == "class"
+    assert names["Runner"] == "interface"
+    assert names["main"] == "method"
+    assert names["greet"] == "method"
+
+
+def test_supported_extensions_include_new_languages():
+    """Verify that new language extensions are registered."""
+    assert ".go" in SUPPORTED_EXTENSIONS
+    assert ".rs" in SUPPORTED_EXTENSIONS
+    assert ".java" in SUPPORTED_EXTENSIONS
+    assert ".py" in SUPPORTED_EXTENSIONS
+    assert ".ts" in SUPPORTED_EXTENSIONS
 
 
 def test_typescript_call_extraction(tmp_path):

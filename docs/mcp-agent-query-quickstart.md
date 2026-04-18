@@ -154,6 +154,7 @@ Import tracking supports:
 - Local relative imports (`./utils`, `../core`)
 - Directory imports with index/init files
 - Language-agnostic path resolution
+- Multi-language: Python, TypeScript/JavaScript, Go, Rust, Java
 
 ## Symbol-level incremental indexing
 
@@ -162,6 +163,29 @@ Version 1.14.0 introduces fine-grained incremental updates:
 - **Symbol hash**: detects changes to function/class signatures
 - **Call hash**: detects changes to function call patterns
 - **Import hash**: detects changes to import dependencies
+
+## Multi-language support (v1.16.0)
+
+ContextGraph now supports **Go**, **Rust**, and **Java** in addition to Python and TypeScript/JavaScript:
+
+```python
+# Supported file extensions
+SUPPORTED_EXTENSIONS = {
+    ".py",              # Python
+    ".ts", ".tsx",      # TypeScript
+    ".js", ".jsx",      # JavaScript
+    ".go",              # Go
+    ".rs",              # Rust
+    ".java",            # Java
+}
+```
+
+Each parser uses regex-based lightweight extraction (no external dependencies):
+- **Go**: Functions, structs, interfaces, methods, imports (packages)
+- **Rust**: Modules, structs, traits, impl blocks, functions, imports (use)
+- **Java**: Classes, interfaces, enums, methods, imports (packages)
+
+**Enables agents to query codebases across 6 programming languages**, reducing token overhead by reusing global architecture queries instead of file reads.
 
 ## Performance benchmarking (v1.15.0)
 
