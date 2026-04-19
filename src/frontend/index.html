@@ -51,8 +51,9 @@
       display: flex; align-items: center; gap: 12px;
       padding: 12px 24px;
       border-bottom: 1px solid var(--border);
-      background: rgba(255,255,255,.02);
+      background: var(--panel-elevated);
       position: sticky; top: 0; z-index: 10;
+      box-shadow: 0 1px 0 rgba(0,0,0,.25);
     }
     .topbar .logo {
       display: flex; align-items: center; gap: 9px;
@@ -114,12 +115,27 @@
       margin-bottom: 16px;
     }
     .section-header h2 { font-size: 16px; }
+    .audit-filters {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      white-space: nowrap;
+      scrollbar-width: thin;
+    }
+    .audit-filters input,
+    .audit-filters select {
+      flex: 0 0 auto;
+      width: auto;
+    }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     thead th {
       text-align: left; padding: 10px 12px;
       color: var(--muted); font-weight: 600; font-size: 11px;
       text-transform: uppercase; letter-spacing: .06em;
       border-bottom: 1px solid var(--border);
+      background: var(--panel);
     }
     thead th.sortable { cursor: pointer; user-select: none; }
     thead th.sortable:hover { color: var(--text); }
@@ -352,6 +368,7 @@
     <div class="topbar-nav">
       <button class="tab-btn active" id="tab-projects-btn" onclick="switchTab('projects',this)">Projects &amp; Tokens</button>
       <button class="tab-btn" id="tab-users-btn" onclick="switchTab('users',this)">Users</button>
+      <button class="tab-btn" id="tab-audit-btn" onclick="switchTab('audit',this)">Audit</button>
     </div>
     <div class="user-badge">
       <div class="user-menu-wrap" id="user-menu-wrap">
@@ -416,6 +433,40 @@
             <th>Actions</th>
           </tr></thead>
           <tbody id="users-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- AUDIT -->
+    <div class="pane" id="pane-audit">
+      <div class="section-header">
+        <h2>Audit</h2>
+        <div class="audit-filters">
+          <input id="audit-actor" placeholder="Actor" style="width:130px" />
+          <input id="audit-project" placeholder="Project" style="width:130px" />
+          <input id="audit-path" placeholder="Path contains" style="width:180px" />
+          <select id="audit-scope" style="width:120px">
+            <option value="">all scopes</option>
+            <option value="api">api</option>
+            <option value="mcp">mcp</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th class="sortable" onclick="setAuditSort('created_at')">Time <span id="sort-audit-created_at"></span></th>
+            <th class="sortable" onclick="setAuditSort('scope')">Scope <span id="sort-audit-scope"></span></th>
+            <th class="sortable" onclick="setAuditSort('method')">Method <span id="sort-audit-method"></span></th>
+            <th class="sortable" onclick="setAuditSort('path')">Path <span id="sort-audit-path"></span></th>
+            <th class="sortable" onclick="setAuditSort('status_code')">Status <span id="sort-audit-status_code"></span></th>
+            <th class="sortable" onclick="setAuditSort('duration_ms')">Duration <span id="sort-audit-duration_ms"></span></th>
+            <th class="sortable" onclick="setAuditSort('actor_display')">Actor <span id="sort-audit-actor_display"></span></th>
+            <th class="sortable" onclick="setAuditSort('project_external_id_display')">Project ID <span id="sort-audit-project_external_id_display"></span></th>
+            <th class="sortable" onclick="setAuditSort('token_count_sort')">Token Usage <span id="sort-audit-token_count_sort"></span></th>
+            <th class="sortable" onclick="setAuditSort('details_display')">Details <span id="sort-audit-details_display"></span></th>
+          </tr></thead>
+          <tbody id="audit-body"></tbody>
         </table>
       </div>
     </div>
@@ -527,6 +578,7 @@ let _me = null;
 let _currentProjectId = null;
 let _projectsSort = { key: 'created_at', dir: 'desc' };
 let _usersSort = { key: 'id', dir: 'asc' };
+let _auditSort = { key: 'created_at', dir: 'desc' };
 
 function _compareValues(a, b) {
   if (typeof a === 'boolean' || typeof b === 'boolean') {
@@ -636,6 +688,7 @@ async function initApp() {
   if (_me.role !== 'admin') {
     document.getElementById('new-project-btn').style.display = 'none';
     document.getElementById('tab-users-btn').style.display = 'none';
+    document.getElementById('tab-audit-btn').style.display = 'none';
   }
   await loadProjects();
 }
@@ -697,11 +750,23 @@ function switchTab(name, btn) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('pane-' + name).classList.add('active');
   if (btn) btn.classList.add('active');
+  if (_auditPollInterval) {
+    clearInterval(_auditPollInterval);
+    _auditPollInterval = null;
+  }
   if (!btn && name === 'projects') {
     const projectsTabBtn = document.getElementById('tab-projects-btn');
     if (projectsTabBtn) projectsTabBtn.classList.add('active');
   }
   if (name === 'users') loadUsers();
+  if (name === 'audit') {
+    loadAudit();
+    _auditPollInterval = setInterval(() => {
+      if (document.getElementById('pane-audit')?.classList.contains('active')) {
+        loadAudit();
+      }
+    }, 3000);
+  }
 }
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
@@ -711,9 +776,71 @@ let _allProjects = [];
 let _tokensCache = {};  // projectId -> tokens[]
 let _indexStatusCache = {};  // projectId -> ProjectIndexStatus
 let _indexStatusPollInterval = null;
+let _expandedProjectIds = new Set();
+let _auditRowsCache = [];
+let _projectExternalIdByDbId = {};
+let _auditPollInterval = null;
+let _auditLoading = false;
+
+function _renderAuditSortIcons() {
+  const keys = [
+    'created_at',
+    'scope',
+    'method',
+    'path',
+    'status_code',
+    'duration_ms',
+    'actor_display',
+    'project_external_id_display',
+    'token_count_sort',
+    'details_display',
+  ];
+  keys.forEach(k => {
+    const el = document.getElementById('sort-audit-' + k);
+    if (el) el.innerHTML = _sortIcon(_auditSort, k);
+  });
+}
+
+function setAuditSort(key) {
+  if (_auditSort.key === key) {
+    _auditSort.dir = _auditSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    _auditSort.key = key;
+    _auditSort.dir = 'asc';
+  }
+  renderAuditRows();
+}
+
+function renderAuditRows() {
+  const tbody = document.getElementById('audit-body');
+  const rows = _sortRows(_auditRowsCache, _auditSort);
+  _renderAuditSortIcons();
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state">No audit records found</div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td style="font-size:12px;font-family:monospace;color:var(--muted)">${esc(r.created_at || '')}</td>
+      <td><span class="role-tag${r.scope === 'mcp' ? ' viewer' : ''}">${esc(r.scope || '')}</span></td>
+      <td>${esc(r.method || '')}</td>
+      <td style="font-family:monospace;font-size:12px">${esc(r.path || '')}</td>
+      <td><span class="${(r.status_code || 500) < 400 ? 'badge-active' : 'badge-inactive'}">${esc(String(r.status_code || ''))}</span></td>
+      <td style="font-family:monospace;font-size:12px">${esc(String(r.duration_ms || 0))} ms</td>
+      <td style="font-size:12px">${esc(r.actor_display || 'anonymous')}</td>
+      <td style="font-size:12px;font-family:monospace">${esc(r.project_external_id_display || '—')}</td>
+      <td style="font-size:12px;font-family:monospace">${r.token_count_display ? esc(r.token_count_display) : '—'}</td>
+      <td style="font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.details_display || '')}">${esc(r.details_display || '')}</td>
+    </tr>
+  `).join('');
+}
 
 async function loadProjects() {
   _allProjects = await api('GET', '/auth/projects');
+  _projectExternalIdByDbId = {};
+  _allProjects.forEach(p => { _projectExternalIdByDbId[p.id] = p.project_id; });
   // pre-load tokens for all projects (used by search)
   await Promise.all(_allProjects.map(async p => {
     try { _tokensCache[p.id] = await api('GET', `/auth/projects/${p.id}/tokens`); }
@@ -769,9 +896,10 @@ function filterProjects(q) {
     const progress = (job?.files || 0) > 0 ? Math.min(100, (job?.symbols || 0) / Math.max(1, job?.files || 1) * 100) : 0;
     const statusDot = job ? `<span class="status-dot ${job.status}"></span>` : '';
     const statusText = job ? `${job.status}${job.error ? ': ' + job.error : ''}` : 'idle';
+    const expanded = _expandedProjectIds.has(p.id);
     return `
     <tr>
-      <td><button class="expand-btn" onclick="toggleTokens(${p.id},this)">&#9654;</button></td>
+      <td><button class="expand-btn" onclick="toggleTokens(${p.id},this)">${expanded ? '&#9660;' : '&#9654;'}</button></td>
       <td style="font-family:monospace;font-size:12px;color:var(--muted)">${esc(p.project_id)}</td>
       <td>
         <strong>${esc(p.project_key)}</strong>
@@ -796,18 +924,35 @@ function filterProjects(q) {
           <button class="btn btn-sm btn-danger" onclick="deleteProject(${p.id})">Delete</button>`:''}
       </td>
     </tr>
-    <tr id="tokens-row-${p.id}" style="display:none">
+    <tr id="tokens-row-${p.id}" style="display:${expanded ? '' : 'none'}">
       <td colspan="7" style="padding:0 12px 12px 36px">
         <div id="tokens-panel-${p.id}"></div>
       </td>
     </tr>
   `}).join('');
+
+  rows.forEach(p => {
+    if (_expandedProjectIds.has(p.id)) {
+      const panel = document.getElementById('tokens-panel-' + p.id);
+      if (panel) {
+        const tokens = _tokensCache[p.id] || [];
+        renderTokensPanel(panel, tokens, p.id);
+      }
+    }
+  });
 }
 
 async function toggleTokens(projectId, btn) {
   const row = document.getElementById('tokens-row-' + projectId);
-  if (row.style.display !== 'none') { row.style.display='none'; btn.innerHTML='&#9654;'; return; }
-  row.style.display=''; btn.innerHTML='&#9660;';
+  if (row.style.display !== 'none') {
+    row.style.display='none';
+    btn.innerHTML='&#9654;';
+    _expandedProjectIds.delete(projectId);
+    return;
+  }
+  row.style.display='';
+  btn.innerHTML='&#9660;';
+  _expandedProjectIds.add(projectId);
   const panel = document.getElementById('tokens-panel-' + projectId);
   // use cache first, refresh async after render
   if (_tokensCache[projectId]) {
@@ -958,6 +1103,43 @@ async function loadUsers() {
         : '<span style="color:var(--muted);font-size:12px">You</span>'}</td>
     </tr>`).join('');
 }
+
+async function loadAudit() {
+  if (_auditLoading) return;
+  _auditLoading = true;
+  try {
+    const actor = document.getElementById('audit-actor')?.value.trim() || '';
+    const projectKey = document.getElementById('audit-project')?.value.trim() || '';
+    const pathLike = document.getElementById('audit-path')?.value.trim() || '';
+    const scope = document.getElementById('audit-scope')?.value || '';
+
+    const params = new URLSearchParams({ limit: '150' });
+    if (actor) params.set('actor', actor);
+    if (projectKey) params.set('project_key', projectKey);
+    if (pathLike) params.set('path_like', pathLike);
+    if (scope) params.set('scope', scope);
+
+    const rows = await api('GET', '/auth/audit?' + params.toString());
+    _auditRowsCache = rows.map(r => {
+      const preciseUsage = Number.isFinite(r.token_usage_total) ? Math.max(0, Number(r.token_usage_total)) : null;
+      const details = r.request_body || r.response_error || r.details_json || '';
+      return {
+        ...r,
+        actor_display: r.actor_name || r.actor_type || 'anonymous',
+        project_external_id_display: _projectExternalIdByDbId[r.project_id] || '',
+        details_display: details,
+        token_count_sort: preciseUsage !== null ? preciseUsage : -1,
+        token_count_display: preciseUsage !== null ? String(preciseUsage) : '',
+      };
+    });
+    renderAuditRows();
+  } catch(e) {
+    toast(e.message, 'error');
+  } finally {
+    _auditLoading = false;
+  }
+}
+
 function openNewUser() {
   ['nu-user','nu-pass'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('nu-role').value='viewer';

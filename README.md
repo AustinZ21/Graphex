@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.8  
+**Version:** 1.29.9  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-19 (docs: add LOC column to benchmark tables)
+**Date:** 2026-04-19 (ui: rename Audit Token column to Token Usage)
 
 ## 1. Introduction
 
