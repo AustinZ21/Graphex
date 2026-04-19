@@ -87,7 +87,7 @@ def test_mcp_rejects_non_mcp_token_type(tmp_path, monkeypatch):
         "/mcp/ping",
         headers={
             "Authorization": "Bearer edge-token",
-            "X-Project-ID": "1",
+            "X-Project-ID": "P1",
         },
     )
 
@@ -104,7 +104,7 @@ def test_mcp_rejects_project_mismatch(tmp_path, monkeypatch):
         "/mcp/ping",
         headers={
             "Authorization": "Bearer good-token",
-            "X-Project-ID": "2",
+            "X-Project-ID": "P2",
         },
     )
 
@@ -121,7 +121,7 @@ def test_mcp_accepts_matching_mcp_token(tmp_path, monkeypatch):
         "/mcp/ping",
         headers={
             "Authorization": "Bearer good-token",
-            "X-Project-ID": "1",
+            "X-Project-ID": "P1",
         },
     )
 

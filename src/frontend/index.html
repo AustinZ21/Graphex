@@ -365,8 +365,8 @@
         <table>
           <thead><tr>
             <th></th>
-            <th class="sortable" onclick="setProjectsSort('project_key')">Project Name <span id="sort-project_key"></span></th>
             <th class="sortable" onclick="setProjectsSort('project_id')">Project ID <span id="sort-project_id"></span></th>
+            <th class="sortable" onclick="setProjectsSort('project_key')">Project Name <span id="sort-project_key"></span></th>
             <th class="sortable" onclick="setProjectsSort('upstream_url')">Upstream URL <span id="sort-upstream_url"></span></th>
             <th class="sortable" onclick="setProjectsSort('is_active')">Status <span id="sort-is_active"></span></th>
             <th class="sortable" onclick="setProjectsSort('created_at')">Created <span id="sort-created_at"></span></th>
@@ -720,8 +720,8 @@ function filterProjects(q) {
   tbody.innerHTML = rows.map(p => `
     <tr>
       <td><button class="expand-btn" onclick="toggleTokens(${p.id},this)">&#9654;</button></td>
-      <td><strong>${esc(p.project_key)}</strong></td>
       <td style="font-family:monospace;font-size:12px;color:var(--muted)">${esc(p.project_id)}</td>
+      <td><strong>${esc(p.project_key)}</strong></td>
       <td style="color:var(--muted)">${esc(p.upstream_url||'—')}</td>
       <td><span class="${p.is_active?'badge-active':'badge-inactive'}">${p.is_active?'Active':'Inactive'}</span></td>
       <td style="color:var(--muted);font-size:12px;font-family:monospace">${esc(p.created_at)}</td>

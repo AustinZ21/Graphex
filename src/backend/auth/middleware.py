@@ -27,9 +27,8 @@ class ProjectTokenMiddleware(BaseHTTPMiddleware):
         if not project_id_raw:
             return JSONResponse({"detail": "Missing project_id (use X-Project-ID header)"}, status_code=401)
 
-        try:
-            project_id = int(project_id_raw)
-        except ValueError:
+        project_id = project_id_raw.strip()
+        if not project_id:
             return JSONResponse({"detail": "Invalid project_id"}, status_code=400)
 
         token = auth[len("Bearer "):]
@@ -41,7 +40,7 @@ class ProjectTokenMiddleware(BaseHTTPMiddleware):
                 digest = hash_token(token)
                 async with db.execute(
                     """
-                    SELECT pt.id, pt.project_id, pt.token_type
+                    SELECT pt.id, pt.project_id, pt.token_type, p.project_id AS project_external_id
                     FROM project_tokens pt
                     JOIN projects p ON p.id = pt.project_id
                     WHERE pt.token_hash = ? AND pt.is_active = 1 AND p.is_active = 1
@@ -58,10 +57,11 @@ class ProjectTokenMiddleware(BaseHTTPMiddleware):
         if row["token_type"] != "mcp":
             return JSONResponse({"detail": "Token type not allowed for MCP endpoint"}, status_code=403)
 
-        if row["project_id"] != project_id:
+        if row["project_external_id"] != project_id:
             return JSONResponse({"detail": "Token is not valid for this project_id"}, status_code=403)
 
-        request.state.project_id = row["project_id"]
+        request.state.project_id = row["project_external_id"]
+        request.state.project_db_id = row["project_id"]
         request.state.project_token_id = row["id"]
 
         return await call_next(request)
