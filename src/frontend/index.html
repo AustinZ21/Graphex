@@ -378,10 +378,6 @@
           <span class="chevron">&#9660;</span>
         </button>
         <div class="user-dropdown" id="user-dropdown">
-          <div class="user-dropdown-header">
-            <strong id="dd-username"></strong>
-            <span id="dd-email"></span>
-          </div>
           <button class="user-dropdown-item" onclick="openProfile(); closeUserMenu()">&#9998; Profile</button>
           <div class="user-dropdown-divider"></div>
           <button class="user-dropdown-item danger" onclick="logout()">&#10148; Sign out</button>
@@ -680,8 +676,6 @@ async function initApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('topbar-user').textContent = _me.username;
-  document.getElementById('dd-username').textContent = _me.username;
-  document.getElementById('dd-email').textContent = _me.email || '';
   const roleEl = document.getElementById('topbar-role');
   roleEl.textContent = _me.role;
   roleEl.className = 'role-tag' + (_me.role === 'admin' ? '' : ' viewer');
@@ -738,8 +732,6 @@ async function submitProfile() {
   try {
     _me = await api('PATCH', '/auth/me', body);
     document.getElementById('topbar-user').textContent = _me.username;
-    document.getElementById('dd-username').textContent = _me.username;
-    document.getElementById('dd-email').textContent = _me.email || '';
     closeModal('modal-profile');
     toast('Profile updated');
   } catch(e) { toast(e.message, 'error'); }

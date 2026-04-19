@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.10  
+**Version:** 1.29.11  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-19 (ui: move Project ID column before Scope in Audit table)
+**Date:** 2026-04-19 (ui: remove logged-in user item from dropdown menu)
 
 ## 1. Introduction
 
