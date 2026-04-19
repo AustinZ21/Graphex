@@ -281,10 +281,10 @@
             <strong id="dd-username"></strong>
             <span id="dd-email"></span>
           </div>
-          <button class="user-dropdown-item" onclick="openProfile(); closeUserMenu()">&#9998; 个人资料</button>
-          <button class="user-dropdown-item" id="dd-users-link" onclick="switchTab('users', document.querySelector('[onclick*=users]')); closeUserMenu()">&#128100; 用户管理</button>
+          <button class="user-dropdown-item" onclick="openProfile(); closeUserMenu()">&#9998; Profile</button>
+          <button class="user-dropdown-item" id="dd-users-link" onclick="switchTab('users', document.querySelector('[onclick*=users]')); closeUserMenu()">&#128100; Users</button>
           <div class="user-dropdown-divider"></div>
-          <button class="user-dropdown-item danger" onclick="logout()">&#10148; 退出登录</button>
+          <button class="user-dropdown-item danger" onclick="logout()">&#10148; Sign out</button>
         </div>
       </div>
     </div>
@@ -300,10 +300,10 @@
     <div class="pane active" id="pane-projects">
       <div class="section-header">
         <h2>Projects</h2>
-        <button class="btn btn-primary btn-sm" id="new-project-btn" onclick="openNewProject()">+ 新建项目</button>
+        <button class="btn btn-primary btn-sm" id="new-project-btn" onclick="openNewProject()">+ New Project</button>
       </div>
       <div class="search-wrap">
-        <input id="project-search" placeholder="搜索项目名称、Project ID、URL、Token、Token ID、日期..." oninput="filterProjects(this.value)" />
+        <input id="project-search" placeholder="Search by name, project ID, URL, token, token ID, date..." oninput="filterProjects(this.value)" />
       </div>
       <div class="table-wrap">
         <table>
@@ -337,9 +337,9 @@
 <!-- MODAL: New / Edit Project -->
 <div class="overlay" id="modal-project">
   <div class="modal">
-    <h3 id="modal-project-title">新建项目</h3>
+    <h3 id="modal-project-title">New Project</h3>
     <div class="form-group">
-      <label>项目名称</label>
+      <label>Project Name</label>
       <input id="np-key" placeholder="e.g. osagent-local" />
     </div>
     <div class="form-group">
@@ -347,12 +347,12 @@
       <input id="np-url" placeholder="http://localhost:8000" />
     </div>
     <div class="form-group">
-      <label>描述</label>
-      <textarea id="np-desc" placeholder="可选" rows="3" style="resize:vertical"></textarea>
+      <label>Description</label>
+      <textarea id="np-desc" placeholder="Optional" rows="3" style="resize:vertical"></textarea>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
-      <button class="btn btn-ghost" onclick="closeModal('modal-project')">取消</button>
-      <button class="btn btn-primary" id="modal-project-submit" onclick="submitProjectModal()">创建</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-project')">Cancel</button>
+      <button class="btn btn-primary" id="modal-project-submit" onclick="submitProjectModal()">Create</button>
     </div>
   </div>
 </div>
@@ -403,32 +403,32 @@
 <!-- PROFILE MODAL -->
 <div class="overlay" id="modal-profile">
   <div class="modal" style="width:min(480px,100%)">
-    <h3>个人资料</h3>
+    <h3>Profile</h3>
     <div class="form-group">
-      <label>用户名</label>
+      <label>Username</label>
       <input id="pf-username" type="text" autocomplete="username" />
     </div>
     <div class="form-group">
-      <label>邮箱</label>
-      <input id="pf-email" type="email" autocomplete="email" placeholder="（可选）" />
+      <label>Email</label>
+      <input id="pf-email" type="email" autocomplete="email" placeholder="Optional" />
     </div>
     <hr style="border-color:var(--border);margin:16px 0" />
-    <p style="color:var(--muted);font-size:12px;margin-bottom:12px">修改密码（留空则不更改）</p>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:12px">Change password (leave blank to keep current)</p>
     <div class="form-group">
-      <label>当前密码</label>
+      <label>Current password</label>
       <input id="pf-cur-pass" type="password" autocomplete="current-password" />
     </div>
     <div class="form-group">
-      <label>新密码（至少 8 位）</label>
+      <label>New password (min 8 chars)</label>
       <input id="pf-new-pass" type="password" autocomplete="new-password" />
     </div>
     <div class="form-group">
-      <label>确认新密码</label>
+      <label>Confirm new password</label>
       <input id="pf-confirm-pass" type="password" autocomplete="new-password" />
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
-      <button class="btn btn-ghost" onclick="closeModal('modal-profile')">取消</button>
-      <button class="btn btn-primary" onclick="submitProfile()">保存</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-profile')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitProfile()">Save</button>
     </div>
   </div>
 </div>
@@ -498,6 +498,52 @@ async function initApp() {
 function logout() {
   _jwt = ''; _me = null;
   localStorage.removeItem('cg_jwt');
+
+// ── User dropdown ─────────────────────────────────────────────────────────
+function toggleUserMenu() {
+  const btn = document.getElementById('user-menu-btn');
+  const dd  = document.getElementById('user-dropdown');
+  const open = dd.classList.toggle('open');
+  btn.classList.toggle('open', open);
+}
+function closeUserMenu() {
+  document.getElementById('user-dropdown').classList.remove('open');
+  document.getElementById('user-menu-btn').classList.remove('open');
+}
+document.addEventListener('click', e => {
+  if (!document.getElementById('user-menu-wrap')?.contains(e.target)) closeUserMenu();
+});
+
+// ── Profile ───────────────────────────────────────────────────────────────
+function openProfile() {
+  document.getElementById('pf-username').value = _me.username;
+  document.getElementById('pf-email').value = _me.email || '';
+  ['pf-cur-pass','pf-new-pass','pf-confirm-pass'].forEach(id => document.getElementById(id).value='');
+  openModal('modal-profile');
+}
+async function submitProfile() {
+  const username = document.getElementById('pf-username').value.trim();
+  const email    = document.getElementById('pf-email').value.trim();
+  const curPass  = document.getElementById('pf-cur-pass').value;
+  const newPass  = document.getElementById('pf-new-pass').value;
+  const confirmP = document.getElementById('pf-confirm-pass').value;
+  if (!username) { toast('Username is required', 'error'); return; }
+  if (newPass && newPass !== confirmP) { toast('Passwords do not match', 'error'); return; }
+  if (newPass && newPass.length < 8) { toast('New password must be at least 8 characters', 'error'); return; }
+  const body = {};
+  if (username !== _me.username) body.username = username;
+  if (email !== (_me.email||'')) body.email = email;
+  if (newPass) { body.current_password = curPass; body.new_password = newPass; }
+  if (!Object.keys(body).length) { toast('No changes'); closeModal('modal-profile'); return; }
+  try {
+    _me = await api('PATCH', '/auth/me', body);
+    document.getElementById('topbar-user').textContent = _me.username;
+    document.getElementById('dd-username').textContent = _me.username;
+    document.getElementById('dd-email').textContent = _me.email || '';
+    closeModal('modal-profile');
+    toast('Profile updated');
+  } catch(e) { toast(e.message, 'error'); }
+}
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
 }
@@ -518,7 +564,7 @@ let _tokensCache = {};  // projectId -> tokens[]
 
 async function loadProjects() {
   _allProjects = await api('GET', '/auth/projects');
-  // 预加载所有项目的 token，用于搜索
+  // pre-load tokens for all projects (used by search)
   await Promise.all(_allProjects.map(async p => {
     try { _tokensCache[p.id] = await api('GET', `/auth/projects/${p.id}/tokens`); }
     catch { _tokensCache[p.id] = []; }
@@ -539,7 +585,7 @@ function filterProjects(q) {
     : _allProjects;
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">${kw ? '无匹配结果' : '暂无项目'}</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">${kw ? 'No matching projects' : 'No projects yet'}</div></td></tr>`;
     return;
   }
   tbody.innerHTML = rows.map(p => `
@@ -553,8 +599,8 @@ function filterProjects(q) {
       <td>
         <button class="btn btn-sm btn-ghost" style="margin-right:4px" onclick="openGenerateToken(${p.id})">+ Token</button>
         ${_me?.role==='admin'?`
-          <button class="btn btn-sm" style="margin-right:4px" onclick="openEditProject(${p.id},'${esc(p.project_key)}','${esc(p.upstream_url||'')}',${JSON.stringify(p.description||'')})">编辑</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteProject(${p.id})">删除</button>`:''}
+          <button class="btn btn-sm" style="margin-right:4px" onclick="openEditProject(${p.id},'${esc(p.project_key)}','${esc(p.upstream_url||'')}',${JSON.stringify(p.description||'')})">Edit</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteProject(${p.id})">Delete</button>`:''}
       </td>
     </tr>
     <tr id="tokens-row-${p.id}" style="display:none">
@@ -570,7 +616,7 @@ async function toggleTokens(projectId, btn) {
   if (row.style.display !== 'none') { row.style.display='none'; btn.innerHTML='&#9654;'; return; }
   row.style.display=''; btn.innerHTML='&#9660;';
   const panel = document.getElementById('tokens-panel-' + projectId);
-  // 优先用缓存，展示后异步刷新
+  // use cache first, refresh async after render
   if (_tokensCache[projectId]) {
     renderTokensPanel(panel, _tokensCache[projectId], projectId);
   } else {
@@ -609,15 +655,15 @@ function renderTokensPanel(panel, tokens, projectId) {
 let _editProjectId = null;
 function openNewProject() {
   _editProjectId = null;
-  document.getElementById('modal-project-title').textContent = '新建项目';
-  document.getElementById('modal-project-submit').textContent = '创建';
+  document.getElementById('modal-project-title').textContent = 'New Project';
+  document.getElementById('modal-project-submit').textContent = 'Create';
   ['np-key','np-url','np-desc'].forEach(id=>document.getElementById(id).value='');
   openModal('modal-project');
 }
 function openEditProject(id, key, url, desc) {
   _editProjectId = id;
-  document.getElementById('modal-project-title').textContent = '编辑项目';
-  document.getElementById('modal-project-submit').textContent = '保存';
+  document.getElementById('modal-project-title').textContent = 'Edit Project';
+  document.getElementById('modal-project-submit').textContent = 'Save';
   document.getElementById('np-key').value = key;
   document.getElementById('np-url').value = url;
   document.getElementById('np-desc').value = desc;
@@ -625,7 +671,7 @@ function openEditProject(id, key, url, desc) {
 }
 async function submitProjectModal() {
   const key = document.getElementById('np-key').value.trim();
-  if (!key) { toast('项目名称不能为空','error'); return; }
+  if (!key) { toast('Project name is required','error'); return; }
   try {
     if (_editProjectId) {
       await api('PATCH',`/auth/projects/${_editProjectId}`,{
@@ -633,20 +679,20 @@ async function submitProjectModal() {
         upstream_url: document.getElementById('np-url').value.trim(),
         description: document.getElementById('np-desc').value.trim()
       });
-      closeModal('modal-project'); toast('项目已更新'); await loadProjects();
+      closeModal('modal-project'); toast('Project updated'); await loadProjects();
     } else {
       await api('POST','/auth/projects',{
         project_key: key,
         upstream_url: document.getElementById('np-url').value.trim(),
         description: document.getElementById('np-desc').value.trim()
       });
-      closeModal('modal-project'); toast('项目已创建'); await loadProjects();
+      closeModal('modal-project'); toast('Project created'); await loadProjects();
     }
   } catch(e) { toast(e.message,'error'); }
 }
 async function deleteProject(id) {
-  if (!confirm('删除该项目及其所有 Token？')) return;
-  try { await api('DELETE',`/auth/projects/${id}`); toast('项目已删除'); await loadProjects(); }
+  if (!confirm('Delete this project and all its tokens?')) return;
+  try { await api('DELETE',`/auth/projects/${id}`); toast('Project deleted'); await loadProjects(); }
   catch(e) { toast(e.message,'error'); }
 }
 
@@ -664,7 +710,7 @@ async function submitGenerateToken() {
     document.getElementById('gt-result').style.display='block';
     document.getElementById('gt-generate-btn').style.display='none';
     document.getElementById('gt-cancel-btn').textContent='Done';
-    toast('Token 已生成 — 请立即复制！');
+    toast('Token generated — copy it now!');
     const panel=document.getElementById('tokens-panel-'+_currentProjectId);
     const tokens=await api('GET',`/auth/projects/${_currentProjectId}/tokens`);
     _tokensCache[_currentProjectId]=tokens;
@@ -693,7 +739,7 @@ async function rotateToken(tokenId,projectId) {
     document.getElementById('gt-generate-btn').style.display='none';
     document.getElementById('gt-cancel-btn').textContent='Done';
     openModal('modal-token');
-    toast(`已 Rotate 至 v${t.version} — 请立即复制新 Token！`);
+    toast(`Rotated to v${t.version} — copy new token now!`);
     const tokens=await api('GET',`/auth/projects/${projectId}/tokens`);
     _tokensCache[projectId]=tokens;
     renderTokensPanel(document.getElementById('tokens-panel-'+projectId),tokens,projectId);
