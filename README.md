@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.37  
+**Version:** 1.29.38  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-19 (feat: admin can edit user role via Edit modal)
+**Date:** 2026-04-19 (ui: rename Projects & Tokens tab to Projects)
 
 ## 1. Introduction
 
