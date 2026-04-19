@@ -1223,7 +1223,7 @@ function filterProjects(q) {
         <div class="project-actions">
           <button class="btn btn-sm btn-ghost" onclick="openGenerateToken(${p.id})">+ Token</button>
           ${_me?.role==='admin'?`
-            <button class="btn btn-sm" onclick="openEditProject(${p.id},'${esc(p.project_key)}','${esc(p.upstream_url||'')}',${JSON.stringify(p.description||'')})">Edit</button>
+            <button class="btn btn-sm" onclick="openEditProject(${p.id})">Edit</button>
             <button class="btn btn-sm btn-danger" onclick="deleteProject(${p.id})">Delete</button>`:''}
         </div>
       </td>
@@ -1324,13 +1324,15 @@ function openNewProject() {
   ['np-key','np-url','np-desc'].forEach(id=>document.getElementById(id).value='');
   openModal('modal-project');
 }
-function openEditProject(id, key, url, desc) {
+function openEditProject(id) {
+  const p = _allProjects.find(x => x.id === id);
+  if (!p) return;
   _editProjectId = id;
   document.getElementById('modal-project-title').textContent = 'Edit Project';
   document.getElementById('modal-project-submit').textContent = 'Save';
-  document.getElementById('np-key').value = key;
-  document.getElementById('np-url').value = url;
-  document.getElementById('np-desc').value = desc;
+  document.getElementById('np-key').value = p.project_key;
+  document.getElementById('np-url').value = p.upstream_url || '';
+  document.getElementById('np-desc').value = p.description || '';
   openModal('modal-project');
 }
 async function submitProjectModal() {
