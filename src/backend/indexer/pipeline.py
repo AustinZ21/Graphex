@@ -14,6 +14,8 @@ All graph writes use MERGE so re-indexing is safe and idempotent.
 from __future__ import annotations
 
 import ast
+import math
+import os
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -26,7 +28,30 @@ from backend.indexer.call_analyzer import CallAnalyzer, RawCall
 from backend.indexer.hasher import file_changed, hash_variable_flows, sha256_file
 from backend.indexer.parser import ParsedFile, SUPPORTED_EXTENSIONS, SourceParser, discover_files, path_to_module
 
-_CONCURRENT_WORKERS = 8
+# Worker count bounds
+_MIN_WORKERS = 2
+_MAX_WORKERS = int(os.getenv("CG_INDEX_MAX_WORKERS", str(min(32, (os.cpu_count() or 4) * 2))))
+
+
+def _adaptive_workers(file_count: int) -> int:
+    """Return a worker count that scales with file_count.
+
+    Scaling formula: workers = clamp(ceil(log2(file_count + 1)) * 2, MIN, MAX)
+
+    file_count |  workers
+    -----------+---------
+            1  |   2
+            4  |   4
+           16  |   8
+           64  |  12
+          256  |  16
+         1024  |  20
+        >=big  |  MAX
+    """
+    if file_count <= 0:
+        return _MIN_WORKERS
+    raw = math.ceil(math.log2(file_count + 1)) * 2
+    return max(_MIN_WORKERS, min(_MAX_WORKERS, raw))
 
 log = structlog.get_logger()
 
@@ -105,13 +130,25 @@ class IndexPipeline:
     def index_full(self, repo_path: str) -> dict:
         resolved_repo_path = _normalize_repo_path(repo_path)
         files = list(discover_files(resolved_repo_path))
-        log.info("pipeline.full.start", repo_path=repo_path, resolved_repo_path=resolved_repo_path, files=len(files))
+        workers = _adaptive_workers(len(files))
+        log.info("pipeline.full.start", repo_path=repo_path, resolved_repo_path=resolved_repo_path, files=len(files), workers=workers)
         self._upsert_repo(repo_path)
         stats: dict = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "imports": 0, "variables": 0, "variable_flows": 0, "errors": 0}
         symbol_map: dict[str, str] = {}
-        for fpath in files:
-            result = self._index_file(repo_path, fpath, symbol_map, force=True)
-            self._accumulate(stats, result)
+        symbol_map_lock = threading.Lock()
+
+        def _process_full(fpath: str) -> dict:
+            return self._index_file(repo_path, fpath, symbol_map, force=True, symbol_map_lock=symbol_map_lock)
+
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {executor.submit(_process_full, fp): fp for fp in files}
+            for future in as_completed(futures):
+                try:
+                    self._accumulate(stats, future.result())
+                except Exception as exc:
+                    log.error("pipeline.full.worker_error", path=futures[future], error=str(exc))
+                    stats["errors"] = stats.get("errors", 0) + 1
+
         stats["symbols"] = self._count_symbols()
         log.info("pipeline.full.done", **stats)
         return stats
@@ -136,8 +173,9 @@ class IndexPipeline:
                 continue
             valid_paths.append(normalized_fpath)
 
-        workers = min(_CONCURRENT_WORKERS, max(1, len(valid_paths)))
+        workers = _adaptive_workers(len(valid_paths))
         symbol_map_lock = threading.Lock()
+        log.info("pipeline.incremental.workers", file_count=len(valid_paths), workers=workers)
 
         def _process(fpath: str) -> dict:
             result = self._index_file(repo_path, fpath, symbol_map, force=False, symbol_map_lock=symbol_map_lock)

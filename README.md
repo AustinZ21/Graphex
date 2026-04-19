@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.5  
+**Version:** 1.29.6  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-19 (perf: UNWIND batch graph writes + concurrent incremental indexing)
+**Date:** 2026-04-19 (perf: adaptive concurrent workers + index_full parallelized)
 
 ## 1. Introduction
 
