@@ -239,7 +239,7 @@
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th></th><th>Project Key</th><th>Project ID</th>
+            <th></th><th>Project Name</th><th>Project ID</th>
             <th>Upstream URL</th><th>Status</th><th>Created</th><th>Actions</th>
           </tr></thead>
           <tbody id="projects-body"></tbody>
@@ -270,7 +270,7 @@
   <div class="modal">
     <h3>New Project</h3>
     <div class="form-group">
-      <label>Project Key <span style="color:var(--muted);font-size:12px">(unique slug)</span></label>
+      <label>Project Name</label>
       <input id="np-key" placeholder="e.g. osagent-local" />
     </div>
     <div class="form-group">
@@ -473,7 +473,7 @@ function openNewProject() {
 }
 async function submitNewProject() {
   const key=document.getElementById('np-key').value.trim();
-  if (!key) { toast('Project key required','error'); return; }
+  if (!key) { toast('Project name required','error'); return; }
   try {
     await api('POST','/auth/projects',{
       project_key:key,
