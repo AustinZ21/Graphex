@@ -507,6 +507,7 @@
       <button class="tab-btn active" id="tab-projects-btn" onclick="switchTab('projects',this)">Projects</button>
       <button class="tab-btn" id="tab-users-btn" onclick="switchTab('users',this)">Users</button>
       <button class="tab-btn" id="tab-audit-btn" onclick="switchTab('audit',this)">Audit</button>
+      <button class="tab-btn" id="tab-fdb-btn" style="display:none" onclick="openFdbBrowser()">FDB-Browser</button>
     </div>
     <div class="user-badge">
       <div class="user-menu-wrap" id="user-menu-wrap">
@@ -743,6 +744,7 @@ let _usersPagination = { page: 1, pageSize: 25 };
 let _auditPagination = { page: 1, pageSize: 25 };
 let _allUsers = [];
 let _auditTotal = 0;
+let _falkordbUrl = 'falkor://localhost:6379';
 
 function _ensurePageBounds(state, totalRows) {
   const totalPages = Math.max(1, Math.ceil(totalRows / state.pageSize));
@@ -963,12 +965,37 @@ async function initApp() {
   const roleEl = document.getElementById('topbar-role');
   roleEl.textContent = _me.role;
   roleEl.className = 'role-tag' + (_me.role === 'admin' ? '' : ' developer');
+  if (_me.role === 'admin') {
+    try {
+      const cfg = await api('GET', '/admin/runtime-config');
+      if (cfg?.falkordb_url) _falkordbUrl = cfg.falkordb_url;
+    } catch {}
+    document.getElementById('tab-fdb-btn').style.display = '';
+  }
   if (_me.role !== 'admin') {
     document.getElementById('new-project-btn').style.display = 'none';
     document.getElementById('tab-users-btn').style.display = 'none';
     document.getElementById('tab-audit-btn').style.display = 'none';
   }
   await loadProjects();
+}
+
+async function openFdbBrowser() {
+  try {
+    const launch = await api('POST', '/admin/fdb-browser/launch');
+    window.open(launch?.url || 'http://localhost:13000/graph', '_blank', 'noopener,noreferrer');
+  } catch {
+    const falkorUrl = _falkordbUrl;
+    try {
+      const conn = new URL(falkorUrl);
+      const target = new URL('http://localhost:13000/login');
+      if (conn.hostname) target.searchParams.set('host', conn.hostname);
+      if (conn.port) target.searchParams.set('port', conn.port);
+      window.open(target.toString(), '_blank', 'noopener,noreferrer');
+    } catch {
+      window.open('http://localhost:13000/login', '_blank', 'noopener,noreferrer');
+    }
+  }
 }
 
 function goHome() {

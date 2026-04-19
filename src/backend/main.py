@@ -21,10 +21,13 @@ import os
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
+from urllib.parse import urlparse
+
+import httpx
 
 import structlog
 import uvicorn
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi import HTTPException
 from fastapi import Request
 from jose import JWTError
@@ -33,6 +36,7 @@ from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
 from backend.auth.database import DB_PATH, init_db, insert_audit_log
+from backend.auth.dependencies import require_admin
 from backend.auth.middleware import ProjectTokenMiddleware
 from backend.auth.router import router as auth_router
 from backend.auth.security import decode_access_token, hash_token
@@ -46,6 +50,15 @@ log = structlog.get_logger()
 
 FALKORDB_HOST = os.getenv("FALKORDB_HOST", "localhost")
 FALKORDB_PORT = int(os.getenv("FALKORDB_PORT", "6379"))
+FALKORDB_URL = os.getenv("FALKORDB_URL", f"falkor://{FALKORDB_HOST}:{FALKORDB_PORT}")
+_fdb_parsed = urlparse(FALKORDB_URL)
+_fdb_browser_default = (
+    f"http://{_fdb_parsed.hostname}:3000"
+    if _fdb_parsed.hostname and _fdb_parsed.hostname not in {"localhost", "127.0.0.1"}
+    else "http://localhost:13000"
+)
+FALKORDB_BROWSER_URL = os.getenv("FALKORDB_BROWSER_URL", _fdb_browser_default).rstrip("/")
+FALKORDB_BROWSER_PUBLIC_URL = os.getenv("FALKORDB_BROWSER_PUBLIC_URL", "http://localhost:13000").rstrip("/")
 QUEUE_REDIS_URL = os.getenv("QUEUE_REDIS_URL", "redis://localhost:6380/1")
 CACHE_REDIS_URL = os.getenv("CACHE_REDIS_URL", "redis://localhost:6380")  # db=2 set in QueryCache
 TRACE_ENABLED = os.getenv("TRACE_ENABLED", "true").lower() == "true"
@@ -420,6 +433,66 @@ async def api_benchmark_token_efficiency(payload: dict) -> dict:
         return benchmark_token_efficiency(payload=payload, repo_root=REPO_ROOT)
     except TokenBenchmarkInputError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.get("/api/admin/runtime-config")
+async def api_admin_runtime_config(_: dict = Depends(require_admin)) -> dict:
+    return {
+        "falkordb_url": FALKORDB_URL,
+    }
+
+
+@app.post("/api/admin/fdb-browser/launch")
+async def api_admin_fdb_browser_launch(response: Response, _: dict = Depends(require_admin)) -> dict:
+    parsed = urlparse(FALKORDB_URL)
+    host = parsed.hostname or FALKORDB_HOST or "localhost"
+    port = parsed.port or 6379
+
+    login_url = f"{FALKORDB_BROWSER_PUBLIC_URL}/login?host={host}&port={port}"
+    graph_url = f"{FALKORDB_BROWSER_PUBLIC_URL}/graph"
+
+    try:
+      with httpx.Client(timeout=8.0, follow_redirects=True) as client:
+          csrf_resp = client.get(f"{FALKORDB_BROWSER_URL}/api/auth/csrf")
+          csrf_resp.raise_for_status()
+          csrf_token = (csrf_resp.json() or {}).get("csrfToken")
+          if not csrf_token:
+              raise ValueError("Missing csrfToken from FalkorDB Browser")
+
+          callback_payload = {
+              "redirect": "false",
+              "host": host,
+              "port": str(port),
+              "tls": "false",
+              "csrfToken": csrf_token,
+              "callbackUrl": login_url,
+              "json": "true",
+          }
+          cb_resp = client.post(
+              f"{FALKORDB_BROWSER_URL}/api/auth/callback/credentials",
+              data=callback_payload,
+              headers={"Content-Type": "application/x-www-form-urlencoded"},
+          )
+          cb_resp.raise_for_status()
+
+          for cookie in client.cookies.jar:
+              if not cookie.name.startswith("next-auth."):
+                  continue
+              response.set_cookie(
+                  key=cookie.name,
+                  value=cookie.value,
+                  path=cookie.path or "/",
+                  expires=cookie.expires,
+                  httponly=True,
+                  secure=bool(cookie.secure),
+                  samesite="lax",
+              )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to establish Falkor session: {exc}") from exc
+
+    return {
+        "url": graph_url,
+    }
 
 
 # ── MCP SSE transport ──────────────────────────────────────────────────────
