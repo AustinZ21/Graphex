@@ -140,3 +140,24 @@ class ProjectTokenOut(BaseModel):
 
 class GenerateTokenRequest(BaseModel):
     token_type: str = Field(pattern="^(mcp|edge_agent)$")
+
+
+class IndexJobStatus(BaseModel):
+    """Status of an index job."""
+    job_id: str
+    job_type: str
+    repo_path: str
+    status: str  # pending, processing, done, failed
+    created_at: str
+    updated_at: str
+    error: str | None = None
+    # Stats from pipeline (if done):
+    files: int | None = None
+    symbols: int | None = None
+
+
+class ProjectIndexStatus(BaseModel):
+    """Index status for a project."""
+    project_id: int
+    project_key: str
+    latest_job: IndexJobStatus | None = None

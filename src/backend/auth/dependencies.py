@@ -1,7 +1,7 @@
 """FastAPI dependencies: current user, admin guard, token validation."""
 from __future__ import annotations
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from backend.auth.database import get_db
@@ -45,3 +45,8 @@ async def require_admin(user: dict = Depends(get_current_user)) -> dict:
     if user["role"] != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
     return user
+
+
+async def get_consumer(request: Request):
+    """Get IndexerConsumer from app state."""
+    return getattr(request.app.state, 'consumer', None)

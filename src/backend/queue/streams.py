@@ -172,6 +172,38 @@ class JobConsumer:
             raise RuntimeError("JobConsumer not connected")
         await _set_job_status(self._client, job, status="failed", error=error)
 
+    async def get_job_status(self, job_id: str) -> dict | None:
+        """Get status of a specific job."""
+        if not self._client:
+            raise RuntimeError("JobConsumer not connected")
+        return await _get_job_status(self._client, job_id)
+
+    async def get_jobs_by_repo(self, repo_path: str) -> list[dict]:
+        """Get all job statuses for a given repo path, most recent first.
+        Matching is case-insensitive to handle Windows path variations.
+        """
+        if not self._client:
+            raise RuntimeError("JobConsumer not connected")
+        # Scan all job status keys and find those matching the repo_path (case-insensitive)
+        jobs = []
+        cursor = 0
+        repo_path_lower = repo_path.lower()
+        while True:
+            cursor, keys = await self._client.scan(
+                cursor,
+                match=f"{STATUS_KEY_PREFIX}*",
+                count=100
+            )
+            for key in keys:
+                status_data = await self._client.hgetall(key)
+                if status_data and status_data.get("repo_path", "").lower() == repo_path_lower:
+                    jobs.append(dict(status_data))
+            if cursor == 0:
+                break
+        # Sort by updated_at, most recent first
+        jobs.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
+        return jobs
+
     async def _ensure_group(self) -> None:
         try:
             await self._client.xgroup_create(  # type: ignore[union-attr]

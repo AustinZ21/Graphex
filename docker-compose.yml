@@ -69,6 +69,7 @@ services:
       - PYTHONPATH=/app/src
     volumes:
       - auth_db_dev_data:/app/data
+      - d:/Repos:/repos:ro
     depends_on:
       falkordb-dev:
         condition: service_healthy

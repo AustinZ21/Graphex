@@ -219,6 +219,28 @@
     .empty-state { text-align: center; padding: 40px; color: var(--muted); }
     .expand-btn { background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; padding:0 4px; }
 
+    /* ── Index Progress ── */
+    .index-progress-bar {
+      height: 4px; background: rgba(70,80,104,.3); border-radius: 2px;
+      overflow: hidden; margin-top: 6px;
+    }
+    .index-progress-fill {
+      height: 100%; background: linear-gradient(90deg, #4ae387, #3d9b6d);
+      width: 0%; transition: width .3s ease;
+    }
+    .index-status {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; color: var(--muted); margin-top: 4px;
+    }
+    .status-dot {
+      width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+    }
+    .status-dot.pending { background: #ffa500; animation: pulse 1.5s ease-in-out infinite; }
+    .status-dot.processing { background: #4ae387; animation: pulse 1s ease-in-out infinite; }
+    .status-dot.done { background: #4ae387; }
+    .status-dot.failed { background: #e35a5a; }
+    @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+
     /* ── Search bar ── */
     .search-wrap { margin-bottom: 14px; position: relative; }
     .search-wrap input {
@@ -687,6 +709,8 @@ function closeModal(id) { document.getElementById(id).classList.remove('open'); 
 
 let _allProjects = [];
 let _tokensCache = {};  // projectId -> tokens[]
+let _indexStatusCache = {};  // projectId -> ProjectIndexStatus
+let _indexStatusPollInterval = null;
 
 async function loadProjects() {
   _allProjects = await api('GET', '/auth/projects');
@@ -695,7 +719,28 @@ async function loadProjects() {
     try { _tokensCache[p.id] = await api('GET', `/auth/projects/${p.id}/tokens`); }
     catch { _tokensCache[p.id] = []; }
   }));
+  // Load initial index status
+  await updateIndexStatus();
+  // Start polling for index status updates
+  if (_indexStatusPollInterval) clearInterval(_indexStatusPollInterval);
+  _indexStatusPollInterval = setInterval(updateIndexStatus, 2000);  // Poll every 2 seconds
   filterProjects(document.getElementById('project-search')?.value || '');
+}
+
+async function updateIndexStatus() {
+  try {
+    const statuses = await api('GET', '/auth/projects/index-status');
+    _indexStatusCache = {};
+    statuses.forEach(status => {
+      _indexStatusCache[status.project_id] = status;
+    });
+    // Re-render if projects are visible
+    if (document.getElementById('pane-projects')?.classList.contains('active')) {
+      filterProjects(document.getElementById('project-search')?.value || '');
+    }
+  } catch(e) {
+    // Silently fail, polling continues
+  }
 }
 
 function filterProjects(q) {
@@ -717,11 +762,30 @@ function filterProjects(q) {
     tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">${kw ? 'No matching projects' : 'No projects yet'}</div></td></tr>`;
     return;
   }
-  tbody.innerHTML = rows.map(p => `
+  tbody.innerHTML = rows.map(p => {
+    const status = _indexStatusCache[p.id];
+    const job = status?.latest_job;
+    const isProcessing = job && (job.status === 'processing' || job.status === 'pending');
+    const progress = (job?.files || 0) > 0 ? Math.min(100, (job?.symbols || 0) / Math.max(1, job?.files || 1) * 100) : 0;
+    const statusDot = job ? `<span class="status-dot ${job.status}"></span>` : '';
+    const statusText = job ? `${job.status}${job.error ? ': ' + job.error : ''}` : 'idle';
+    return `
     <tr>
       <td><button class="expand-btn" onclick="toggleTokens(${p.id},this)">&#9654;</button></td>
       <td style="font-family:monospace;font-size:12px;color:var(--muted)">${esc(p.project_id)}</td>
-      <td><strong>${esc(p.project_key)}</strong></td>
+      <td>
+        <strong>${esc(p.project_key)}</strong>
+        ${job ? `
+          <div class="index-progress-bar">
+            <div class="index-progress-fill" style="width:${progress}%"></div>
+          </div>
+          <div class="index-status">
+            ${statusDot}
+            <span title="${esc(job.repo_path)}">${esc(statusText)}</span>
+            ${job.files !== null ? `<span style="color:var(--accent)">${job.files}F / ${job.symbols || 0}S</span>` : ''}
+          </div>
+        ` : ''}
+      </td>
       <td style="color:var(--muted)">${esc(p.upstream_url||'—')}</td>
       <td><span class="${p.is_active?'badge-active':'badge-inactive'}">${p.is_active?'Active':'Inactive'}</span></td>
       <td style="color:var(--muted);font-size:12px;font-family:monospace">${esc(p.created_at)}</td>
@@ -737,7 +801,7 @@ function filterProjects(q) {
         <div id="tokens-panel-${p.id}"></div>
       </td>
     </tr>
-  `).join('');
+  `}).join('');
 }
 
 async function toggleTokens(projectId, btn) {

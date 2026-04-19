@@ -5,15 +5,17 @@ import secrets
 import string
 
 import aiosqlite
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from backend.auth.database import get_db
-from backend.auth.dependencies import get_current_user, require_admin
+from backend.auth.dependencies import get_current_user, require_admin, get_consumer
 from backend.auth.models import (
     AdminUserUpdate,
     GenerateTokenRequest,
+    IndexJobStatus,
     LoginRequest,
     ProjectCreate,
+    ProjectIndexStatus,
     ProjectOut,
     ProjectTokenOut,
     ProjectUpdate,
@@ -370,3 +372,66 @@ async def revoke_token(
 ):
     await db.execute("UPDATE project_tokens SET is_active = 0 WHERE id = ?", (token_id,))
     await db.commit()
+
+
+# ── Job Status / Indexing Progress ─────────────────────────────────────────
+
+@router.get("/projects/index-status", response_model=list[ProjectIndexStatus])
+async def list_projects_index_status(
+    _: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+    consumer = Depends(get_consumer),
+):
+    """Get indexing status for all projects."""
+    
+    # Get all projects
+    async with db.execute(
+        "SELECT id, project_key, project_id FROM projects WHERE is_active = 1 ORDER BY id"
+    ) as cur:
+        projects = await cur.fetchall()
+    
+    results = []
+    for proj in projects:
+        proj_dict = dict(proj)
+        latest_job = None
+        
+        # Get latest job status for this project (if consumer available)
+        if consumer:
+            try:
+                # Use project_id path pattern from OSAgent/.env and BrowserAgent/.env
+                # Try both common repo path patterns
+                repo_patterns = [
+                    f"D:/Repos/{proj_dict['project_key']}",
+                    f"d:/repos/{proj_dict['project_key'].lower()}",
+                ]
+                
+                jobs = []
+                for pattern in repo_patterns:
+                    matching = await consumer.get_jobs_by_repo(pattern)
+                    if matching:
+                        jobs = matching
+                        break
+                
+                if jobs:
+                    job_data = jobs[0]  # Most recent
+                    latest_job = IndexJobStatus(
+                        job_id=job_data.get("job_id", ""),
+                        job_type=job_data.get("job_type", ""),
+                        repo_path=job_data.get("repo_path", ""),
+                        status=job_data.get("status", ""),
+                        created_at=job_data.get("created_at", ""),
+                        updated_at=job_data.get("updated_at", ""),
+                        error=job_data.get("error"),
+                        files=int(job_data["files"]) if "files" in job_data and job_data["files"] else None,
+                        symbols=int(job_data["symbols"]) if "symbols" in job_data and job_data["symbols"] else None,
+                    )
+            except Exception:
+                pass  # Silently ignore consumer errors
+        
+        results.append(ProjectIndexStatus(
+            project_id=proj_dict["id"],
+            project_key=proj_dict["project_key"],
+            latest_job=latest_job,
+        ))
+    
+    return results

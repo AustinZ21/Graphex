@@ -27,6 +27,28 @@ from backend.indexer.parser import ParsedFile, SUPPORTED_EXTENSIONS, SourceParse
 log = structlog.get_logger()
 
 
+def _normalize_repo_path(repo_path: str) -> str:
+    """Return an indexable repo path in both host and container runtimes.
+
+    In Docker dev, Windows-style paths (e.g. D:/Repos/OSAgent) are not directly
+    visible. We map them to /repos/<name> when that path exists.
+    """
+    candidate = Path(repo_path)
+    if candidate.exists():
+        return str(candidate)
+
+    normalized = repo_path.replace("\\", "/")
+    marker = "/Repos/"
+    idx = normalized.find(marker)
+    if idx >= 0:
+        tail = normalized[idx + len(marker):].strip("/")
+        mapped = Path("/repos") / tail
+        if mapped.exists():
+            return str(mapped)
+
+    return repo_path
+
+
 def _resolve_import_path(source_file: str, imported_module: str, repo_path: str) -> str | None:
     """Resolve relative import to actual file path (best effort).
     
@@ -76,8 +98,9 @@ class IndexPipeline:
         self._call_analyzer = CallAnalyzer()
 
     def index_full(self, repo_path: str) -> dict:
-        files = list(discover_files(repo_path))
-        log.info("pipeline.full.start", repo_path=repo_path, files=len(files))
+        resolved_repo_path = _normalize_repo_path(repo_path)
+        files = list(discover_files(resolved_repo_path))
+        log.info("pipeline.full.start", repo_path=repo_path, resolved_repo_path=resolved_repo_path, files=len(files))
         self._upsert_repo(repo_path)
         stats: dict = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "imports": 0, "variables": 0, "variable_flows": 0, "errors": 0}
         symbol_map: dict[str, str] = {}
@@ -89,14 +112,23 @@ class IndexPipeline:
         return stats
 
     def index_incremental(self, repo_path: str, changed_paths: list[str]) -> dict:
-        log.info("pipeline.incremental.start", changed=len(changed_paths))
+        resolved_repo_path = _normalize_repo_path(repo_path)
+        log.info("pipeline.incremental.start", changed=len(changed_paths), repo_path=repo_path, resolved_repo_path=resolved_repo_path)
         self._upsert_repo(repo_path)
         stats: dict = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "imports": 0, "variables": 0, "variable_flows": 0, "errors": 0}
         symbol_map = self._load_symbol_map()
         for fpath in changed_paths:
-            if Path(fpath).suffix.lower() not in SUPPORTED_EXTENSIONS:
+            normalized_fpath = fpath
+            if not Path(normalized_fpath).exists():
+                rel = Path(fpath).as_posix().replace("\\", "/")
+                if rel.startswith("D:/Repos/"):
+                    rel = rel[len("D:/Repos/"):]
+                mapped_file = Path("/repos") / rel
+                normalized_fpath = str(mapped_file)
+
+            if Path(normalized_fpath).suffix.lower() not in SUPPORTED_EXTENSIONS:
                 continue
-            result = self._index_file(repo_path, fpath, symbol_map, force=False)
+            result = self._index_file(repo_path, normalized_fpath, symbol_map, force=False)
             self._accumulate(stats, result)
         stats["symbols"] = self._count_symbols()
         log.info("pipeline.incremental.done", **stats)
