@@ -157,9 +157,25 @@
       margin-bottom: 10px; color: var(--muted);
       font-size: 12px; text-transform: uppercase; letter-spacing:.06em;
     }
+    .tokens-grid-header,
     .token-row {
-      display: flex; align-items: center; gap: 8px;
-      padding: 6px 0; border-bottom: 1px solid rgba(70,80,104,.35);
+      display: grid;
+      grid-template-columns: 30px 44px 170px 96px 130px 160px 76px 1fr;
+      align-items: center;
+      column-gap: 8px;
+    }
+    .tokens-grid-header {
+      padding: 0 0 6px;
+      border-bottom: 1px solid rgba(70,80,104,.45);
+      margin-bottom: 2px;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    .token-row {
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(70,80,104,.35);
     }
     .token-row:last-child { border-bottom: none; }
     .token-id { color: var(--muted); font-size: 11px; font-family: monospace; }
@@ -168,10 +184,7 @@
       background: var(--surface2); padding: 1px 5px; border-radius: 4px;
     }
     .token-created { color: var(--muted); font-size: 12px; font-family: monospace; }
-    .token-info {
-      display: flex; align-items: center; gap: 8px;
-      flex: 1; min-width: 0;
-    }
+    .token-info { display: contents; }
     .token-hint { font-family: monospace; color: var(--accent); }
     .token-purpose { color: var(--muted); font-size: 12px; white-space: nowrap; }
     .token-status-chip {
@@ -188,10 +201,37 @@
       background: var(--danger-soft);
       color: var(--danger);
     }
-    .token-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .token-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
     .token-type-badge {
       padding: 2px 8px; border-radius: 999px; font-size: 11px;
       background: #1e2a3a; color: #6ab3e3; border: 1px solid rgba(106,179,227,.3);
+      width: fit-content;
+    }
+    @media (max-width: 1200px) {
+      .tokens-grid-header,
+      .token-row {
+        grid-template-columns: 30px 44px 160px 96px 110px 1fr 72px 1fr;
+      }
+      .token-purpose {
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+    @media (max-width: 900px) {
+      .tokens-grid-header { display: none; }
+      .token-row {
+        grid-template-columns: 30px 44px 1fr;
+        row-gap: 6px;
+      }
+      .token-created,
+      .token-type-badge,
+      .token-hint,
+      .token-purpose,
+      .token-status-chip,
+      .token-actions {
+        grid-column: 3;
+      }
+      .token-actions { justify-content: flex-start; }
     }
 
     /* ── Status badges ── */
@@ -998,6 +1038,16 @@ function renderTokensPanel(panel, tokens, projectId) {
   }
   panel.innerHTML = `<div class="tokens-panel">
     <h4>Tokens (${tokens.filter(t=>t.is_active).length} active)</h4>
+    <div class="tokens-grid-header">
+      <span>ID</span>
+      <span>Ver</span>
+      <span>Created</span>
+      <span>Type</span>
+      <span>Hint</span>
+      <span>Purpose</span>
+      <span>Status</span>
+      <span style="text-align:right">Actions</span>
+    </div>
     ${tokens.map(t=>`
       <div class="token-row">
         <span class="token-id">${t.id}</span>

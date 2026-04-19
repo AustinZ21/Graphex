@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.13  
+**Version:** 1.29.14  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-19 (ui: enrich token middle area with purpose and status)
+**Date:** 2026-04-19 (ui: token panel switched to standard column layout)
 
 ## 1. Introduction
 
