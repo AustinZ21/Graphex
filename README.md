@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.30  
+**Version:** 1.29.32  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-19 (ui: upgrade login cyber background to mesh-node network style)
+**Date:** 2026-04-19 (ui: tune VANTA.NET login params points/maxDistance/spacing to 20)
 
 ## 1. Introduction
 

@@ -35,17 +35,14 @@
       min-height: 100vh; padding: 24px;
       overflow: hidden;
       isolation: isolate;
+      background: linear-gradient(135deg, #08101e 0%, #12243c 55%, #0b1728 100%);
     }
     #login-screen::before {
       content: "";
       position: absolute;
       inset: 0;
       z-index: -2;
-      background-image:
-        linear-gradient(120deg, rgba(10, 34, 28, 0.7), rgba(8, 14, 30, 0.82)),
-        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1600 900'%3E%3Cdefs%3E%3ClinearGradient id='bg' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23060c1a'/%3E%3Cstop offset='1' stop-color='%2315233b'/%3E%3C/linearGradient%3E%3Cfilter id='glow' x='-20%25' y='-20%25' width='140%25' height='140%25'%3E%3CfeGaussianBlur stdDeviation='2.6' result='b'/%3E%3CfeMerge%3E%3CfeMergeNode in='b'/%3E%3CfeMergeNode in='SourceGraphic'/%3E%3C/feMerge%3E%3C/filter%3E%3Cpattern id='micro' width='30' height='30' patternUnits='userSpaceOnUse'%3E%3Cpath d='M30 0H0V30' fill='none' stroke='%232e4364' stroke-width='1' opacity='0.45'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='1600' height='900' fill='url(%23bg)'/%3E%3Crect width='1600' height='900' fill='url(%23micro)'/%3E%3Cg filter='url(%23glow)' stroke-linecap='round' fill='none'%3E%3Cpath d='M120 180 L320 120 L520 180 L700 120 L880 190 L1090 130 L1270 220 L1450 170' stroke='%234ae387' stroke-width='1.8' opacity='0.52'/%3E%3Cpath d='M80 360 L250 290 L430 350 L620 280 L810 360 L980 300 L1180 380 L1410 320' stroke='%2337b4ff' stroke-width='1.7' opacity='0.46'/%3E%3Cpath d='M120 600 L300 520 L500 620 L680 520 L880 610 L1070 530 L1260 620 L1480 560' stroke='%234ae387' stroke-width='1.8' opacity='0.5'/%3E%3Cpath d='M180 760 L360 700 L560 770 L760 700 L970 780 L1180 710 L1400 770' stroke='%2337b4ff' stroke-width='1.7' opacity='0.44'/%3E%3Cpath d='M250 290 L300 520 M430 350 L500 620 M620 280 L680 520 M980 300 L1070 530 M1180 380 L1260 620 M520 180 L620 280 M700 120 L810 360 M1090 130 L980 300' stroke='%2354ffd4' stroke-width='1.2' opacity='0.32'/%3E%3C/g%3E%3Cg fill='%230f1f36'%3E%3Ccircle cx='120' cy='180' r='7'/%3E%3Ccircle cx='320' cy='120' r='7'/%3E%3Ccircle cx='520' cy='180' r='7'/%3E%3Ccircle cx='700' cy='120' r='7'/%3E%3Ccircle cx='880' cy='190' r='7'/%3E%3Ccircle cx='1090' cy='130' r='7'/%3E%3Ccircle cx='1270' cy='220' r='7'/%3E%3Ccircle cx='1450' cy='170' r='7'/%3E%3Ccircle cx='80' cy='360' r='6.5'/%3E%3Ccircle cx='250' cy='290' r='6.5'/%3E%3Ccircle cx='430' cy='350' r='6.5'/%3E%3Ccircle cx='620' cy='280' r='6.5'/%3E%3Ccircle cx='810' cy='360' r='6.5'/%3E%3Ccircle cx='980' cy='300' r='6.5'/%3E%3Ccircle cx='1180' cy='380' r='6.5'/%3E%3Ccircle cx='1410' cy='320' r='6.5'/%3E%3Ccircle cx='120' cy='600' r='7'/%3E%3Ccircle cx='300' cy='520' r='7'/%3E%3Ccircle cx='500' cy='620' r='7'/%3E%3Ccircle cx='680' cy='520' r='7'/%3E%3Ccircle cx='880' cy='610' r='7'/%3E%3Ccircle cx='1070' cy='530' r='7'/%3E%3Ccircle cx='1260' cy='620' r='7'/%3E%3Ccircle cx='1480' cy='560' r='7'/%3E%3Ccircle cx='180' cy='760' r='6.5'/%3E%3Ccircle cx='360' cy='700' r='6.5'/%3E%3Ccircle cx='560' cy='770' r='6.5'/%3E%3Ccircle cx='760' cy='700' r='6.5'/%3E%3Ccircle cx='970' cy='780' r='6.5'/%3E%3Ccircle cx='1180' cy='710' r='6.5'/%3E%3Ccircle cx='1400' cy='770' r='6.5'/%3E%3C/g%3E%3Cg filter='url(%23glow)'%3E%3Cg fill='%234ae387'%3E%3Ccircle cx='120' cy='180' r='2.8'/%3E%3Ccircle cx='520' cy='180' r='2.8'/%3E%3Ccircle cx='880' cy='190' r='2.8'/%3E%3Ccircle cx='1270' cy='220' r='2.8'/%3E%3Ccircle cx='250' cy='290' r='2.6'/%3E%3Ccircle cx='620' cy='280' r='2.6'/%3E%3Ccircle cx='980' cy='300' r='2.6'/%3E%3Ccircle cx='120' cy='600' r='2.8'/%3E%3Ccircle cx='500' cy='620' r='2.8'/%3E%3Ccircle cx='880' cy='610' r='2.8'/%3E%3Ccircle cx='1260' cy='620' r='2.8'/%3E%3C/g%3E%3Cg fill='%2337b4ff'%3E%3Ccircle cx='320' cy='120' r='2.8'/%3E%3Ccircle cx='700' cy='120' r='2.8'/%3E%3Ccircle cx='1090' cy='130' r='2.8'/%3E%3Ccircle cx='1450' cy='170' r='2.8'/%3E%3Ccircle cx='80' cy='360' r='2.6'/%3E%3Ccircle cx='430' cy='350' r='2.6'/%3E%3Ccircle cx='810' cy='360' r='2.6'/%3E%3Ccircle cx='1180' cy='380' r='2.6'/%3E%3Ccircle cx='300' cy='520' r='2.8'/%3E%3Ccircle cx='680' cy='520' r='2.8'/%3E%3Ccircle cx='1070' cy='530' r='2.8'/%3E%3Ccircle cx='1480' cy='560' r='2.8'/%3E%3Ccircle cx='180' cy='760' r='2.6'/%3E%3Ccircle cx='560' cy='770' r='2.6'/%3E%3Ccircle cx='970' cy='780' r='2.6'/%3E%3Ccircle cx='1400' cy='770' r='2.6'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-      background-size: cover;
-      background-position: center;
+      background: linear-gradient(135deg, rgba(8, 20, 36, 0.75), rgba(7, 15, 29, 0.82));
     }
     #login-screen::after {
       content: "";
@@ -56,6 +53,14 @@
         radial-gradient(circle at 78% 20%, rgba(74, 227, 135, 0.2), transparent 38%),
         radial-gradient(circle at 20% 84%, rgba(55, 142, 255, 0.2), transparent 42%);
       pointer-events: none;
+    }
+    #login-screen > * {
+      position: relative;
+      z-index: 2;
+    }
+    #login-screen .vanta-canvas {
+      z-index: 0 !important;
+      opacity: 0.8;
     }
     .login-card {
       width: min(400px, 100%);
@@ -464,6 +469,7 @@
       </div>
       <div id="login-err" style="color:var(--danger);font-size:13px;margin-bottom:12px;display:none"></div>
       <button type="submit" class="btn btn-primary" style="width:100%">Sign in</button>
+      <button type="button" class="btn btn-ghost" style="width:100%;margin-top:8px" onclick="loginWithGitHub()">Sign in with GitHub</button>
     </form>
   </div>
   <footer class="footer" style="position:absolute;left:0;right:0;bottom:0;">Created by Nate Scott (NASCO)</footer>
@@ -703,6 +709,8 @@
 
 <div id="toast-area"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.net.min.js"></script>
 <script>
 let _jwt = localStorage.getItem('cg_jwt') || '';
 let _me = null;
@@ -710,6 +718,7 @@ let _currentProjectId = null;
 let _projectsSort = { key: 'created_at', dir: 'desc' };
 let _usersSort = { key: 'id', dir: 'desc' };
 let _auditSort = { key: 'created_at', dir: 'desc' };
+let _loginVanta = null;
 let _projectsPagination = { page: 1, pageSize: 25 };
 let _usersPagination = { page: 1, pageSize: 25 };
 let _auditPagination = { page: 1, pageSize: 25 };
@@ -861,6 +870,53 @@ function toast(msg, type = 'success') {
   setTimeout(() => el.remove(), 3500);
 }
 
+function loginWithGitHub() {
+  window.location.href = '/api/auth/github/start';
+}
+
+function showOauthErrorFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const raw = params.get('oauth_error');
+  if (!raw) return;
+  const errEl = document.getElementById('login-err');
+  errEl.textContent = 'GitHub sign-in failed: ' + raw;
+  errEl.style.display = 'block';
+  params.delete('oauth_error');
+  const qs = params.toString();
+  const next = window.location.pathname + (qs ? ('?' + qs) : '') + window.location.hash;
+  window.history.replaceState({}, '', next);
+}
+
+function initLoginBackground() {
+  const loginEl = document.getElementById('login-screen');
+  if (!loginEl || loginEl.style.display === 'none' || _loginVanta) return;
+  if (typeof window.VANTA === 'undefined' || typeof window.VANTA.NET !== 'function') return;
+
+  _loginVanta = window.VANTA.NET({
+    el: '#login-screen',
+    mouseControls: true,
+    touchControls: true,
+    gyroControls: false,
+    minHeight: 200,
+    minWidth: 200,
+    scale: 1,
+    scaleMobile: 1,
+    color: 0x37b4ff,
+    backgroundColor: 0x091326,
+    points: 20,
+    maxDistance: 20,
+    spacing: 20,
+    showDots: true,
+  });
+}
+
+function destroyLoginBackground() {
+  if (_loginVanta && typeof _loginVanta.destroy === 'function') {
+    _loginVanta.destroy();
+  }
+  _loginVanta = null;
+}
+
 document.getElementById('login-form').addEventListener('submit', async e => {
   e.preventDefault();
   const errEl = document.getElementById('login-err');
@@ -881,6 +937,7 @@ document.getElementById('login-form').addEventListener('submit', async e => {
 
 async function initApp() {
   try { _me = await api('GET', '/auth/me'); } catch { logout(); return; }
+  destroyLoginBackground();
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('topbar-user').textContent = _me.username;
@@ -901,10 +958,12 @@ function goHome() {
 }
 
 function logout() {
+  destroyLoginBackground();
   _jwt = ''; _me = null;
   localStorage.removeItem('cg_jwt');
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
+  initLoginBackground();
 }
 
 // ── User dropdown ─────────────────────────────────────────────────────────
@@ -1470,7 +1529,9 @@ function esc(s) {
   return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+initLoginBackground();
 if (_jwt) initApp();
+showOauthErrorFromQuery();
 </script>
 </body>
 </html>
