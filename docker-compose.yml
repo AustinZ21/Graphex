@@ -66,6 +66,14 @@ services:
       - 'JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-local-jwt-secret-key}'
       - 'ADMIN_USERNAME=${ADMIN_USERNAME:-admin}'
       - 'ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}'
+      - 'GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID:-}'
+      - 'GITHUB_OAUTH_CLIENT_SECRET=${GITHUB_OAUTH_CLIENT_SECRET:-}'
+      - 'GITHUB_OAUTH_CALLBACK_URL=${GITHUB_OAUTH_CALLBACK_URL:-http://localhost:8001/api/auth/github/callback}'
+      - 'GITHUB_OAUTH_SCOPE=${GITHUB_OAUTH_SCOPE:-read:user user:email}'
+      - 'GITHUB_OAUTH_DEFAULT_ROLE=${GITHUB_OAUTH_DEFAULT_ROLE:-viewer}'
+      - 'GITHUB_OAUTH_ALLOWED_USERS=${GITHUB_OAUTH_ALLOWED_USERS:-}'
+      - 'GITHUB_OAUTH_ALLOWED_ORGS=${GITHUB_OAUTH_ALLOWED_ORGS:-}'
+      - 'GITHUB_OAUTH_STATE_SECRET=${GITHUB_OAUTH_STATE_SECRET:-dev-local-oauth-state-secret}'
       - PYTHONPATH=/app/src
     volumes:
       - auth_db_dev_data:/app/data
@@ -171,6 +179,14 @@ services:
       - 'JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-jwt-secret-key-32chars!!}'
       - 'ADMIN_USERNAME=${ADMIN_USERNAME:-admin}'
       - 'ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}'
+      - 'GITHUB_OAUTH_CLIENT_ID=${GITHUB_OAUTH_CLIENT_ID:-}'
+      - 'GITHUB_OAUTH_CLIENT_SECRET=${GITHUB_OAUTH_CLIENT_SECRET:-}'
+      - 'GITHUB_OAUTH_CALLBACK_URL=${GITHUB_OAUTH_CALLBACK_URL:-https://your-domain.com/api/auth/github/callback}'
+      - 'GITHUB_OAUTH_SCOPE=${GITHUB_OAUTH_SCOPE:-read:user user:email}'
+      - 'GITHUB_OAUTH_DEFAULT_ROLE=${GITHUB_OAUTH_DEFAULT_ROLE:-viewer}'
+      - 'GITHUB_OAUTH_ALLOWED_USERS=${GITHUB_OAUTH_ALLOWED_USERS:-}'
+      - 'GITHUB_OAUTH_ALLOWED_ORGS=${GITHUB_OAUTH_ALLOWED_ORGS:-}'
+      - 'GITHUB_OAUTH_STATE_SECRET=${GITHUB_OAUTH_STATE_SECRET:-change-me-oauth-state-secret}'
       - 'MCP_ACCESS_TOKEN=${MCP_ACCESS_TOKEN:-}'
     volumes:
       - auth_db_data:/app/data
