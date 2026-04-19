@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.7  
+**Version:** 1.29.8  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-19 (docs: add token efficiency benchmark section with BA + OSA results)
+**Date:** 2026-04-19 (docs: add LOC column to benchmark tables)
 
 ## 1. Introduction
 
@@ -292,23 +292,25 @@ API: `POST http://localhost:8001/api/benchmark/token-efficiency` (shared cross-p
 
 #### BrowserAgent (BA) — 2026-04-19
 
-| Scenario | Baseline (tokens) | CG (tokens) | Saved | Ratio |
-|---|---:|---:|---:|---:|
-| ba-server HTTP 路由 | — | — | 50.8% | 2.03x |
-| BA 工作流执行函数签名 | — | — | 57.2% | 2.34x |
-| 并行工作流定义 | — | — | 77.5% | 4.45x |
-| batch+monitor | — | — | 84.8% | 6.60x |
-| **TOTAL** | — | — | **69.0%** | **3.22x** |
+| Scenario | LOC¹ | Baseline (tokens) | CG (tokens) | Saved | Ratio |
+|---|---:|---:|---:|---:|---:|
+| ba-server HTTP 路由 | ~70 | — | — | 50.8% | 2.03x |
+| BA 工作流执行函数签名 | ~75 | — | — | 57.2% | 2.34x |
+| 并行工作流定义 | ~76 | — | — | 77.5% | 4.45x |
+| batch+monitor | ~123 | — | — | 84.8% | 6.60x |
+| **TOTAL** | **~344** | — | — | **69.0%** | **3.22x** |
+
+> ¹ BA LOC values estimated from source section ranges in `ba-server.ps1` / `ba-tools.ps1` (benchmark script no longer retained).
 
 #### OSAgent (OSA) — 2026-04-19
 
-| Scenario | Baseline (tokens) | CG (tokens) | Saved | Ratio |
-|---|---:|---:|---:|---:|
-| protocol.rs 消息认证函数 | 797 | 167 | 79.0% | 4.77x |
-| security.rs 安全配置类型 | 889 | 305 | 65.7% | 2.92x |
-| osa-ca/lib.rs CA 工作流类型 + trait | 609 | 200 | 67.2% | 3.04x |
-| roles.rs 跨 crate 共享角色类型 | 326 | 171 | 47.5% | 1.91x |
-| **TOTAL** | **2621** | **843** | **67.8%** | **3.11x** |
+| Scenario | LOC | Baseline (tokens) | CG (tokens) | Saved | Ratio |
+|---|---:|---:|---:|---:|---:|
+| protocol.rs 消息认证函数 | 80 | 797 | 167 | 79.0% | 4.77x |
+| security.rs 安全配置类型 | 89 | 889 | 305 | 65.7% | 2.92x |
+| osa-ca/lib.rs CA 工作流类型 + trait | 61 | 609 | 200 | 67.2% | 3.04x |
+| roles.rs 跨 crate 共享角色类型 | 49 | 326 | 171 | 47.5% | 1.91x |
+| **TOTAL** | **279** | **2621** | **843** | **67.8%** | **3.11x** |
 
 ### 4.3 Cross-Project Summary
 
