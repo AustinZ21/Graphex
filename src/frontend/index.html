@@ -505,9 +505,9 @@
           <thead><tr>
             <th class="sortable" onclick="setUsersSort('id')">ID <span id="sort-user-id"></span></th>
             <th class="sortable" onclick="setUsersSort('username')">Username <span id="sort-user-username"></span></th>
-            <th class="sortable" onclick="setUsersSort('role')">Role <span id="sort-user-role"></span></th>
-            <th class="sortable" onclick="setUsersSort('is_active')">Status <span id="sort-user-is_active"></span></th>
-            <th class="sortable" onclick="setUsersSort('created_at')">Created <span id="sort-user-created_at"></span></th>
+            <th class="sortable center-col-header" onclick="setUsersSort('role')">Role <span id="sort-user-role"></span></th>
+            <th class="sortable center-col-header" onclick="setUsersSort('is_active')">Status <span id="sort-user-is_active"></span></th>
+            <th class="sortable center-col-header" onclick="setUsersSort('created_at')">Created <span id="sort-user-created_at"></span></th>
             <th>Actions</th>
           </tr></thead>
           <tbody id="users-body"></tbody>
@@ -1190,9 +1190,9 @@ async function loadUsers() {
     <tr>
       <td>${u.id}</td>
       <td>${esc(u.username)}</td>
-      <td><span class="role-tag${u.role==='admin'?'':' viewer'}">${u.role}</span></td>
-      <td><span class="${u.is_active?'badge-active':'badge-inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
-      <td style="color:var(--muted);font-size:12px;font-family:monospace">${u.created_at}</td>
+      <td style="text-align:center"><span class="role-tag${u.role==='admin'?'':' viewer'}">${u.role}</span></td>
+      <td style="text-align:center"><span class="${u.is_active?'badge-active':'badge-inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
+      <td style="text-align:center;color:var(--muted);font-size:12px;font-family:monospace">${u.created_at}</td>
       <td>${u.id!==_me?.id
         ? `${u.role==='viewer'
             ? `<button class="btn btn-sm" style="margin-right:4px" onclick='editUsername(${u.id}, ${JSON.stringify(u.username)})'>Edit Username</button>`
