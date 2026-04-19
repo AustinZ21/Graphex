@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.33  
+**Version:** 1.29.34  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-19 (ui: increase VANTA.NET login background transparency)
+**Date:** 2026-04-19 (feat: rename user role viewer→developer)
 
 ## 1. Introduction
 

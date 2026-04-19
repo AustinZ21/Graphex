@@ -16,7 +16,9 @@ CREATE TABLE IF NOT EXISTS users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     username      TEXT    UNIQUE NOT NULL,
     password_hash TEXT    NOT NULL,
-    role          TEXT    NOT NULL DEFAULT 'viewer',
+    auth_provider TEXT    NOT NULL DEFAULT 'local',
+    github_id     TEXT    UNIQUE,
+    role          TEXT    NOT NULL DEFAULT 'developer',
     created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
     is_active     INTEGER NOT NULL DEFAULT 1
 );
@@ -99,6 +101,28 @@ async def init_db() -> None:
             await db.commit()
         except Exception:
             pass  # column already exists
+        # oauth provider columns
+        try:
+            await db.execute("ALTER TABLE users ADD COLUMN auth_provider TEXT NOT NULL DEFAULT 'local'")
+            await db.commit()
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("ALTER TABLE users ADD COLUMN github_id TEXT")
+            await db.commit()
+        except Exception:
+            pass  # column already exists
+        try:
+            await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id) WHERE github_id IS NOT NULL")
+            await db.commit()
+        except Exception:
+            pass  # index creation best-effort
+        # role rename: viewer -> developer
+        try:
+            await db.execute("UPDATE users SET role = 'developer' WHERE role = 'viewer'")
+            await db.commit()
+        except Exception:
+            pass  # best-effort migration
 
 
 async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:

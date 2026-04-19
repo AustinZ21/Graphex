@@ -116,7 +116,7 @@
       background: var(--accent-soft); color: var(--accent);
       border: 1px solid rgba(74,227,135,.3);
     }
-    .role-tag.viewer { background: #1e2a3a; color: #6ab3e3; border-color: rgba(106,179,227,.3); }
+    .role-tag.developer { background: #1e2a3a; color: #6ab3e3; border-color: rgba(106,179,227,.3); }
 
     .tabs {
       display: flex; gap: 4px;
@@ -644,7 +644,7 @@
     <div class="form-group">
       <label>Role</label>
       <select id="nu-role">
-        <option value="viewer">viewer</option>
+        <option value="developer">developer</option>
         <option value="admin">admin</option>
       </select>
     </div>
@@ -943,7 +943,7 @@ async function initApp() {
   document.getElementById('topbar-user').textContent = _me.username;
   const roleEl = document.getElementById('topbar-role');
   roleEl.textContent = _me.role;
-  roleEl.className = 'role-tag' + (_me.role === 'admin' ? '' : ' viewer');
+  roleEl.className = 'role-tag' + (_me.role === 'admin' ? '' : ' developer');
   if (_me.role !== 'admin') {
     document.getElementById('new-project-btn').style.display = 'none';
     document.getElementById('tab-users-btn').style.display = 'none';
@@ -1095,7 +1095,7 @@ function renderAuditRows() {
     <tr>
       <td style="text-align:center;font-size:12px;font-family:monospace;color:var(--muted)">${esc(r.created_at || '')}</td>
       <td style="text-align:center;font-size:12px;font-family:monospace">${esc(r.project_external_id_display || '—')}</td>
-      <td style="text-align:center"><span class="role-tag${r.scope === 'mcp' ? ' viewer' : ''}">${esc(r.scope || '')}</span></td>
+      <td style="text-align:center"><span class="role-tag${r.scope === 'mcp' ? ' developer' : ''}">${esc(r.scope || '')}</span></td>
       <td style="text-align:center">${esc(r.method || '')}</td>
       <td style="font-family:monospace;font-size:12px">${esc(r.path || '')}</td>
       <td style="text-align:center"><span class="${(r.status_code || 500) < 400 ? 'badge-active' : 'badge-inactive'}">${esc(String(r.status_code || ''))}</span></td>
@@ -1422,11 +1422,11 @@ function renderUsers() {
     <tr>
       <td>${u.id}</td>
       <td>${esc(u.username)}</td>
-      <td style="text-align:center"><span class="role-tag${u.role==='admin'?'':' viewer'}">${u.role}</span></td>
+      <td style="text-align:center"><span class="role-tag${u.role==='admin'?'':' developer'}">${u.role}</span></td>
       <td style="text-align:center"><span class="${u.is_active?'badge-active':'badge-inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
       <td style="text-align:center;color:var(--muted);font-size:12px;font-family:monospace">${u.created_at}</td>
       <td style="text-align:center">${u.id!==_me?.id
-        ? `${u.role==='viewer'
+        ? `${u.role==='developer'
             ? `<button class="btn btn-sm" style="margin-right:4px" onclick='editUsername(${u.id}, ${JSON.stringify(u.username)})'>Edit Username</button>`
             : ''}
            ${u.is_active
@@ -1487,7 +1487,7 @@ async function loadAudit() {
 
 function openNewUser() {
   ['nu-user','nu-pass'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('nu-role').value='viewer';
+  document.getElementById('nu-role').value='developer';
   openModal('modal-user');
 }
 async function submitNewUser() {

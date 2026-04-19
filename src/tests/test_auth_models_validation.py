@@ -5,7 +5,7 @@ from backend.auth.models import AdminUserUpdate, ProjectCreate, ProjectUpdate, U
 
 def test_rejects_sqli_like_username_payload():
     try:
-        UserCreate(username="admin'; DROP TABLE users;--", password="Password123!", role="viewer")
+        UserCreate(username="admin'; DROP TABLE users;--", password="Password123!", role="developer")
         assert False, "Expected ValidationError"
     except ValidationError:
         pass
@@ -20,7 +20,7 @@ def test_rejects_sqli_like_project_key_payload():
 
 
 def test_accepts_valid_identifier_payloads():
-    u = UserCreate(username="admin_user-01", password="Password123!", role="viewer")
+    u = UserCreate(username="admin_user-01", password="Password123!", role="developer")
     p = ProjectCreate(project_key="browseragent-prod", upstream_url="http://localhost:8001", description="safe")
     a = AdminUserUpdate(username="viewer.user")
     assert u.username == "admin_user-01"

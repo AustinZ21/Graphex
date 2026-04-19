@@ -1,11 +1,19 @@
 """Auth API router: login, users, projects, tokens."""
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
+import os
 import secrets
 import string
+import time
+from urllib.parse import urlencode
 
 import aiosqlite
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from backend.auth.database import get_db
 from backend.auth.dependencies import get_current_user, require_admin, get_consumer
@@ -37,6 +45,107 @@ from backend.auth.security import (
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+GITHUB_OAUTH_CLIENT_ID = os.getenv("GITHUB_OAUTH_CLIENT_ID", "").strip()
+GITHUB_OAUTH_CLIENT_SECRET = os.getenv("GITHUB_OAUTH_CLIENT_SECRET", "").strip()
+GITHUB_OAUTH_CALLBACK_URL = os.getenv("GITHUB_OAUTH_CALLBACK_URL", "").strip()
+GITHUB_OAUTH_SCOPE = os.getenv("GITHUB_OAUTH_SCOPE", "read:user user:email").strip() or "read:user user:email"
+GITHUB_OAUTH_DEFAULT_ROLE = os.getenv("GITHUB_OAUTH_DEFAULT_ROLE", "developer").strip().lower()
+GITHUB_OAUTH_ALLOWED_USERS = {
+    v.strip().lower() for v in os.getenv("GITHUB_OAUTH_ALLOWED_USERS", "").split(",") if v.strip()
+}
+GITHUB_OAUTH_ALLOWED_ORGS = {
+    v.strip().lower() for v in os.getenv("GITHUB_OAUTH_ALLOWED_ORGS", "").split(",") if v.strip()
+}
+GITHUB_OAUTH_STATE_SECRET = os.getenv("GITHUB_OAUTH_STATE_SECRET", os.getenv("JWT_SECRET_KEY", "dev-local-state-secret"))
+GITHUB_OAUTH_STATE_TTL_SEC = int(os.getenv("GITHUB_OAUTH_STATE_TTL_SEC", "600"))
+
+
+def _github_oauth_enabled() -> bool:
+    return bool(GITHUB_OAUTH_CLIENT_ID and GITHUB_OAUTH_CLIENT_SECRET and GITHUB_OAUTH_CALLBACK_URL)
+
+
+def _state_b64url_encode(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def _state_b64url_decode(value: str) -> bytes:
+    padding = "=" * ((4 - (len(value) % 4)) % 4)
+    return base64.urlsafe_b64decode((value + padding).encode())
+
+
+def _create_state() -> str:
+    ts = str(int(time.time()))
+    nonce = secrets.token_urlsafe(18)
+    payload = f"{ts}.{nonce}"
+    sig = hmac.new(GITHUB_OAUTH_STATE_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    return _state_b64url_encode(f"{payload}.{sig}".encode())
+
+
+def _validate_state(state: str) -> bool:
+    try:
+        raw = _state_b64url_decode(state).decode()
+        ts_s, nonce, sig = raw.split(".", 2)
+        payload = f"{ts_s}.{nonce}"
+        expected = hmac.new(GITHUB_OAUTH_STATE_SECRET.encode(), payload.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected):
+            return False
+        issued = int(ts_s)
+        return (int(time.time()) - issued) <= GITHUB_OAUTH_STATE_TTL_SEC
+    except Exception:
+        return False
+
+
+async def _github_in_allowed_orgs(token: str) -> bool:
+    if not GITHUB_OAUTH_ALLOWED_ORGS:
+        return True
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        r = await client.get(
+            "https://api.github.com/user/orgs",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
+    if r.status_code >= 400:
+        return False
+    orgs = r.json() if isinstance(r.json(), list) else []
+    user_orgs = {str(item.get("login", "")).lower() for item in orgs}
+    return bool(user_orgs.intersection(GITHUB_OAUTH_ALLOWED_ORGS))
+
+
+def _safe_username(base: str) -> str:
+    text = "".join(ch for ch in base if ch.isalnum() or ch in "._-")[:56].strip("._-")
+    if len(text) < 3:
+        text = f"gh_{secrets.token_hex(3)}"
+    return text
+
+
+async def _ensure_unique_username(db: aiosqlite.Connection, preferred: str) -> str:
+    username = _safe_username(preferred)
+    for idx in range(50):
+        candidate = username if idx == 0 else f"{username}_{idx}"
+        async with db.execute("SELECT 1 FROM users WHERE username = ?", (candidate,)) as cur:
+            if not await cur.fetchone():
+                return candidate
+    return f"gh_{secrets.token_hex(5)}"
+
+
+def _oauth_error_redirect(msg: str) -> RedirectResponse:
+    return RedirectResponse(url=f"/admin?oauth_error={msg}", status_code=302)
+
+
+def _oauth_success_page(token: str) -> HTMLResponse:
+    script_token = token.replace("\\", "\\\\").replace("'", "\\'")
+    html = (
+        "<!doctype html><html><head><meta charset='utf-8'><title>CG Admin OAuth</title></head>"
+        "<body><script>"
+        f"localStorage.setItem('cg_jwt','{script_token}');"
+        "window.location='/admin';"
+        "</script></body></html>"
+    )
+    return HTMLResponse(content=html, status_code=200)
+
 
 # ── Helper ─────────────────────────────────────────────────────────────────
 
@@ -60,6 +169,136 @@ async def login(body: LoginRequest, db: aiosqlite.Connection = Depends(get_db)):
 
     token = create_access_token({"sub": body.username, "role": row["role"]})
     return TokenResponse(access_token=token)
+
+
+@router.get("/github/start")
+async def github_oauth_start():
+    if not _github_oauth_enabled():
+        raise HTTPException(status_code=400, detail="GitHub OAuth is not configured")
+    state = _create_state()
+    params = {
+        "client_id": GITHUB_OAUTH_CLIENT_ID,
+        "redirect_uri": GITHUB_OAUTH_CALLBACK_URL,
+        "scope": GITHUB_OAUTH_SCOPE,
+        "state": state,
+    }
+    return RedirectResponse(url=f"https://github.com/login/oauth/authorize?{urlencode(params)}", status_code=302)
+
+
+@router.get("/github/callback")
+async def github_oauth_callback(
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    if error:
+        return _oauth_error_redirect("github_oauth_denied")
+    if not _github_oauth_enabled():
+        return _oauth_error_redirect("github_oauth_not_configured")
+    if not code or not state:
+        return _oauth_error_redirect("github_oauth_bad_request")
+    if not _validate_state(state):
+        return _oauth_error_redirect("github_oauth_invalid_state")
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        token_resp = await client.post(
+            "https://github.com/login/oauth/access_token",
+            headers={"Accept": "application/json"},
+            data={
+                "client_id": GITHUB_OAUTH_CLIENT_ID,
+                "client_secret": GITHUB_OAUTH_CLIENT_SECRET,
+                "code": code,
+                "redirect_uri": GITHUB_OAUTH_CALLBACK_URL,
+                "state": state,
+            },
+        )
+
+    if token_resp.status_code >= 400:
+        return _oauth_error_redirect("github_oauth_exchange_failed")
+
+    token_data = token_resp.json()
+    gh_access_token = token_data.get("access_token")
+    if not gh_access_token:
+        return _oauth_error_redirect("github_oauth_no_token")
+
+    headers = {
+        "Authorization": f"Bearer {gh_access_token}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        user_resp = await client.get("https://api.github.com/user", headers=headers)
+    if user_resp.status_code >= 400:
+        return _oauth_error_redirect("github_oauth_user_fetch_failed")
+    gh_user = user_resp.json()
+
+    gh_id = str(gh_user.get("id", "")).strip()
+    gh_login = str(gh_user.get("login", "")).strip()
+    gh_email = str(gh_user.get("email") or "").strip().lower()
+    if not gh_id or not gh_login:
+        return _oauth_error_redirect("github_oauth_missing_user")
+
+    if not gh_email:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            email_resp = await client.get("https://api.github.com/user/emails", headers=headers)
+        if email_resp.status_code < 400:
+            emails = email_resp.json() if isinstance(email_resp.json(), list) else []
+            primary = next((e for e in emails if e.get("primary") and e.get("verified")), None)
+            any_verified = next((e for e in emails if e.get("verified")), None)
+            candidate = primary or any_verified
+            if candidate:
+                gh_email = str(candidate.get("email") or "").strip().lower()
+
+    if GITHUB_OAUTH_ALLOWED_USERS and gh_login.lower() not in GITHUB_OAUTH_ALLOWED_USERS:
+        return _oauth_error_redirect("github_oauth_user_not_allowed")
+
+    if not await _github_in_allowed_orgs(gh_access_token):
+        return _oauth_error_redirect("github_oauth_org_not_allowed")
+
+    async with db.execute(
+        "SELECT id, username, role, is_active FROM users WHERE github_id = ?",
+        (gh_id,),
+    ) as cur:
+        user_row = await cur.fetchone()
+
+    if not user_row and gh_email:
+        async with db.execute(
+            "SELECT id, username, role, is_active FROM users WHERE LOWER(email) = ?",
+            (gh_email,),
+        ) as cur:
+            email_row = await cur.fetchone()
+        if email_row:
+            await db.execute(
+                "UPDATE users SET github_id = ?, auth_provider = 'github' WHERE id = ?",
+                (gh_id, email_row["id"]),
+            )
+            await db.commit()
+            user_row = email_row
+
+    if not user_row:
+        role = GITHUB_OAUTH_DEFAULT_ROLE if GITHUB_OAUTH_DEFAULT_ROLE in {"admin", "developer"} else "developer"
+        username = await _ensure_unique_username(db, gh_login)
+        password_hash = hash_password(generate_token())
+        try:
+            async with db.execute(
+                """
+                INSERT INTO users(username, password_hash, role, email, auth_provider, github_id, is_active)
+                VALUES(?,?,?,?,?,?,1)
+                RETURNING id, username, role, is_active
+                """,
+                (username, password_hash, role, gh_email, "github", gh_id),
+            ) as cur:
+                user_row = await cur.fetchone()
+            await db.commit()
+        except aiosqlite.IntegrityError:
+            return _oauth_error_redirect("github_oauth_conflict")
+
+    if not user_row or not bool(user_row["is_active"]):
+        return _oauth_error_redirect("github_oauth_user_inactive")
+
+    app_token = create_access_token({"sub": user_row["username"], "role": user_row["role"]})
+    return _oauth_success_page(app_token)
 
 
 @router.get("/me", response_model=UserOut)
@@ -199,8 +438,8 @@ async def update_user(
     if row["id"] == current["id"] and body.username != row["username"]:
         raise HTTPException(status_code=400, detail="You cannot change your own username")
 
-    if row["role"] != "viewer" and body.username != row["username"]:
-        raise HTTPException(status_code=400, detail="Only viewer usernames can be changed")
+    if row["role"] != "developer" and body.username != row["username"]:
+        raise HTTPException(status_code=400, detail="Only developer usernames can be changed")
 
     if body.username != row["username"]:
         try:
