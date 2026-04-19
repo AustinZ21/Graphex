@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from backend.auth.database import get_db
 from backend.auth.dependencies import get_current_user, require_admin, get_consumer
 from backend.auth.models import (
+    AuditLogOut,
     AdminUserUpdate,
     GenerateTokenRequest,
     IndexJobStatus,
@@ -164,6 +165,18 @@ async def delete_user(
     if user_id == current["id"]:
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
     await db.execute("UPDATE users SET is_active = 0 WHERE id = ?", (user_id,))
+    await db.commit()
+
+
+@router.post("/users/{user_id}/activate", status_code=204)
+async def activate_user(
+    user_id: int,
+    current: dict = Depends(require_admin),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    if user_id == current["id"]:
+        raise HTTPException(status_code=400, detail="Your account is already active")
+    await db.execute("UPDATE users SET is_active = 1 WHERE id = ?", (user_id,))
     await db.commit()
 
 
@@ -435,3 +448,52 @@ async def list_projects_index_status(
         ))
     
     return results
+
+
+@router.get("/audit", response_model=list[AuditLogOut])
+async def list_audit_logs(
+    limit: int = 100,
+    offset: int = 0,
+    scope: str | None = None,
+    actor: str | None = None,
+    project_key: str | None = None,
+    path_like: str | None = None,
+    _: dict = Depends(require_admin),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Admin-only audit query for API/MCP activity and token operations."""
+    safe_limit = max(1, min(limit, 500))
+    safe_offset = max(0, offset)
+
+    clauses: list[str] = []
+    params: list[object] = []
+
+    if scope:
+        clauses.append("scope = ?")
+        params.append(scope.strip().lower())
+    if actor:
+        clauses.append("LOWER(COALESCE(actor_name, '')) LIKE ?")
+        params.append(f"%{actor.strip().lower()}%")
+    if project_key:
+        clauses.append("LOWER(COALESCE(project_key, '')) LIKE ?")
+        params.append(f"%{project_key.strip().lower()}%")
+    if path_like:
+        clauses.append("LOWER(path) LIKE ?")
+        params.append(f"%{path_like.strip().lower()}%")
+
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    sql = f"""
+        SELECT id, created_at, scope, method, path, status_code, duration_ms,
+               actor_type, actor_id, actor_name,
+               project_id, project_key, token_id,
+             client_ip, user_agent, query_string, request_body, response_error, details_json, token_usage_total
+        FROM audit_logs
+        {where_sql}
+        ORDER BY id DESC
+        LIMIT ? OFFSET ?
+    """
+    params.extend([safe_limit, safe_offset])
+
+    async with db.execute(sql, tuple(params)) as cur:
+        rows = await cur.fetchall()
+    return [AuditLogOut(**dict(r)) for r in rows]

@@ -161,3 +161,26 @@ class ProjectIndexStatus(BaseModel):
     project_id: int
     project_key: str
     latest_job: IndexJobStatus | None = None
+
+
+class AuditLogOut(BaseModel):
+    id: int
+    created_at: str
+    scope: str
+    method: str
+    path: str
+    status_code: int
+    duration_ms: int
+    actor_type: str
+    actor_id: int | None = None
+    actor_name: str | None = None
+    project_id: int | None = None
+    project_key: str | None = None
+    token_id: int | None = None
+    client_ip: str | None = None
+    user_agent: str | None = None
+    query_string: str | None = None
+    request_body: str | None = None
+    response_error: str | None = None
+    details_json: str | None = None
+    token_usage_total: int | None = None

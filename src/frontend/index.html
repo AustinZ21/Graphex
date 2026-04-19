@@ -1197,7 +1197,9 @@ async function loadUsers() {
         ? `${u.role==='viewer'
             ? `<button class="btn btn-sm" style="margin-right:4px" onclick='editUsername(${u.id}, ${JSON.stringify(u.username)})'>Edit Username</button>`
             : ''}
-           <button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">Deactivate</button>`
+           ${u.is_active
+             ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">Deactivate</button>`
+             : `<button class="btn btn-sm" onclick="activateUser(${u.id})">Activate</button>`}`
         : '<span style="color:var(--muted);font-size:12px">You</span>'}</td>
     </tr>`).join('');
 }
@@ -1255,6 +1257,12 @@ async function submitNewUser() {
 async function deleteUser(id) {
   if (!confirm('Deactivate this user?')) return;
   try { await api('DELETE',`/auth/users/${id}`); toast('User deactivated'); await loadUsers(); }
+  catch(e) { toast(e.message,'error'); }
+}
+
+async function activateUser(id) {
+  if (!confirm('Activate this user?')) return;
+  try { await api('POST',`/auth/users/${id}/activate`); toast('User activated'); await loadUsers(); }
   catch(e) { toast(e.message,'error'); }
 }
 

@@ -16,7 +16,9 @@ Shutdown sequence reverses the above gracefully.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -24,12 +26,16 @@ import structlog
 import uvicorn
 from fastapi import FastAPI
 from fastapi import HTTPException
+from fastapi import Request
+from jose import JWTError
 from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
-from backend.auth.database import init_db
+from backend.auth.database import DB_PATH, init_db, insert_audit_log
 from backend.auth.middleware import ProjectTokenMiddleware
 from backend.auth.router import router as auth_router
+from backend.auth.security import decode_access_token, hash_token
 from backend.graph.registry import GraphRegistry
 from backend.indexer.consumer import IndexerConsumer
 from backend.tools.producer import MCPProducer
@@ -121,6 +127,268 @@ app.add_middleware(ProjectTokenMiddleware)
 
 # ── Auth API ───────────────────────────────────────────────────────────────
 app.include_router(auth_router, prefix="/api")
+
+
+def _truncate(value: str | None, limit: int) -> str | None:
+    if value is None:
+        return None
+    return value if len(value) <= limit else (value[: limit - 1] + "…")
+
+
+def _redact_sensitive(data):
+    if isinstance(data, dict):
+        redacted = {}
+        for key, value in data.items():
+            key_l = str(key).lower()
+            if any(s in key_l for s in ("password", "token", "secret", "authorization", "api_key", "access_key")):
+                redacted[key] = "***"
+            else:
+                redacted[key] = _redact_sensitive(value)
+        return redacted
+    if isinstance(data, list):
+        return [_redact_sensitive(v) for v in data]
+    return data
+
+
+def _parse_json_text(value: str | bytes | None):
+    if value is None:
+        return None
+    try:
+        if isinstance(value, bytes):
+            if not value:
+                return None
+            return json.loads(value.decode("utf-8", errors="ignore"))
+        if isinstance(value, str):
+            if not value.strip():
+                return None
+            return json.loads(value)
+    except Exception:
+        return None
+    return None
+
+
+def _normalize_usage_dict(candidate: dict) -> dict | None:
+    prompt = candidate.get("prompt_tokens", candidate.get("input_tokens"))
+    completion = candidate.get("completion_tokens", candidate.get("output_tokens"))
+    total = candidate.get("total_tokens", candidate.get("token_usage_total"))
+
+    try:
+        prompt_n = int(prompt) if prompt is not None else None
+    except Exception:
+        prompt_n = None
+    try:
+        completion_n = int(completion) if completion is not None else None
+    except Exception:
+        completion_n = None
+    try:
+        total_n = int(total) if total is not None else None
+    except Exception:
+        total_n = None
+
+    if total_n is None and (prompt_n is not None or completion_n is not None):
+        total_n = max(0, int(prompt_n or 0) + int(completion_n or 0))
+
+    if total_n is None and prompt_n is None and completion_n is None:
+        return None
+
+    return {
+        "prompt_tokens": max(0, int(prompt_n or 0)),
+        "completion_tokens": max(0, int(completion_n or 0)),
+        "total_tokens": max(0, int(total_n or 0)),
+    }
+
+
+def _find_usage_dict(obj) -> dict | None:
+    if not isinstance(obj, dict):
+        return None
+
+    direct = _normalize_usage_dict(obj)
+    if direct:
+        return direct
+
+    usage_like = obj.get("usage")
+    if isinstance(usage_like, dict):
+        from_usage = _normalize_usage_dict(usage_like)
+        if from_usage:
+            return from_usage
+
+    for value in obj.values():
+        if isinstance(value, dict):
+            nested = _find_usage_dict(value)
+            if nested:
+                return nested
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    nested = _find_usage_dict(item)
+                    if nested:
+                        return nested
+    return None
+
+
+@app.middleware("http")
+async def audit_request_middleware(request: Request, call_next):
+    path = request.url.path
+    should_audit = path.startswith("/api") or path.startswith("/mcp")
+    if not should_audit:
+        return await call_next(request)
+
+    start = time.perf_counter()
+    method = request.method
+    query_string = request.url.query
+    user_agent = request.headers.get("user-agent")
+    client_ip = request.client.host if request.client else None
+
+    actor_type = "anonymous"
+    actor_id = None
+    actor_name = None
+    project_id = None
+    project_key = None
+    token_id = None
+
+    raw_auth = request.headers.get("authorization", "")
+    token_usage_eligible = path.startswith("/mcp/messages") or path == "/api/benchmark/token-efficiency"
+    if raw_auth.startswith("Bearer "):
+        bearer_token = raw_auth[len("Bearer ") :]
+        if path.startswith("/api"):
+            try:
+                claims = decode_access_token(bearer_token)
+                actor_name = claims.get("sub")
+                actor_type = "user"
+                if actor_name:
+                    import aiosqlite
+
+                    async with aiosqlite.connect(DB_PATH) as db:
+                        db.row_factory = aiosqlite.Row
+                        async with db.execute(
+                            "SELECT id FROM users WHERE username = ?",
+                            (actor_name,),
+                        ) as cur:
+                            user_row = await cur.fetchone()
+                            actor_id = user_row["id"] if user_row else None
+            except JWTError:
+                actor_type = "anonymous"
+        elif path.startswith("/mcp"):
+            try:
+                import aiosqlite
+
+                digest = hash_token(bearer_token)
+                async with aiosqlite.connect(DB_PATH) as db:
+                    db.row_factory = aiosqlite.Row
+                    async with db.execute(
+                        """
+                        SELECT pt.id AS token_id, pt.project_id, p.project_key
+                        FROM project_tokens pt
+                        JOIN projects p ON p.id = pt.project_id
+                        WHERE pt.token_hash = ?
+                        """,
+                        (digest,),
+                    ) as cur:
+                        token_row = await cur.fetchone()
+                        if token_row:
+                            actor_type = "project_token"
+                            token_id = token_row["token_id"]
+                            project_id = token_row["project_id"]
+                            project_key = token_row["project_key"]
+                            actor_name = f"token:{token_id}"
+            except Exception:
+                pass
+
+    request_body = None
+    request_obj = None
+    if method in {"POST", "PUT", "PATCH", "DELETE"}:
+        try:
+            body_bytes = await request.body()
+            if body_bytes:
+                content_type = request.headers.get("content-type", "")
+                if "application/json" in content_type:
+                    request_obj = _parse_json_text(body_bytes)
+                    request_body = json.dumps(_redact_sensitive(request_obj), ensure_ascii=True)
+                else:
+                    request_body = "<non-json-body>"
+        except Exception:
+            request_body = "<body-unavailable>"
+
+    response = None
+    status_code = 500
+    error_message = None
+    response_obj = None
+    usage_obj = None
+    token_usage_total = None
+    try:
+        response = await call_next(request)
+        status_code = response.status_code
+
+        content_type = (response.headers.get("content-type") or "").lower()
+        is_json_response = "application/json" in content_type
+        is_sse = path.startswith("/mcp/sse") or "text/event-stream" in content_type
+
+        if is_json_response and not is_sse:
+            response_body_bytes = b""
+            if getattr(response, "body", None) is not None:
+                response_body_bytes = response.body  # type: ignore[assignment]
+            elif getattr(response, "body_iterator", None) is not None:
+                chunks = []
+                async for chunk in response.body_iterator:
+                    chunks.append(chunk)
+                response_body_bytes = b"".join(chunks)
+                response_headers = dict(response.headers)
+                response_headers.pop("content-length", None)
+                response = Response(
+                    content=response_body_bytes,
+                    status_code=response.status_code,
+                    headers=response_headers,
+                    media_type=response.media_type,
+                    background=response.background,
+                )
+
+            response_obj = _parse_json_text(response_body_bytes)
+            usage_obj = (_find_usage_dict(response_obj) or _find_usage_dict(request_obj)) if token_usage_eligible else None
+            if usage_obj and token_usage_eligible:
+                token_usage_total = int(usage_obj.get("total_tokens") or 0)
+
+        return response
+    except Exception as exc:
+        error_message = str(exc)
+        raise
+    finally:
+        duration_ms = int((time.perf_counter() - start) * 1000)
+        if not project_id:
+            project_id = request.scope.get("state", {}).get("project_db_id")
+        if not project_key:
+            project_key = request.scope.get("state", {}).get("project_key")
+        if not token_id:
+            token_id = request.scope.get("state", {}).get("project_token_id")
+        scope_name = "mcp" if path.startswith("/mcp") else "api"
+        details_payload = {
+            "auth_header_present": bool(raw_auth),
+            "status_bucket": f"{status_code // 100}xx",
+        }
+        if usage_obj:
+            details_payload["llm_usage"] = usage_obj
+        try:
+            await insert_audit_log(
+                scope=scope_name,
+                method=method,
+                path=path,
+                status_code=status_code,
+                duration_ms=duration_ms,
+                actor_type=actor_type,
+                actor_id=actor_id,
+                actor_name=actor_name,
+                project_id=project_id,
+                project_key=project_key,
+                token_id=token_id,
+                client_ip=_truncate(client_ip, 128),
+                user_agent=_truncate(user_agent, 512),
+                query_string=_truncate(query_string, 512),
+                request_body=_truncate(request_body, 2000),
+                response_error=_truncate(error_message, 1000),
+                details=details_payload,
+                token_usage_total=token_usage_total,
+            )
+        except Exception as exc:
+            log.warning("audit.write_failed", reason=str(exc), path=path)
 
 
 @app.get("/health")
