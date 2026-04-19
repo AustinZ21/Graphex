@@ -540,6 +540,9 @@ function goHome() {
 function logout() {
   _jwt = ''; _me = null;
   localStorage.removeItem('cg_jwt');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
 
 // ── User dropdown ─────────────────────────────────────────────────────────
 function toggleUserMenu() {
@@ -585,9 +588,6 @@ async function submitProfile() {
     closeModal('modal-profile');
     toast('Profile updated');
   } catch(e) { toast(e.message, 'error'); }
-}
-  document.getElementById('app').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
 }
 
 function switchTab(name, btn) {
