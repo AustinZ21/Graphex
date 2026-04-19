@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.11  
+**Version:** 1.29.12  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-19 (ui: remove logged-in user item from dropdown menu)
+**Date:** 2026-04-19 (ui: token row id display and metadata order update)
 
 ## 1. Introduction
 

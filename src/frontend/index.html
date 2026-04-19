@@ -968,11 +968,11 @@ function renderTokensPanel(panel, tokens, projectId) {
     <h4>Tokens (${tokens.filter(t=>t.is_active).length} active)</h4>
     ${tokens.map(t=>`
       <div class="token-row">
-        <span style="color:var(--muted);font-size:11px;font-family:monospace">#${t.id}</span>
-        <span class="token-type-badge">${esc(t.token_type)}</span>
-        <span class="token-hint">${esc(t.token_hint)}</span>
+        <span style="color:var(--muted);font-size:11px;font-family:monospace">${t.id}</span>
         <span style="color:var(--muted);font-size:11px;background:var(--surface2);padding:1px 5px;border-radius:4px">v${t.version}</span>
         <span style="color:var(--muted);font-size:12px;font-family:monospace">${esc(t.created_at)}</span>
+        <span class="token-type-badge">${esc(t.token_type)}</span>
+        <span class="token-hint">${esc(t.token_hint)}</span>
         ${t.is_active
           ? (_me?.role==='admin'?`
             <button class="btn btn-sm" onclick="rotateToken(${t.id},${projectId})" title="Revoke and issue new token with version+1">Rotate</button>
