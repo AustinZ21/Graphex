@@ -26,9 +26,17 @@ class UserCreate(BaseModel):
 class UserOut(BaseModel):
     id: int
     username: str
+    email: str = ""
     role: str
     created_at: str
     is_active: bool
+
+
+class UserProfileUpdate(BaseModel):
+    username: str | None = Field(default=None, min_length=3, max_length=64)
+    email: str | None = None
+    current_password: str | None = None
+    new_password: str | None = Field(default=None, min_length=8)
 
 
 class ProjectCreate(BaseModel):

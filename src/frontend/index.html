@@ -203,6 +203,42 @@
       font-size: 13px; pointer-events: none; opacity: .5;
     }
     .search-highlight { background: rgba(74,227,135,.18); border-radius: 2px; }
+
+    /* ── User dropdown ── */
+    .user-menu-wrap { position: relative; }
+    .user-menu-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: transparent; border: 1px solid var(--border);
+      border-radius: 8px; padding: 5px 10px;
+      color: var(--text); cursor: pointer; font-size: 13px;
+      transition: background .15s;
+    }
+    .user-menu-btn:hover { background: var(--panel-elevated); }
+    .user-menu-btn .chevron { font-size: 10px; color: var(--muted); transition: transform .15s; }
+    .user-menu-btn.open .chevron { transform: rotate(180deg); }
+    .user-dropdown {
+      display: none; position: absolute; right: 0; top: calc(100% + 6px);
+      background: var(--panel-elevated); border: 1px solid var(--border);
+      border-radius: 10px; min-width: 160px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.4);
+      z-index: 50; overflow: hidden;
+    }
+    .user-dropdown.open { display: block; }
+    .user-dropdown-header {
+      padding: 10px 14px 8px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px; color: var(--muted);
+    }
+    .user-dropdown-header strong { display: block; color: var(--text); font-size: 13px; }
+    .user-dropdown-item {
+      display: block; width: 100%; text-align: left;
+      padding: 9px 14px; background: transparent;
+      border: none; color: var(--text); cursor: pointer;
+      font-size: 13px; transition: background .12s;
+    }
+    .user-dropdown-item:hover { background: rgba(255,255,255,.05); }
+    .user-dropdown-item.danger { color: var(--danger); }
+    .user-dropdown-divider { height: 1px; background: var(--border); margin: 2px 0; }
   </style>
 </head>
 <body>
@@ -234,9 +270,23 @@
     <span style="font-size:11px;color:var(--muted);padding-left:6px;align-self:center">v0.0.4</span>
     <div style="flex:1"></div>
     <div class="user-badge">
-      <span id="topbar-user"></span>
-      <span id="topbar-role" class="role-tag"></span>
-      <button class="btn btn-ghost btn-sm" onclick="logout()">Sign out</button>
+      <div class="user-menu-wrap" id="user-menu-wrap">
+        <button class="user-menu-btn" id="user-menu-btn" onclick="toggleUserMenu()">
+          <span id="topbar-user"></span>
+          <span id="topbar-role" class="role-tag"></span>
+          <span class="chevron">&#9660;</span>
+        </button>
+        <div class="user-dropdown" id="user-dropdown">
+          <div class="user-dropdown-header">
+            <strong id="dd-username"></strong>
+            <span id="dd-email"></span>
+          </div>
+          <button class="user-dropdown-item" onclick="openProfile(); closeUserMenu()">&#9998; 个人资料</button>
+          <button class="user-dropdown-item" id="dd-users-link" onclick="switchTab('users', document.querySelector('[onclick*=users]')); closeUserMenu()">&#128100; 用户管理</button>
+          <div class="user-dropdown-divider"></div>
+          <button class="user-dropdown-item danger" onclick="logout()">&#10148; 退出登录</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -350,6 +400,39 @@
   </div>
 </div>
 
+<!-- PROFILE MODAL -->
+<div class="overlay" id="modal-profile">
+  <div class="modal" style="width:min(480px,100%)">
+    <h3>个人资料</h3>
+    <div class="form-group">
+      <label>用户名</label>
+      <input id="pf-username" type="text" autocomplete="username" />
+    </div>
+    <div class="form-group">
+      <label>邮箱</label>
+      <input id="pf-email" type="email" autocomplete="email" placeholder="（可选）" />
+    </div>
+    <hr style="border-color:var(--border);margin:16px 0" />
+    <p style="color:var(--muted);font-size:12px;margin-bottom:12px">修改密码（留空则不更改）</p>
+    <div class="form-group">
+      <label>当前密码</label>
+      <input id="pf-cur-pass" type="password" autocomplete="current-password" />
+    </div>
+    <div class="form-group">
+      <label>新密码（至少 8 位）</label>
+      <input id="pf-new-pass" type="password" autocomplete="new-password" />
+    </div>
+    <div class="form-group">
+      <label>确认新密码</label>
+      <input id="pf-confirm-pass" type="password" autocomplete="new-password" />
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:20px">
+      <button class="btn btn-ghost" onclick="closeModal('modal-profile')">取消</button>
+      <button class="btn btn-primary" onclick="submitProfile()">保存</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast-area"></div>
 
 <script>
@@ -399,12 +482,15 @@ async function initApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('topbar-user').textContent = _me.username;
+  document.getElementById('dd-username').textContent = _me.username;
+  document.getElementById('dd-email').textContent = _me.email || '';
   const roleEl = document.getElementById('topbar-role');
   roleEl.textContent = _me.role;
   roleEl.className = 'role-tag' + (_me.role === 'admin' ? '' : ' viewer');
   if (_me.role !== 'admin') {
     document.getElementById('tab-users-btn').style.display = 'none';
     document.getElementById('new-project-btn').style.display = 'none';
+    document.getElementById('dd-users-link').style.display = 'none';
   }
   await loadProjects();
 }

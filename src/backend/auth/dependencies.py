@@ -31,7 +31,7 @@ async def get_current_user(
         raise exc
 
     async with db.execute(
-        "SELECT id, username, role, is_active FROM users WHERE username = ?",
+        "SELECT id, username, email, role, password_hash, is_active FROM users WHERE username = ?",
         (username,),
     ) as cur:
         row = await cur.fetchone()

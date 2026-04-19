@@ -19,6 +19,7 @@ from backend.auth.models import (
     TokenResponse,
     UserCreate,
     UserOut,
+    UserProfileUpdate,
 )
 from backend.auth.security import (
     create_access_token,
@@ -61,9 +62,57 @@ async def me(user: dict = Depends(get_current_user)):
     return UserOut(
         id=user["id"],
         username=user["username"],
+        email=user.get("email", "") or "",
         role=user["role"],
         created_at="",
         is_active=bool(user["is_active"]),
+    )
+
+
+@router.patch("/me", response_model=UserOut)
+async def update_me(
+    body: UserProfileUpdate,
+    user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    if body.new_password:
+        if not body.current_password:
+            raise HTTPException(status_code=400, detail="current_password required to set a new password")
+        if not verify_password(body.current_password, user["password_hash"]):
+            raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    fields: list[str] = []
+    values: list = []
+    if body.username is not None:
+        fields.append("username = ?")
+        values.append(body.username)
+    if body.email is not None:
+        fields.append("email = ?")
+        values.append(body.email)
+    if body.new_password:
+        fields.append("password_hash = ?")
+        values.append(hash_password(body.new_password))
+
+    if fields:
+        values.append(user["id"])
+        try:
+            await db.execute(f"UPDATE users SET {', '.join(fields)} WHERE id = ?", values)
+            await db.commit()
+        except aiosqlite.IntegrityError:
+            raise HTTPException(status_code=409, detail="Username already taken")
+
+    async with db.execute(
+        "SELECT id, username, email, role, created_at, is_active FROM users WHERE id = ?",
+        (user["id"],),
+    ) as cur:
+        row = await cur.fetchone()
+    return UserOut(
+        id=row["id"],
+        username=row["username"],
+        email=row["email"] or "",
+        role=row["role"],
+        created_at=row["created_at"],
+        is_active=bool(row["is_active"]),
     )
 
 

@@ -57,6 +57,12 @@ async def init_db() -> None:
             await db.commit()
         except Exception:
             pass  # column already exists
+        # email column
+        try:
+            await db.execute("ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT ''")
+            await db.commit()
+        except Exception:
+            pass  # column already exists
 
 
 async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:
