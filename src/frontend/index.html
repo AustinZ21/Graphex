@@ -655,11 +655,18 @@
   </div>
 </div>
 
-<!-- MODAL: Edit Username -->
+<!-- MODAL: Edit User -->
 <div class="overlay" id="modal-edit-username">
   <div class="modal">
-    <h3>Edit Username</h3>
-    <div class="form-group"><label>New Username</label><input id="eu-username" autocomplete="off" /></div>
+    <h3>Edit User</h3>
+    <div class="form-group"><label>Username</label><input id="eu-username" autocomplete="off" /></div>
+    <div class="form-group">
+      <label>Role</label>
+      <select id="eu-role">
+        <option value="developer">developer</option>
+        <option value="admin">admin</option>
+      </select>
+    </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
       <button class="btn btn-ghost" onclick="closeModal('modal-edit-username')">Cancel</button>
       <button class="btn btn-primary" onclick="submitEditUsername()">Save</button>
@@ -1439,7 +1446,7 @@ function renderUsers() {
       <td style="text-align:center;color:var(--muted);font-size:12px;font-family:monospace">${u.created_at}</td>
       <td style="text-align:center">${u.id!==_me?.id
         ? `${u.role!=='admin'
-            ? `<button class="btn btn-sm" style="margin-right:4px" onclick='editUsername(${u.id}, ${JSON.stringify(u.username)})'>Edit</button>`
+            ? `<button class="btn btn-sm" style="margin-right:4px" onclick='editUsername(${u.id}, ${JSON.stringify(u.username)}, ${JSON.stringify(u.role)})'>Edit</button>`
             : ''}
            ${u.is_active
              ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">Deactivate</button>`
@@ -1525,23 +1532,30 @@ async function activateUser(id) {
 
 let _editUsernameId = null;
 let _editUsernameOld = null;
+let _editRoleOld = null;
 
-function editUsername(id, currentUsername) {
+function editUsername(id, currentUsername, currentRole) {
   _editUsernameId = id;
   _editUsernameOld = currentUsername;
+  _editRoleOld = currentRole;
   const inp = document.getElementById('eu-username');
   inp.value = currentUsername;
+  document.getElementById('eu-role').value = currentRole;
   openModal('modal-edit-username');
   setTimeout(() => { inp.focus(); inp.select(); }, 80);
 }
 
 async function submitEditUsername() {
   const username = document.getElementById('eu-username').value.trim();
-  if (!username || username === _editUsernameOld) { closeModal('modal-edit-username'); return; }
+  const role = document.getElementById('eu-role').value;
+  if (!username) { closeModal('modal-edit-username'); return; }
+  const usernameChanged = username !== _editUsernameOld;
+  const roleChanged = role !== _editRoleOld;
+  if (!usernameChanged && !roleChanged) { closeModal('modal-edit-username'); return; }
   try {
-    await api('PATCH', `/auth/users/${_editUsernameId}`, { username });
+    await api('PATCH', `/auth/users/${_editUsernameId}`, { username, role });
     closeModal('modal-edit-username');
-    toast('Username updated');
+    toast('User updated');
     await loadUsers();
   } catch(e) {
     toast(e.message, 'error');

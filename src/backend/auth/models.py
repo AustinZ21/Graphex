@@ -61,6 +61,7 @@ class UserProfileUpdate(BaseModel):
 
 class AdminUserUpdate(BaseModel):
     username: str = Field(min_length=3, max_length=64)
+    role: str | None = Field(default=None, pattern="^(admin|developer)$")
 
     @field_validator("username")
     @classmethod

@@ -438,8 +438,8 @@ async def update_user(
     if row["id"] == current["id"] and body.username != row["username"]:
         raise HTTPException(status_code=400, detail="You cannot change your own username")
 
-    if row["role"] != "developer" and body.username != row["username"]:
-        raise HTTPException(status_code=400, detail="Only developer usernames can be changed")
+    if body.role is not None and row["id"] == current["id"]:
+        raise HTTPException(status_code=400, detail="You cannot change your own role")
 
     if body.username != row["username"]:
         try:
@@ -447,6 +447,10 @@ async def update_user(
             await db.commit()
         except aiosqlite.IntegrityError:
             raise HTTPException(status_code=409, detail="Username already exists")
+
+    if body.role is not None and body.role != row["role"]:
+        await db.execute("UPDATE users SET role = ? WHERE id = ?", (body.role, user_id))
+        await db.commit()
 
     async with db.execute(
         "SELECT id, username, email, role, created_at, is_active FROM users WHERE id = ?",
