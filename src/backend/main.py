@@ -148,7 +148,14 @@ _FRONTEND = Path(__file__).resolve().parents[1] / "frontend"
 
 @app.get("/admin", include_in_schema=False)
 async def admin_ui():
-    return FileResponse(_FRONTEND / "index.html")
+    return FileResponse(
+        _FRONTEND / "index.html",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 
 if _FRONTEND.is_dir():
