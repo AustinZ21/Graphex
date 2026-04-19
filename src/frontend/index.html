@@ -201,7 +201,9 @@
       background: var(--danger-soft);
       color: var(--danger);
     }
-    .token-actions { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+    .token-actions { display: flex; align-items: center; gap: 8px; justify-content: center; }
+    .actions-col-header { text-align: center; }
+    .project-actions { display: flex; justify-content: center; align-items: center; gap: 6px; }
     .token-type-badge {
       padding: 2px 8px; border-radius: 999px; font-size: 11px;
       background: #1e2a3a; color: #6ab3e3; border: 1px solid rgba(106,179,227,.3);
@@ -231,7 +233,7 @@
       .token-actions {
         grid-column: 3;
       }
-      .token-actions { justify-content: flex-start; }
+      .token-actions { justify-content: center; }
     }
 
     /* ── Status badges ── */
@@ -471,7 +473,7 @@
             <th class="sortable" onclick="setProjectsSort('upstream_url')">Upstream URL <span id="sort-upstream_url"></span></th>
             <th class="sortable" onclick="setProjectsSort('is_active')">Status <span id="sort-is_active"></span></th>
             <th class="sortable" onclick="setProjectsSort('created_at')">Created <span id="sort-created_at"></span></th>
-            <th>Actions</th>
+            <th class="actions-col-header">Actions</th>
           </tr></thead>
           <tbody id="projects-body"></tbody>
         </table>
@@ -976,10 +978,12 @@ function filterProjects(q) {
       <td><span class="${p.is_active?'badge-active':'badge-inactive'}">${p.is_active?'Active':'Inactive'}</span></td>
       <td style="color:var(--muted);font-size:12px;font-family:monospace">${esc(p.created_at)}</td>
       <td>
-        <button class="btn btn-sm btn-ghost" style="margin-right:4px" onclick="openGenerateToken(${p.id})">+ Token</button>
-        ${_me?.role==='admin'?`
-          <button class="btn btn-sm" style="margin-right:4px" onclick="openEditProject(${p.id},'${esc(p.project_key)}','${esc(p.upstream_url||'')}',${JSON.stringify(p.description||'')})">Editit</button>
-          <button class="btn btn-sm btn-danger" onclick="deleteProject(${p.id})">Delete</button>`:''}
+        <div class="project-actions">
+          <button class="btn btn-sm btn-ghost" onclick="openGenerateToken(${p.id})">+ Token</button>
+          ${_me?.role==='admin'?`
+            <button class="btn btn-sm" onclick="openEditProject(${p.id},'${esc(p.project_key)}','${esc(p.upstream_url||'')}',${JSON.stringify(p.description||'')})">Editit</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteProject(${p.id})">Delete</button>`:''}
+        </div>
       </td>
     </tr>
     <tr id="tokens-row-${p.id}" style="display:${expanded ? '' : 'none'}">
@@ -1046,7 +1050,7 @@ function renderTokensPanel(panel, tokens, projectId) {
       <span>Hint</span>
       <span>Purpose</span>
       <span>Status</span>
-      <span style="text-align:right">Actions</span>
+      <span class="actions-col-header">Actions</span>
     </div>
     ${tokens.map(t=>`
       <div class="token-row">
