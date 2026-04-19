@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.38  
+**Version:** 1.29.39  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-19 (ui: rename Projects & Tokens tab to Projects)
+**Date:** 2026-04-19 (docs: set CG Admin Solution 1 default + add one-command startup script)
 
 ## 1. Introduction
 
@@ -14,6 +14,24 @@ The core philosophy of ADC is to manage the "soul of the project" (architecture,
 Unlike traditional documentation, ADC is specifically optimized for both **AI Agents (Coding Assistants)** and **newly onboarded developers**. It ensures that both can acquire the most accurate project context in the shortest possible time, thereby eliminating issues where AI generates code that violates team conventions or humans fail to grasp historical architectural decisions.
 
 By design, all ADC materials are stored within a hidden `.adc/` directory at the project root. The `.` prefix ensures that the Constitution remains distinctly separated from application source code, preventing clutter in regular IDE tree views while remaining instantly discoverable to any AI scanner workflow.
+
+### ContextGraph Admin Default Runtime (Solution 1)
+For CG Admin local development, the default supported runtime is **Solution 1**:
+- **Backend + Admin UI are served together by `api-dev`** (FastAPI serves `/admin` and static frontend).
+- **Primary local URL:** `http://localhost:8001/admin`.
+- **Recommended one-command startup:**
+
+```powershell
+./src/scripts/start-admin-s1.ps1 start
+```
+
+Useful commands:
+
+```powershell
+./src/scripts/start-admin-s1.ps1 status
+./src/scripts/start-admin-s1.ps1 logs
+./src/scripts/start-admin-s1.ps1 stop
+```
 
 ---
 
