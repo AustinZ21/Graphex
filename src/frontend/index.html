@@ -1223,7 +1223,7 @@ function filterProjects(q) {
         <div class="project-actions">
           <button class="btn btn-sm btn-ghost" onclick="openGenerateToken(${p.id})">+ Token</button>
           ${_me?.role==='admin'?`
-            <button class="btn btn-sm" onclick="openEditProject(${p.id},'${esc(p.project_key)}','${esc(p.upstream_url||'')}',${JSON.stringify(p.description||'')})">Editit</button>
+            <button class="btn btn-sm" onclick="openEditProject(${p.id},'${esc(p.project_key)}','${esc(p.upstream_url||'')}',${JSON.stringify(p.description||'')})">Edit</button>
             <button class="btn btn-sm btn-danger" onclick="deleteProject(${p.id})">Delete</button>`:''}
         </div>
       </td>
