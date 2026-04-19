@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.29  
+**Version:** 1.29.30  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-19 (ui: add cyber background image for login page only)
+**Date:** 2026-04-19 (ui: upgrade login cyber background to mesh-node network style)
 
 ## 1. Introduction
 
