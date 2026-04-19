@@ -29,7 +29,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.auth.database import init_db
 from backend.auth.middleware import ProjectTokenMiddleware
 from backend.auth.router import router as auth_router
-from backend.graph.client import GraphClient
+from backend.graph.registry import GraphRegistry
 from backend.indexer.consumer import IndexerConsumer
 from backend.tools.producer import MCPProducer
 from backend.tools import server as mcp_server
@@ -42,7 +42,7 @@ QUEUE_REDIS_URL = os.getenv("QUEUE_REDIS_URL", "redis://localhost:6380/1")
 CACHE_REDIS_URL = os.getenv("CACHE_REDIS_URL", "redis://localhost:6380")  # db=2 set in QueryCache
 TRACE_ENABLED = os.getenv("TRACE_ENABLED", "true").lower() == "true"
 
-_graph = GraphClient(host=FALKORDB_HOST, port=FALKORDB_PORT)
+_registry = GraphRegistry(host=FALKORDB_HOST, port=FALKORDB_PORT)
 _producer = MCPProducer(redis_url=QUEUE_REDIS_URL)
 _consumer: IndexerConsumer | None = None
 _consumer_task: asyncio.Task | None = None
@@ -56,8 +56,7 @@ async def lifespan(app: FastAPI):
     # Startup: auth DB
     await init_db()
 
-    _graph.connect()
-    _graph.ensure_indexes()
+    # Registry connects graphs lazily per project on first use
     await _producer.connect()
 
     # Phase 3: query cache
@@ -75,14 +74,19 @@ async def lifespan(app: FastAPI):
         try:
             from backend.eval.trace_eval import TraceRecorder, TraceEvaluator
             recorder = TraceRecorder(redis_url=CACHE_REDIS_URL)
-            _trace_evaluator = TraceEvaluator(redis_url=CACHE_REDIS_URL, graph_client=_graph)
+            # TraceEvaluator uses a default graph; per-project eval is a future improvement
+            _trace_evaluator = TraceEvaluator(redis_url=CACHE_REDIS_URL, graph_client=None)
             await _trace_evaluator.start()
         except Exception as exc:
             log.warning("trace_eval.disabled", reason=str(exc))
 
-    mcp_server.init(graph=_graph, producer=_producer, cache=cache, recorder=recorder)
-    _consumer = IndexerConsumer(redis_url=QUEUE_REDIS_URL, graph=_graph)
+    mcp_server.init(registry=_registry, producer=_producer, cache=cache, recorder=recorder)
+    _consumer = IndexerConsumer(redis_url=QUEUE_REDIS_URL, registry=_registry)
     _consumer_task = asyncio.create_task(_consumer.start())
+    
+    # Make consumer available via app state for API endpoints
+    app.state.consumer = _consumer
+    
     log.info("contextgraph.started", falkordb=f"{FALKORDB_HOST}:{FALKORDB_PORT}")
 
     yield
@@ -103,7 +107,7 @@ async def lifespan(app: FastAPI):
     if cache:
         cache.close()
     await _producer.close()
-    _graph.close()
+    _registry.close_all()
     log.info("contextgraph.stopped")
 
 

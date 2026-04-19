@@ -25,6 +25,7 @@ class IndexJob(BaseModel):
     job_type: JobType
     repo_path: str
     changed_paths: Optional[list[str]] = None
+    project_key: Optional[str] = None  # FalkorDB graph name for this project
     created_at: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )

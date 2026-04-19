@@ -14,6 +14,7 @@ import structlog
 from backend.queue.streams import JobConsumer
 from backend.queue.models import JobType, IndexJob
 from backend.graph.client import GraphClient
+from backend.graph.registry import GraphRegistry
 from backend.indexer.pipeline import IndexPipeline
 
 log = structlog.get_logger()
@@ -23,9 +24,9 @@ _MAX_SLEEP = 30.0
 
 
 class IndexerConsumer:
-    def __init__(self, redis_url: str, graph: GraphClient) -> None:
+    def __init__(self, redis_url: str, registry: GraphRegistry) -> None:
         self._consumer = JobConsumer(redis_url=redis_url)
-        self._pipeline = IndexPipeline(graph=graph)
+        self._registry = registry
         self._running = False
         self._sleep = _BASE_SLEEP
 
@@ -51,17 +52,26 @@ class IndexerConsumer:
         await self._consumer.close()
         log.info("indexer.consumer.stopped")
 
+    # Delegate job status queries to JobConsumer
+    async def get_jobs_by_repo(self, repo_path: str) -> list[dict]:
+        """Get all job statuses for a given repo path, most recent first."""
+        return await self._consumer.get_jobs_by_repo(repo_path)
+
     async def _process(self, msg_id: str, job: IndexJob) -> None:
         log.info("indexer.job.start", job_id=job.job_id, type=job.job_type)
         try:
             await self._consumer.set_job_processing(job)
+            # Route to the per-project graph; fall back to contextvar default if unset
+            project_key = job.project_key or "contextgraph"
+            graph = self._registry.get(project_key)
+            pipeline = IndexPipeline(graph=graph)
             if job.job_type == JobType.INDEX_FULL:
                 stats = await asyncio.to_thread(
-                    self._pipeline.index_full, job.repo_path
+                    pipeline.index_full, job.repo_path
                 )
             elif job.job_type == JobType.INDEX_INCREMENTAL:
                 stats = await asyncio.to_thread(
-                    self._pipeline.index_incremental,
+                    pipeline.index_incremental,
                     job.repo_path,
                     job.changed_paths or [],
                 )

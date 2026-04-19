@@ -30,6 +30,7 @@ from mcp.server.fastmcp import FastMCP
 
 from backend.agent.query_strategy import run_cg_first_strategy
 from backend.graph.client import GraphClient
+from backend.graph.registry import GraphRegistry
 from backend.graph import schema as S
 from backend.tools.producer import MCPProducer
 
@@ -37,22 +38,42 @@ log = structlog.get_logger()
 
 mcp = FastMCP("contextgraph")
 
-_graph: GraphClient | None = None
+_registry: GraphRegistry | None = None
 _producer: MCPProducer | None = None
 _cache = None           # QueryCache | None  – set via init()
 _recorder = None        # TraceRecorder | None  – set via init()
 _repo_root = Path(os.getenv("CONTEXTGRAPH_REPO_ROOT", ".")).resolve()
 
 
+class _GraphProxy:
+    """Module-level proxy that routes graph calls to the current project's GraphClient.
+
+    All existing ``_graph.query(...)`` calls and ``if not _graph:`` guards work
+    unchanged – the proxy dispatches to the correct per-project graph at call time
+    using the ``_current_project_key`` ContextVar set by ProjectTokenMiddleware.
+    """
+
+    def query(self, cypher: str, params: dict | None = None):
+        if _registry is None:
+            raise RuntimeError("MCP server not initialized")
+        return _registry.current().query(cypher, params)
+
+    def __bool__(self) -> bool:  # enables ``if not _graph:`` checks
+        return _registry is not None
+
+
+_graph = _GraphProxy()
+
+
 def init(
-    graph: GraphClient,
+    registry: GraphRegistry,
     producer: MCPProducer,
     cache=None,
     recorder=None,
 ) -> None:
     """Wire dependencies after app startup."""
-    global _graph, _producer, _cache, _recorder
-    _graph = graph
+    global _registry, _producer, _cache, _recorder
+    _registry = registry
     _producer = producer
     _cache = cache
     _recorder = recorder
@@ -139,7 +160,9 @@ async def index_full(repo_path: str) -> dict:
     """Enqueue a full index job for the given repository path."""
     if not _producer:
         raise RuntimeError("MCP server not initialized")
-    submitted = await _producer.submit_full_index(repo_path)
+    from backend.graph.registry import _current_project_key
+    project_key = _current_project_key.get()
+    submitted = await _producer.submit_full_index(repo_path, project_key=project_key)
     # Invalidate cache so stale reads are avoided after re-index
     if _cache:
         _cache.invalidate_all()
@@ -156,7 +179,11 @@ async def index_incremental(repo_path: str, changed_paths: list[str]) -> dict:
     """Enqueue an incremental index job for a list of changed files."""
     if not _producer:
         raise RuntimeError("MCP server not initialized")
-    submitted = await _producer.submit_incremental_index(repo_path, changed_paths)
+    from backend.graph.registry import _current_project_key
+    project_key = _current_project_key.get()
+    submitted = await _producer.submit_incremental_index(
+        repo_path, changed_paths, project_key=project_key
+    )
     if _cache:
         _cache.invalidate_all()
     return {
@@ -576,7 +603,7 @@ def run_eval() -> dict:
     if not _graph:
         raise RuntimeError("MCP server not initialized")
     from backend.eval.runner import EvalRunner
-    runner = EvalRunner(_graph)
+    runner = EvalRunner(_registry.current())
     return runner.run().as_dict()
 
 
