@@ -53,7 +53,7 @@
       background: rgba(255,255,255,.02);
       position: sticky; top: 0; z-index: 10;
     }
-    .topbar .logo { font-weight: 700; font-size: 15px; flex: 1; }
+    .topbar .logo { font-weight: 700; font-size: 15px; }
     .topbar .user-badge { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
     .role-tag {
       padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
@@ -231,7 +231,8 @@
 <div id="app">
   <div class="topbar">
     <span class="logo">ContextGraph Admin</span>
-    <span style="font-size:11px;color:var(--muted);margin-right:auto;padding-left:8px">v0.0.4</span>
+    <span style="font-size:11px;color:var(--muted);padding-left:6px;align-self:center">v0.0.4</span>
+    <div style="flex:1"></div>
     <div class="user-badge">
       <span id="topbar-user"></span>
       <span id="topbar-role" class="role-tag"></span>
