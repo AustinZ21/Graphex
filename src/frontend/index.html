@@ -655,6 +655,18 @@
   </div>
 </div>
 
+<!-- MODAL: Edit Username -->
+<div class="overlay" id="modal-edit-username">
+  <div class="modal">
+    <h3>Edit Username</h3>
+    <div class="form-group"><label>New Username</label><input id="eu-username" autocomplete="off" /></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit-username')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitEditUsername()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Generate Token -->
 <div class="overlay" id="modal-token">
   <div class="modal">
@@ -1511,13 +1523,24 @@ async function activateUser(id) {
   catch(e) { toast(e.message,'error'); }
 }
 
-async function editUsername(id, currentUsername) {
-  const next = prompt('New username', currentUsername);
-  if (next === null) return;
-  const username = next.trim();
-  if (!username || username === currentUsername) return;
+let _editUsernameId = null;
+let _editUsernameOld = null;
+
+function editUsername(id, currentUsername) {
+  _editUsernameId = id;
+  _editUsernameOld = currentUsername;
+  const inp = document.getElementById('eu-username');
+  inp.value = currentUsername;
+  openModal('modal-edit-username');
+  setTimeout(() => { inp.focus(); inp.select(); }, 80);
+}
+
+async function submitEditUsername() {
+  const username = document.getElementById('eu-username').value.trim();
+  if (!username || username === _editUsernameOld) { closeModal('modal-edit-username'); return; }
   try {
-    await api('PATCH', `/auth/users/${id}`, { username });
+    await api('PATCH', `/auth/users/${_editUsernameId}`, { username });
+    closeModal('modal-edit-username');
     toast('Username updated');
     await loadUsers();
   } catch(e) {
