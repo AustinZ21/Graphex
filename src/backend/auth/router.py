@@ -501,6 +501,7 @@ async def delete_project(
     _: dict = Depends(require_admin),
     db: aiosqlite.Connection = Depends(get_db),
 ):
+    await db.execute("UPDATE project_tokens SET is_active = 0 WHERE project_id = ?", (project_id,))
     await db.execute("UPDATE projects SET is_active = 0 WHERE id = ?", (project_id,))
     await db.commit()
 
