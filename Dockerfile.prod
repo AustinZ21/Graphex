@@ -8,7 +8,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source
 COPY src/ ./src/
-COPY config/ ./config/
 
 # Create data dir for SQLite auth DB
 RUN mkdir -p /app/data
