@@ -1426,8 +1426,8 @@ function renderUsers() {
       <td style="text-align:center"><span class="${u.is_active?'badge-active':'badge-inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
       <td style="text-align:center;color:var(--muted);font-size:12px;font-family:monospace">${u.created_at}</td>
       <td style="text-align:center">${u.id!==_me?.id
-        ? `${u.role==='developer'
-            ? `<button class="btn btn-sm" style="margin-right:4px" onclick='editUsername(${u.id}, ${JSON.stringify(u.username)})'>Edit Username</button>`
+        ? `${u.role!=='admin'
+            ? `<button class="btn btn-sm" style="margin-right:4px" onclick='editUsername(${u.id}, ${JSON.stringify(u.username)})'>Edit</button>`
             : ''}
            ${u.is_active
              ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">Deactivate</button>`

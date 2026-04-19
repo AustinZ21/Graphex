@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.34  
+**Version:** 1.29.35  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-19 (feat: rename user role viewer→developer)
+**Date:** 2026-04-19 (fix: rename Edit Username btn to Edit, show for all non-admin)
 
 ## 1. Introduction
 
