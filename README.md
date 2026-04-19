@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.32  
+**Version:** 1.29.33  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-19 (ui: tune VANTA.NET login params points/maxDistance/spacing to 20)
+**Date:** 2026-04-19 (ui: increase VANTA.NET login background transparency)
 
 ## 1. Introduction
 
