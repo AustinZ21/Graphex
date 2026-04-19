@@ -78,6 +78,10 @@ src/logs/*
 !src/logs/.gitkeep
 *.log
 
+# Auth SQLite database (runtime data, never commit)
+*.db
+data/
+
 # Framework specifics (React/Next/Vite etc)
 .next/
 out/
@@ -93,3 +97,5 @@ out/
 
 *.ps1
 !src/scripts/*.ps1
+
+config/

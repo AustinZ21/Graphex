@@ -1,0 +1,47 @@
+"""FastAPI dependencies: current user, admin guard, token validation."""
+from __future__ import annotations
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from backend.auth.database import get_db
+from backend.auth.security import decode_access_token
+
+import aiosqlite
+from jose import JWTError
+
+_bearer = HTTPBearer(auto_error=False)
+
+
+async def get_current_user(
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: aiosqlite.Connection = Depends(get_db),
+) -> dict:
+    exc = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Not authenticated",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    if not creds:
+        raise exc
+    try:
+        payload = decode_access_token(creds.credentials)
+        username: str = payload.get("sub", "")
+    except JWTError:
+        raise exc
+
+    async with db.execute(
+        "SELECT id, username, role, is_active FROM users WHERE username = ?",
+        (username,),
+    ) as cur:
+        row = await cur.fetchone()
+
+    if not row or not row["is_active"]:
+        raise exc
+    return dict(row)
+
+
+async def require_admin(user: dict = Depends(get_current_user)) -> dict:
+    if user["role"] != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
+    return user

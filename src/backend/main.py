@@ -18,11 +18,17 @@ from __future__ import annotations
 import asyncio
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import structlog
 import uvicorn
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
+from backend.auth.database import init_db
+from backend.auth.middleware import ProjectTokenMiddleware
+from backend.auth.router import router as auth_router
 from backend.graph.client import GraphClient
 from backend.indexer.consumer import IndexerConsumer
 from backend.tools.producer import MCPProducer
@@ -47,7 +53,9 @@ _trace_evaluator = None
 async def lifespan(app: FastAPI):
     global _consumer, _consumer_task, _trace_evaluator
 
-    # Startup
+    # Startup: auth DB
+    await init_db()
+
     _graph.connect()
     _graph.ensure_indexes()
     await _producer.connect()
@@ -101,6 +109,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="ContextGraph", version="0.2.2", lifespan=lifespan)
 
+# ── Auth middleware (validates Bearer token on /mcp routes) ────────────────
+app.add_middleware(ProjectTokenMiddleware)
+
+# ── Auth API ───────────────────────────────────────────────────────────────
+app.include_router(auth_router, prefix="/api")
+
 
 @app.get("/health")
 async def health() -> dict:
@@ -116,8 +130,20 @@ async def mcp_info() -> dict:
     }
 
 
-# Use SSE transport app for stable embedding under FastAPI.
+# ── MCP SSE transport ──────────────────────────────────────────────────────
 app.mount("/mcp", mcp_server.mcp.sse_app(mount_path="/mcp"))
+
+# ── Admin SPA (served last so API routes take precedence) ─────────────────
+_FRONTEND = Path(__file__).resolve().parents[1] / "frontend"
+
+
+@app.get("/admin", include_in_schema=False)
+async def admin_ui():
+    return FileResponse(_FRONTEND / "index.html")
+
+
+if _FRONTEND.is_dir():
+    app.mount("/", StaticFiles(directory=str(_FRONTEND), html=True), name="frontend")
 
 
 if __name__ == "__main__":

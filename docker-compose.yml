@@ -113,6 +113,13 @@ services:
       - FALKORDB_HOST=falkordb
       - FALKORDB_PORT=6379
       - 'QUEUE_REDIS_URL=redis://redis:6379/1'
+      - AUTH_DB_PATH=/app/data/auth.db
+      - 'JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-jwt-secret-key-32chars!!}'
+      - 'ADMIN_USERNAME=${ADMIN_USERNAME:-admin}'
+      - 'ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}'
+      - 'MCP_ACCESS_TOKEN=${MCP_ACCESS_TOKEN:-}'
+    volumes:
+      - auth_db_data:/app/data
     depends_on:
       redis:
         condition: service_healthy
@@ -122,7 +129,6 @@ services:
         condition: service_healthy
     networks:
       - your-app-network
-    command: 'uvicorn src.backend.main:app --host 0.0.0.0 --port 8000 --workers 4'
     healthcheck:
       test:
         - CMD
@@ -245,6 +251,8 @@ volumes:
   falkordb_dev_data:
     driver: local
   redis_dev_data:
+    driver: local
+  auth_db_data:
     driver: local
 networks:
   your-app-network:

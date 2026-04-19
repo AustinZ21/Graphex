@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.2  
+**Version:** 1.29.3  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-18 (ADC token policy + endpoint-first standard alignment)
+**Date:** 2026-04-18 (project token registry JSON + token model clarification)
 
 ## 1. Introduction
 

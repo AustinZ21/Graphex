@@ -1,0 +1,53 @@
+"""Security helpers: password hashing, JWT issue/verify, token hashing."""
+from __future__ import annotations
+
+import hashlib
+import os
+import secrets
+from datetime import datetime, timedelta, timezone
+
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+
+_pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+JWT_SECRET = os.getenv("JWT_SECRET_KEY", "change-me-jwt-secret-key")
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
+
+TOKEN_LENGTH = 35  # ADC standard: 35 A-Za-z0-9 chars
+
+
+def hash_password(plain: str) -> str:
+    return _pwd_ctx.hash(plain)
+
+
+def verify_password(plain: str, hashed: str) -> bool:
+    return _pwd_ctx.verify(plain, hashed)
+
+
+def create_access_token(data: dict) -> str:
+    payload = data.copy()
+    payload["exp"] = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRE_HOURS)
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def decode_access_token(token: str) -> dict:
+    """Raises JWTError on failure."""
+    return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+
+
+def generate_token() -> str:
+    """Generate a cryptographically random 35-char A-Za-z0-9 token."""
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    return "".join(secrets.choice(alphabet) for _ in range(TOKEN_LENGTH))
+
+
+def hash_token(token: str) -> str:
+    """SHA-256 hex digest used for DB storage."""
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def token_hint(token: str) -> str:
+    """First 8 chars shown in the UI for identification."""
+    return token[:8] + "…"

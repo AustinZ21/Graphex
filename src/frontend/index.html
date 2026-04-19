@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ADC Admin</title>
+  <title>ContextGraph Admin</title>
   <style>
     :root {
       --bg: #1f242f;
@@ -12,95 +12,552 @@
       --text: #e7ebf3;
       --muted: #9aa8bd;
       --accent: #4ae387;
-      --accent-soft: #274a38;
+      --accent-soft: #1e3a2c;
       --border: #465068;
+      --danger: #e35a5a;
+      --danger-soft: #3a1e1e;
+      --input-bg: #1a1f2b;
+      --radius: 10px;
     }
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      margin: 0;
       background: radial-gradient(circle at 20% 10%, #2f394d 0%, var(--bg) 45%, #191d27 100%);
       color: var(--text);
       font-family: "Segoe UI", "Noto Sans", sans-serif;
+      font-size: 14px;
       min-height: 100vh;
-      display: grid;
-      place-items: center;
-      padding: 24px;
     }
-    .shell {
-      width: min(1080px, 100%);
+
+    /* ── Login ── */
+    #login-screen {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 24px;
+    }
+    .login-card {
+      width: min(400px, 100%);
+      background: var(--panel-elevated);
       border: 1px solid var(--border);
       border-radius: 16px;
-      background: linear-gradient(180deg, var(--panel-elevated), var(--panel));
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
-      overflow: hidden;
+      padding: 36px 32px;
+      box-shadow: 0 24px 48px rgba(0,0,0,.45);
     }
+    .login-card h1 { font-size: 20px; margin-bottom: 6px; }
+    .login-card p  { color: var(--muted); margin-bottom: 24px; font-size: 13px; }
+
+    /* ── App shell ── */
+    #app { display: none; flex-direction: column; min-height: 100vh; }
     .topbar {
-      display: flex;
-      justify-content: space-between;
-      padding: 16px 20px;
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 24px;
       border-bottom: 1px solid var(--border);
-      background: rgba(255, 255, 255, 0.02);
+      background: rgba(255,255,255,.02);
+      position: sticky; top: 0; z-index: 10;
     }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 14px;
-      padding: 20px;
+    .topbar .logo { font-weight: 700; font-size: 15px; flex: 1; }
+    .topbar .user-badge { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+    .role-tag {
+      padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+      background: var(--accent-soft); color: var(--accent);
+      border: 1px solid rgba(74,227,135,.3);
     }
-    .card {
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px;
-      background: rgba(0, 0, 0, 0.16);
+    .role-tag.viewer { background: #1e2a3a; color: #6ab3e3; border-color: rgba(106,179,227,.3); }
+
+    .tabs {
+      display: flex; gap: 4px;
+      padding: 16px 24px 0;
+      border-bottom: 1px solid var(--border);
     }
-    .label {
-      color: var(--muted);
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
+    .tab-btn {
+      padding: 8px 18px; border: none;
+      border-bottom: 2px solid transparent;
+      background: transparent; color: var(--muted);
+      cursor: pointer; font-size: 13px; font-weight: 500;
+      transition: color .15s, border-color .15s;
     }
-    .value {
-      font-size: 26px;
-      font-weight: 600;
-      margin-top: 8px;
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-btn:hover:not(.active) { color: var(--text); }
+
+    .tab-content { padding: 24px; flex: 1; }
+    .pane { display: none; }
+    .pane.active { display: block; }
+
+    /* ── Tables ── */
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
     }
-    .status {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      background: var(--accent-soft);
-      color: var(--accent);
-      border: 1px solid rgba(74, 227, 135, 0.35);
+    .section-header h2 { font-size: 16px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th {
+      text-align: left; padding: 10px 12px;
+      color: var(--muted); font-weight: 600; font-size: 11px;
+      text-transform: uppercase; letter-spacing: .06em;
+      border-bottom: 1px solid var(--border);
     }
+    tbody tr { border-bottom: 1px solid rgba(70,80,104,.4); }
+    tbody tr:last-child { border-bottom: none; }
+    tbody td { padding: 10px 12px; }
+    .table-wrap {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+
+    /* ── Token sub-panel ── */
+    .tokens-panel {
+      margin-top: 12px; background: var(--panel-elevated);
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 14px 16px; font-size: 13px;
+    }
+    .tokens-panel h4 {
+      margin-bottom: 10px; color: var(--muted);
+      font-size: 12px; text-transform: uppercase; letter-spacing:.06em;
+    }
+    .token-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 0; border-bottom: 1px solid rgba(70,80,104,.35);
+    }
+    .token-row:last-child { border-bottom: none; }
+    .token-hint { font-family: monospace; color: var(--accent); flex: 1; }
+    .token-type-badge {
+      padding: 2px 8px; border-radius: 999px; font-size: 11px;
+      background: #1e2a3a; color: #6ab3e3; border: 1px solid rgba(106,179,227,.3);
+    }
+
+    /* ── Status badges ── */
+    .badge-active { color: var(--accent); }
+    .badge-inactive { color: var(--danger); }
+
+    /* ── Forms ── */
+    .form-group { margin-bottom: 16px; }
+    label { display: block; margin-bottom: 6px; font-size: 13px; color: var(--muted); }
+    input, select {
+      width: 100%; padding: 9px 12px;
+      background: var(--input-bg); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 14px;
+      outline: none; transition: border-color .15s;
+    }
+    input:focus, select:focus { border-color: var(--accent); }
+
+    /* ── Buttons ── */
+    .btn {
+      padding: 8px 16px; border: none; border-radius: 8px;
+      cursor: pointer; font-size: 13px; font-weight: 500;
+      transition: opacity .15s;
+    }
+    .btn:hover { opacity: .88; }
+    .btn-primary { background: var(--accent); color: #0e1a14; }
+    .btn-danger  { background: var(--danger-soft); color: var(--danger); border: 1px solid rgba(227,90,90,.3); }
+    .btn-ghost   { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+    /* ── Modal ── */
+    .overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.6); z-index: 100;
+      align-items: center; justify-content: center; padding: 24px;
+    }
+    .overlay.open { display: flex; }
+    .modal {
+      background: var(--panel-elevated); border: 1px solid var(--border);
+      border-radius: 14px; width: min(440px, 100%);
+      padding: 28px; box-shadow: 0 24px 48px rgba(0,0,0,.5);
+    }
+    .modal h3 { margin-bottom: 20px; }
+
+    /* ── Toast ── */
+    #toast-area {
+      position: fixed; bottom: 24px; right: 24px; z-index: 200;
+      display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+    }
+    .toast {
+      padding: 10px 16px; border-radius: 8px;
+      background: var(--panel-elevated); border: 1px solid var(--border);
+      font-size: 13px; max-width: 340px;
+      animation: fadeIn .2s ease;
+    }
+    .toast.success { border-color: rgba(74,227,135,.5); color: var(--accent); }
+    .toast.error   { border-color: rgba(227,90,90,.5);  color: var(--danger); }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+
+    /* ── Token reveal ── */
+    .token-reveal {
+      font-family: monospace; background: var(--input-bg);
+      border: 1px solid rgba(74,227,135,.4); border-radius: 8px;
+      padding: 12px; word-break: break-all;
+      color: var(--accent); font-size: 13px; margin-top: 12px; user-select: all;
+    }
+    .copy-note { color: var(--muted); font-size: 12px; margin-top: 6px; }
+    .empty-state { text-align: center; padding: 40px; color: var(--muted); }
+    .expand-btn { background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; padding:0 4px; }
   </style>
 </head>
 <body>
-  <main class="shell">
-    <header class="topbar">
-      <strong>ADC Admin Dashboard</strong>
-      <span class="status">System Online</span>
-    </header>
-    <section class="grid">
-      <article class="card">
-        <div class="label">Theme</div>
-        <div class="value">Dark Default</div>
-      </article>
-      <article class="card">
-        <div class="label">Frontend</div>
-        <div class="value">Vuestic-style</div>
-      </article>
-      <article class="card">
-        <div class="label">Backend Health</div>
-        <div class="value">/api/health</div>
-      </article>
-      <article class="card">
-        <div class="label">Gateway</div>
-        <div class="value">/_gateway_health</div>
-      </article>
-    </section>
-  </main>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <h1>ContextGraph Admin</h1>
+    <p>Sign in to manage projects and tokens</p>
+    <form id="login-form">
+      <div class="form-group">
+        <label>Username</label>
+        <input id="lf-user" type="text" autocomplete="username" required />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input id="lf-pass" type="password" autocomplete="current-password" required />
+      </div>
+      <div id="login-err" style="color:var(--danger);font-size:13px;margin-bottom:12px;display:none"></div>
+      <button type="submit" class="btn btn-primary" style="width:100%">Sign in</button>
+    </form>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <span class="logo">ContextGraph Admin</span>
+    <div class="user-badge">
+      <span id="topbar-user"></span>
+      <span id="topbar-role" class="role-tag"></span>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('projects',this)">Projects &amp; Tokens</button>
+    <button class="tab-btn" id="tab-users-btn" onclick="switchTab('users',this)">Users</button>
+  </div>
+
+  <div class="tab-content">
+    <!-- PROJECTS -->
+    <div class="pane active" id="pane-projects">
+      <div class="section-header">
+        <h2>Projects</h2>
+        <button class="btn btn-primary btn-sm" id="new-project-btn" onclick="openNewProject()">+ New Project</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th></th><th>Project Key</th><th>Project ID</th>
+            <th>Upstream URL</th><th>Status</th><th>Created</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="projects-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- USERS -->
+    <div class="pane" id="pane-users">
+      <div class="section-header">
+        <h2>Users</h2>
+        <button class="btn btn-primary btn-sm" onclick="openNewUser()">+ New User</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Username</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="users-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: New Project -->
+<div class="overlay" id="modal-project">
+  <div class="modal">
+    <h3>New Project</h3>
+    <div class="form-group">
+      <label>Project Key <span style="color:var(--muted);font-size:12px">(unique slug)</span></label>
+      <input id="np-key" placeholder="e.g. osagent-local" />
+    </div>
+    <div class="form-group">
+      <label>Upstream URL</label>
+      <input id="np-url" placeholder="http://localhost:8000" />
+    </div>
+    <div class="form-group">
+      <label>Description</label>
+      <input id="np-desc" placeholder="Optional" />
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <button class="btn btn-ghost" onclick="closeModal('modal-project')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitNewProject()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: New User -->
+<div class="overlay" id="modal-user">
+  <div class="modal">
+    <h3>New User</h3>
+    <div class="form-group"><label>Username</label><input id="nu-user" /></div>
+    <div class="form-group"><label>Password</label><input id="nu-pass" type="password" /></div>
+    <div class="form-group">
+      <label>Role</label>
+      <select id="nu-role">
+        <option value="viewer">viewer</option>
+        <option value="admin">admin</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <button class="btn btn-ghost" onclick="closeModal('modal-user')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitNewUser()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Generate Token -->
+<div class="overlay" id="modal-token">
+  <div class="modal">
+    <h3>Generate Token</h3>
+    <div class="form-group">
+      <label>Token Type</label>
+      <select id="gt-type">
+        <option value="mcp">mcp</option>
+        <option value="edge_agent">edge_agent</option>
+      </select>
+    </div>
+    <div id="gt-result" style="display:none">
+      <p style="color:var(--muted);font-size:13px">Token generated — copy it now, it won't be shown again:</p>
+      <div class="token-reveal" id="gt-token-value"></div>
+      <p class="copy-note">Click to select all, then copy.</p>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost" id="gt-cancel-btn" onclick="closeModal('modal-token')">Cancel</button>
+      <button class="btn btn-primary" id="gt-generate-btn" onclick="submitGenerateToken()">Generate</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-area"></div>
+
+<script>
+let _jwt = localStorage.getItem('cg_jwt') || '';
+let _me = null;
+let _currentProjectId = null;
+
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (_jwt) opts.headers['Authorization'] = 'Bearer ' + _jwt;
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const r = await fetch('/api' + path, opts);
+  if (r.status === 204) return null;
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.detail || r.statusText);
+  return data;
+}
+
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  document.getElementById('toast-area').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+document.getElementById('login-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const errEl = document.getElementById('login-err');
+  errEl.style.display = 'none';
+  try {
+    const res = await api('POST', '/auth/login', {
+      username: document.getElementById('lf-user').value.trim(),
+      password: document.getElementById('lf-pass').value,
+    });
+    _jwt = res.access_token;
+    localStorage.setItem('cg_jwt', _jwt);
+    await initApp();
+  } catch(err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+  }
+});
+
+async function initApp() {
+  try { _me = await api('GET', '/auth/me'); } catch { logout(); return; }
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('topbar-user').textContent = _me.username;
+  const roleEl = document.getElementById('topbar-role');
+  roleEl.textContent = _me.role;
+  roleEl.className = 'role-tag' + (_me.role === 'admin' ? '' : ' viewer');
+  if (_me.role !== 'admin') {
+    document.getElementById('tab-users-btn').style.display = 'none';
+    document.getElementById('new-project-btn').style.display = 'none';
+  }
+  await loadProjects();
+}
+
+function logout() {
+  _jwt = ''; _me = null;
+  localStorage.removeItem('cg_jwt');
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('pane-' + name).classList.add('active');
+  btn.classList.add('active');
+  if (name === 'users') loadUsers();
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+async function loadProjects() {
+  const rows = await api('GET', '/auth/projects');
+  const tbody = document.getElementById('projects-body');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state">No projects yet</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(p => `
+    <tr>
+      <td><button class="expand-btn" onclick="toggleTokens(${p.id},this)">&#9654;</button></td>
+      <td><strong>${esc(p.project_key)}</strong></td>
+      <td style="font-family:monospace;font-size:12px;color:var(--muted)">${esc(p.project_id)}</td>
+      <td style="color:var(--muted)">${esc(p.upstream_url||'—')}</td>
+      <td><span class="${p.is_active?'badge-active':'badge-inactive'}">${p.is_active?'Active':'Inactive'}</span></td>
+      <td style="color:var(--muted)">${p.created_at.slice(0,10)}</td>
+      <td>
+        <button class="btn btn-sm btn-ghost" style="margin-right:4px" onclick="openGenerateToken(${p.id})">+ Token</button>
+        ${_me?.role==='admin'?`<button class="btn btn-sm btn-danger" onclick="deleteProject(${p.id})">Delete</button>`:''}
+      </td>
+    </tr>
+    <tr id="tokens-row-${p.id}" style="display:none">
+      <td colspan="7" style="padding:0 12px 12px 36px">
+        <div id="tokens-panel-${p.id}"></div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function toggleTokens(projectId, btn) {
+  const row = document.getElementById('tokens-row-' + projectId);
+  if (row.style.display !== 'none') { row.style.display='none'; btn.innerHTML='&#9654;'; return; }
+  row.style.display=''; btn.innerHTML='&#9660;';
+  const panel = document.getElementById('tokens-panel-' + projectId);
+  panel.innerHTML = '<div style="color:var(--muted);padding:8px">Loading…</div>';
+  try {
+    const tokens = await api('GET', `/auth/projects/${projectId}/tokens`);
+    renderTokensPanel(panel, tokens, projectId);
+  } catch(e) { panel.innerHTML = `<div style="color:var(--danger)">${esc(e.message)}</div>`; }
+}
+
+function renderTokensPanel(panel, tokens, projectId) {
+  if (!tokens.length) {
+    panel.innerHTML='<div class="tokens-panel"><p style="color:var(--muted)">No tokens yet. Use "+ Token" to generate one.</p></div>';
+    return;
+  }
+  panel.innerHTML = `<div class="tokens-panel">
+    <h4>Tokens (${tokens.filter(t=>t.is_active).length} active)</h4>
+    ${tokens.map(t=>`
+      <div class="token-row">
+        <span class="token-type-badge">${esc(t.token_type)}</span>
+        <span class="token-hint">${esc(t.token_hint)}</span>
+        <span style="color:var(--muted);font-size:12px">${t.created_at.slice(0,10)}</span>
+        ${t.is_active
+          ? (_me?.role==='admin'?`<button class="btn btn-sm btn-danger" onclick="revokeToken(${t.id},${projectId})">Revoke</button>`:'')
+          : '<span style="color:var(--danger);font-size:12px">Revoked</span>'}
+      </div>`).join('')}
+  </div>`;
+}
+
+function openNewProject() {
+  ['np-key','np-url','np-desc'].forEach(id=>document.getElementById(id).value='');
+  openModal('modal-project');
+}
+async function submitNewProject() {
+  const key=document.getElementById('np-key').value.trim();
+  if (!key) { toast('Project key required','error'); return; }
+  try {
+    await api('POST','/auth/projects',{
+      project_key:key,
+      upstream_url:document.getElementById('np-url').value.trim(),
+      description:document.getElementById('np-desc').value.trim()
+    });
+    closeModal('modal-project'); toast('Project created'); await loadProjects();
+  } catch(e) { toast(e.message,'error'); }
+}
+async function deleteProject(id) {
+  if (!confirm('Delete this project and all its tokens?')) return;
+  try { await api('DELETE',`/auth/projects/${id}`); toast('Project deleted'); await loadProjects(); }
+  catch(e) { toast(e.message,'error'); }
+}
+
+function openGenerateToken(projectId) {
+  _currentProjectId=projectId;
+  document.getElementById('gt-result').style.display='none';
+  document.getElementById('gt-generate-btn').style.display='';
+  document.getElementById('gt-cancel-btn').textContent='Cancel';
+  openModal('modal-token');
+}
+async function submitGenerateToken() {
+  try {
+    const t=await api('POST',`/auth/projects/${_currentProjectId}/tokens`,{token_type:document.getElementById('gt-type').value});
+    document.getElementById('gt-token-value').textContent=t.token;
+    document.getElementById('gt-result').style.display='block';
+    document.getElementById('gt-generate-btn').style.display='none';
+    document.getElementById('gt-cancel-btn').textContent='Done';
+    toast('Token generated — copy it now!');
+    const panel=document.getElementById('tokens-panel-'+_currentProjectId);
+    if (panel && panel.innerHTML) {
+      const tokens=await api('GET',`/auth/projects/${_currentProjectId}/tokens`);
+      renderTokensPanel(panel,tokens,_currentProjectId);
+    }
+  } catch(e) { toast(e.message,'error'); }
+}
+async function revokeToken(tokenId,projectId) {
+  if (!confirm('Revoke this token?')) return;
+  try {
+    await api('DELETE',`/auth/tokens/${tokenId}`);
+    toast('Token revoked');
+    const tokens=await api('GET',`/auth/projects/${projectId}/tokens`);
+    renderTokensPanel(document.getElementById('tokens-panel-'+projectId),tokens,projectId);
+  } catch(e) { toast(e.message,'error'); }
+}
+
+async function loadUsers() {
+  const rows=await api('GET','/auth/users');
+  document.getElementById('users-body').innerHTML=rows.map(u=>`
+    <tr>
+      <td>${u.id}</td>
+      <td>${esc(u.username)}</td>
+      <td><span class="role-tag${u.role==='admin'?'':' viewer'}">${u.role}</span></td>
+      <td><span class="${u.is_active?'badge-active':'badge-inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
+      <td style="color:var(--muted)">${u.created_at.slice(0,10)}</td>
+      <td>${u.id!==_me?.id?`<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">Deactivate</button>`:'<span style="color:var(--muted);font-size:12px">You</span>'}</td>
+    </tr>`).join('');
+}
+function openNewUser() {
+  ['nu-user','nu-pass'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('nu-role').value='viewer';
+  openModal('modal-user');
+}
+async function submitNewUser() {
+  const username=document.getElementById('nu-user').value.trim();
+  const password=document.getElementById('nu-pass').value;
+  if (!username||!password) { toast('Username and password required','error'); return; }
+  try {
+    await api('POST','/auth/users',{username,password,role:document.getElementById('nu-role').value});
+    closeModal('modal-user'); toast('User created'); await loadUsers();
+  } catch(e) { toast(e.message,'error'); }
+}
+async function deleteUser(id) {
+  if (!confirm('Deactivate this user?')) return;
+  try { await api('DELETE',`/auth/users/${id}`); toast('User deactivated'); await loadUsers(); }
+  catch(e) { toast(e.message,'error'); }
+}
+
+function esc(s) {
+  return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+if (_jwt) initApp();
+</script>
 </body>
 </html>
