@@ -782,7 +782,7 @@ function filterProjects(q) {
           <div class="index-status">
             ${statusDot}
             <span title="${esc(job.repo_path)}">${esc(statusText)}</span>
-            ${job.files !== null ? `<span style="color:var(--accent)">${job.files}F / ${job.symbols || 0}S</span>` : ''}
+            ${job.files !== null ? `<span style="color:var(--accent)">${job.files} Files / ${job.symbols || 0} Symbols</span>` : ''}
           </div>
         ` : ''}
       </td>
