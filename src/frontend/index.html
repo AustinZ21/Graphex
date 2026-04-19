@@ -189,6 +189,20 @@
     .copy-note { color: var(--muted); font-size: 12px; margin-top: 6px; }
     .empty-state { text-align: center; padding: 40px; color: var(--muted); }
     .expand-btn { background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; padding:0 4px; }
+
+    /* ── Search bar ── */
+    .search-wrap { margin-bottom: 14px; position: relative; }
+    .search-wrap input {
+      padding-left: 34px;
+      background: var(--panel); border-color: var(--border);
+      font-size: 13px;
+    }
+    .search-wrap::before {
+      content: '\1F50D';
+      position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+      font-size: 13px; pointer-events: none; opacity: .5;
+    }
+    .search-highlight { background: rgba(74,227,135,.18); border-radius: 2px; }
   </style>
 </head>
 <body>
@@ -217,7 +231,7 @@
 <div id="app">
   <div class="topbar">
     <span class="logo">ContextGraph Admin</span>
-    <span style="font-size:11px;color:var(--muted);margin-right:auto;padding-left:8px">v0.0.3</span>
+    <span style="font-size:11px;color:var(--muted);margin-right:auto;padding-left:8px">v0.0.4</span>
     <div class="user-badge">
       <span id="topbar-user"></span>
       <span id="topbar-role" class="role-tag"></span>
@@ -235,7 +249,10 @@
     <div class="pane active" id="pane-projects">
       <div class="section-header">
         <h2>Projects</h2>
-        <button class="btn btn-primary btn-sm" id="new-project-btn" onclick="openNewProject()">+ New Project</button>
+        <button class="btn btn-primary btn-sm" id="new-project-btn" onclick="openNewProject()">+ 新建项目</button>
+      </div>
+      <div class="search-wrap">
+        <input id="project-search" placeholder="搜索项目名称、Project ID、URL、Token、Token ID、日期..." oninput="filterProjects(this.value)" />
       </div>
       <div class="table-wrap">
         <table>
@@ -409,11 +426,33 @@ function switchTab(name, btn) {
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
+let _allProjects = [];
+let _tokensCache = {};  // projectId -> tokens[]
+
 async function loadProjects() {
-  const rows = await api('GET', '/auth/projects');
+  _allProjects = await api('GET', '/auth/projects');
+  // 预加载所有项目的 token，用于搜索
+  await Promise.all(_allProjects.map(async p => {
+    try { _tokensCache[p.id] = await api('GET', `/auth/projects/${p.id}/tokens`); }
+    catch { _tokensCache[p.id] = []; }
+  }));
+  filterProjects(document.getElementById('project-search')?.value || '');
+}
+
+function filterProjects(q) {
   const tbody = document.getElementById('projects-body');
+  const kw = q.trim().toLowerCase();
+  const rows = kw
+    ? _allProjects.filter(p => {
+        const tokens = _tokensCache[p.id] || [];
+        const tokenStr = tokens.map(t => `#${t.id} ${t.token_hint} ${t.token_type} ${t.created_at}`).join(' ');
+        return [p.project_key, p.project_id, p.upstream_url, p.description, p.created_at, tokenStr]
+          .join(' ').toLowerCase().includes(kw);
+      })
+    : _allProjects;
+
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state">No projects yet</div></td></tr>';
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">${kw ? '无匹配结果' : '暂无项目'}</div></td></tr>`;
     return;
   }
   tbody.innerHTML = rows.map(p => `
@@ -423,7 +462,7 @@ async function loadProjects() {
       <td style="font-family:monospace;font-size:12px;color:var(--muted)">${esc(p.project_id)}</td>
       <td style="color:var(--muted)">${esc(p.upstream_url||'—')}</td>
       <td><span class="${p.is_active?'badge-active':'badge-inactive'}">${p.is_active?'Active':'Inactive'}</span></td>
-      <td style="color:var(--muted)">${p.created_at.slice(0,10)}</td>
+      <td style="color:var(--muted);font-size:12px;font-family:monospace">${esc(p.created_at)}</td>
       <td>
         <button class="btn btn-sm btn-ghost" style="margin-right:4px" onclick="openGenerateToken(${p.id})">+ Token</button>
         ${_me?.role==='admin'?`
@@ -444,9 +483,15 @@ async function toggleTokens(projectId, btn) {
   if (row.style.display !== 'none') { row.style.display='none'; btn.innerHTML='&#9654;'; return; }
   row.style.display=''; btn.innerHTML='&#9660;';
   const panel = document.getElementById('tokens-panel-' + projectId);
-  panel.innerHTML = '<div style="color:var(--muted);padding:8px">Loading…</div>';
+  // 优先用缓存，展示后异步刷新
+  if (_tokensCache[projectId]) {
+    renderTokensPanel(panel, _tokensCache[projectId], projectId);
+  } else {
+    panel.innerHTML = '<div style="color:var(--muted);padding:8px">Loading…</div>';
+  }
   try {
     const tokens = await api('GET', `/auth/projects/${projectId}/tokens`);
+    _tokensCache[projectId] = tokens;
     renderTokensPanel(panel, tokens, projectId);
   } catch(e) { panel.innerHTML = `<div style="color:var(--danger)">${esc(e.message)}</div>`; }
 }
@@ -464,7 +509,7 @@ function renderTokensPanel(panel, tokens, projectId) {
         <span class="token-type-badge">${esc(t.token_type)}</span>
         <span class="token-hint">${esc(t.token_hint)}</span>
         <span style="color:var(--muted);font-size:11px;background:var(--surface2);padding:1px 5px;border-radius:4px">v${t.version}</span>
-        <span style="color:var(--muted);font-size:12px">${t.created_at.slice(0,10)}</span>
+        <span style="color:var(--muted);font-size:12px;font-family:monospace">${esc(t.created_at)}</span>
         ${t.is_active
           ? (_me?.role==='admin'?`
             <button class="btn btn-sm" onclick="rotateToken(${t.id},${projectId})" title="Revoke and issue new token with version+1">Rotate</button>
@@ -532,10 +577,11 @@ async function submitGenerateToken() {
     document.getElementById('gt-result').style.display='block';
     document.getElementById('gt-generate-btn').style.display='none';
     document.getElementById('gt-cancel-btn').textContent='Done';
-    toast('Token generated — copy it now!');
+    toast('Token 已生成 — 请立即复制！');
     const panel=document.getElementById('tokens-panel-'+_currentProjectId);
+    const tokens=await api('GET',`/auth/projects/${_currentProjectId}/tokens`);
+    _tokensCache[_currentProjectId]=tokens;
     if (panel && panel.innerHTML) {
-      const tokens=await api('GET',`/auth/projects/${_currentProjectId}/tokens`);
       renderTokensPanel(panel,tokens,_currentProjectId);
     }
   } catch(e) { toast(e.message,'error'); }
@@ -560,8 +606,9 @@ async function rotateToken(tokenId,projectId) {
     document.getElementById('gt-generate-btn').style.display='none';
     document.getElementById('gt-cancel-btn').textContent='Done';
     openModal('modal-token');
-    toast(`Rotated to v${t.version} — copy new token now!`);
+    toast(`已 Rotate 至 v${t.version} — 请立即复制新 Token！`);
     const tokens=await api('GET',`/auth/projects/${projectId}/tokens`);
+    _tokensCache[projectId]=tokens;
     renderTokensPanel(document.getElementById('tokens-panel-'+projectId),tokens,projectId);
   } catch(e) { toast(e.message,'error'); }
 }
@@ -574,7 +621,7 @@ async function loadUsers() {
       <td>${esc(u.username)}</td>
       <td><span class="role-tag${u.role==='admin'?'':' viewer'}">${u.role}</span></td>
       <td><span class="${u.is_active?'badge-active':'badge-inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
-      <td style="color:var(--muted)">${u.created_at.slice(0,10)}</td>
+      <td style="color:var(--muted);font-size:12px;font-family:monospace">${u.created_at}</td>
       <td>${u.id!==_me?.id?`<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">Deactivate</button>`:'<span style="color:var(--muted);font-size:12px">You</span>'}</td>
     </tr>`).join('');
 }
