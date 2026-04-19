@@ -85,22 +85,22 @@ async def update_me(
         if not verify_password(body.current_password, user["password_hash"]):
             raise HTTPException(status_code=400, detail="Current password is incorrect")
 
-    fields: list[str] = []
-    values: list = []
-    if body.username is not None:
-        fields.append("username = ?")
-        values.append(body.username)
-    if body.email is not None:
-        fields.append("email = ?")
-        values.append(body.email)
-    if body.new_password:
-        fields.append("password_hash = ?")
-        values.append(hash_password(body.new_password))
+    username = body.username if body.username is not None else None
+    email = body.email if body.email is not None else None
+    password_hash = hash_password(body.new_password) if body.new_password else None
 
-    if fields:
-        values.append(user["id"])
+    if any(v is not None for v in (username, email, password_hash)):
         try:
-            await db.execute(f"UPDATE users SET {', '.join(fields)} WHERE id = ?", values)
+            await db.execute(
+                """
+                UPDATE users
+                SET username = COALESCE(?, username),
+                    email = COALESCE(?, email),
+                    password_hash = COALESCE(?, password_hash)
+                WHERE id = ?
+                """,
+                (username, email, password_hash, user["id"]),
+            )
             await db.commit()
         except aiosqlite.IntegrityError:
             raise HTTPException(status_code=409, detail="Username already taken")
@@ -253,21 +253,20 @@ async def update_project(
     _: dict = Depends(require_admin),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    fields, values = [], []
-    if body.project_key is not None:
-        fields.append("project_key = ?")
-        values.append(body.project_key)
-    if body.upstream_url is not None:
-        fields.append("upstream_url = ?")
-        values.append(body.upstream_url)
-    if body.description is not None:
-        fields.append("description = ?")
-        values.append(body.description)
-    if not fields:
+    if body.project_key is None and body.upstream_url is None and body.description is None:
         raise HTTPException(status_code=400, detail="No fields to update")
-    values.append(project_id)
+
     try:
-        await db.execute(f"UPDATE projects SET {', '.join(fields)} WHERE id = ?", values)
+        await db.execute(
+            """
+            UPDATE projects
+            SET project_key = COALESCE(?, project_key),
+                upstream_url = COALESCE(?, upstream_url),
+                description = COALESCE(?, description)
+            WHERE id = ?
+            """,
+            (body.project_key, body.upstream_url, body.description, project_id),
+        )
         await db.commit()
     except aiosqlite.IntegrityError:
         raise HTTPException(status_code=409, detail="project_key already exists")
