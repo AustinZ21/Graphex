@@ -140,7 +140,9 @@ async def mcp_info() -> dict:
 
 
 # ── MCP SSE transport ──────────────────────────────────────────────────────
-app.mount("/mcp", mcp_server.mcp.sse_app(mount_path="/mcp"))
+# Mount at /mcp; let FastMCP generate relative endpoints to avoid duplicated
+# /mcp prefix (which can otherwise yield /mcp/mcp/messages on clients).
+app.mount("/mcp", mcp_server.mcp.sse_app())
 
 # ── Admin SPA (served last so API routes take precedence) ─────────────────
 _FRONTEND = Path(__file__).resolve().parents[1] / "frontend"
