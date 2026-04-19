@@ -127,6 +127,11 @@ async def mcp_info() -> dict:
         "transport": "sse",
         "sse_endpoint": "/mcp/sse",
         "message_endpoint": "/mcp/messages",
+        "auth": {
+            "type": "Bearer",
+            "required_headers": ["Authorization", "X-Project-ID"],
+            "notes": "Bearer token must be an active mcp token bound to the provided project_id",
+        },
     }
 
 
