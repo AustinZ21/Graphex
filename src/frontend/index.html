@@ -1390,8 +1390,7 @@ async function revokeToken(tokenId,projectId) {
   try {
     await api('DELETE',`/auth/tokens/${tokenId}`);
     toast('Token revoked');
-    const tokens=await api('GET',`/auth/projects/${projectId}/tokens`);
-    renderTokensPanel(document.getElementById('tokens-panel-'+projectId),tokens,projectId);
+    location.reload();
   } catch(e) { toast(e.message,'error'); }
 }
 async function rotateToken(tokenId,projectId) {
