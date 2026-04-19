@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS project_tokens (
     token_type  TEXT    NOT NULL,
     token_hash  TEXT    UNIQUE NOT NULL,
     token_hint  TEXT    NOT NULL,
+    version     INTEGER NOT NULL DEFAULT 1,
     created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
     is_active   INTEGER NOT NULL DEFAULT 1
 );
@@ -50,7 +51,12 @@ async def init_db() -> None:
     Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.executescript(_CREATE_TABLES)
-        await db.commit()
+        # Migrations: add columns that may not exist in older DBs
+        try:
+            await db.execute("ALTER TABLE project_tokens ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
+            await db.commit()
+        except Exception:
+            pass  # column already exists
 
 
 async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:

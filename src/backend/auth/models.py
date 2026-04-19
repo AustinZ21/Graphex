@@ -52,9 +52,10 @@ class ProjectTokenOut(BaseModel):
     project_id: int
     token_type: str
     token_hint: str
+    version: int
     created_at: str
     is_active: bool
-    # Only populated on creation (never stored in plaintext):
+    # Only populated on creation/rotation (never stored in plaintext):
     token: str | None = None
 
 

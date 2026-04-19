@@ -217,7 +217,7 @@
 <div id="app">
   <div class="topbar">
     <span class="logo">ContextGraph Admin</span>
-    <span style="font-size:11px;color:var(--muted);margin-right:auto;padding-left:8px">v0.0.1</span>
+    <span style="font-size:11px;color:var(--muted);margin-right:auto;padding-left:8px">v0.0.2</span>
     <div class="user-badge">
       <span id="topbar-user"></span>
       <span id="topbar-role" class="role-tag"></span>
@@ -458,11 +458,15 @@ function renderTokensPanel(panel, tokens, projectId) {
     <h4>Tokens (${tokens.filter(t=>t.is_active).length} active)</h4>
     ${tokens.map(t=>`
       <div class="token-row">
+        <span style="color:var(--muted);font-size:11px;font-family:monospace">#${t.id}</span>
         <span class="token-type-badge">${esc(t.token_type)}</span>
         <span class="token-hint">${esc(t.token_hint)}</span>
+        <span style="color:var(--muted);font-size:11px;background:var(--surface2);padding:1px 5px;border-radius:4px">v${t.version}</span>
         <span style="color:var(--muted);font-size:12px">${t.created_at.slice(0,10)}</span>
         ${t.is_active
-          ? (_me?.role==='admin'?`<button class="btn btn-sm btn-danger" onclick="revokeToken(${t.id},${projectId})">Revoke</button>`:'')
+          ? (_me?.role==='admin'?`
+            <button class="btn btn-sm" onclick="rotateToken(${t.id},${projectId})" title="Revoke and issue new token with version+1">Rotate</button>
+            <button class="btn btn-sm btn-danger" onclick="revokeToken(${t.id},${projectId})">Revoke</button>`:'')
           : '<span style="color:var(--danger);font-size:12px">Revoked</span>'}
       </div>`).join('')}
   </div>`;
@@ -517,6 +521,22 @@ async function revokeToken(tokenId,projectId) {
   try {
     await api('DELETE',`/auth/tokens/${tokenId}`);
     toast('Token revoked');
+    const tokens=await api('GET',`/auth/projects/${projectId}/tokens`);
+    renderTokensPanel(document.getElementById('tokens-panel-'+projectId),tokens,projectId);
+  } catch(e) { toast(e.message,'error'); }
+}
+async function rotateToken(tokenId,projectId) {
+  if (!confirm('Rotate this token? The current token will be revoked and a new one issued.')) return;
+  try {
+    const t=await api('POST',`/auth/tokens/${tokenId}/rotate`);
+    // Show new token one-time reveal in the generate modal
+    _currentProjectId=projectId;
+    document.getElementById('gt-token-value').textContent=t.token;
+    document.getElementById('gt-result').style.display='block';
+    document.getElementById('gt-generate-btn').style.display='none';
+    document.getElementById('gt-cancel-btn').textContent='Done';
+    openModal('modal-token');
+    toast(`Rotated to v${t.version} — copy new token now!`);
     const tokens=await api('GET',`/auth/projects/${projectId}/tokens`);
     renderTokensPanel(document.getElementById('tokens-panel-'+projectId),tokens,projectId);
   } catch(e) { toast(e.message,'error'); }

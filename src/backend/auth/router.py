@@ -165,7 +165,7 @@ async def list_tokens(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     async with db.execute(
-        "SELECT id, project_id, token_type, token_hint, created_at, is_active FROM project_tokens WHERE project_id = ? ORDER BY id",
+        "SELECT id, project_id, token_type, token_hint, version, created_at, is_active FROM project_tokens WHERE project_id = ? ORDER BY id",
         (project_id,),
     ) as cur:
         rows = await cur.fetchall()
@@ -189,10 +189,46 @@ async def generate_project_token(
     hint = token_hint(raw)
 
     async with db.execute(
-        """INSERT INTO project_tokens(project_id, token_type, token_hash, token_hint)
-           VALUES(?,?,?,?)
-           RETURNING id, project_id, token_type, token_hint, created_at, is_active""",
+        """INSERT INTO project_tokens(project_id, token_type, token_hash, token_hint, version)
+           VALUES(?,?,?,?,1)
+           RETURNING id, project_id, token_type, token_hint, version, created_at, is_active""",
         (project_id, body.token_type, digest, hint),
+    ) as cur:
+        row = await cur.fetchone()
+    await db.commit()
+
+    out = ProjectTokenOut(**dict(row))
+    out.token = raw  # one-time reveal
+    return out
+
+
+@router.post("/tokens/{token_id}/rotate", response_model=ProjectTokenOut)
+async def rotate_token(
+    token_id: int,
+    _: dict = Depends(require_admin),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Revoke the old token and issue a new one with version+1."""
+    async with db.execute(
+        "SELECT id, project_id, token_type, version FROM project_tokens WHERE id = ? AND is_active = 1",
+        (token_id,),
+    ) as cur:
+        old = await cur.fetchone()
+    if not old:
+        raise HTTPException(status_code=404, detail="Token not found or already revoked")
+
+    new_version = old["version"] + 1
+    raw = generate_token()
+    digest = hash_token(raw)
+    hint = token_hint(raw)
+
+    # Revoke old, insert new in one transaction
+    await db.execute("UPDATE project_tokens SET is_active = 0 WHERE id = ?", (token_id,))
+    async with db.execute(
+        """INSERT INTO project_tokens(project_id, token_type, token_hash, token_hint, version)
+           VALUES(?,?,?,?,?)
+           RETURNING id, project_id, token_type, token_hint, version, created_at, is_active""",
+        (old["project_id"], old["token_type"], digest, hint, new_version),
     ) as cur:
         row = await cur.fetchone()
     await db.commit()
