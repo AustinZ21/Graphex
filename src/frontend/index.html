@@ -121,6 +121,8 @@
       text-transform: uppercase; letter-spacing: .06em;
       border-bottom: 1px solid var(--border);
     }
+    thead th.sortable { cursor: pointer; user-select: none; }
+    thead th.sortable:hover { color: var(--text); }
     tbody tr { border-bottom: 1px solid rgba(70,80,104,.4); }
     tbody tr:last-child { border-bottom: none; }
     tbody td { padding: 10px 12px; }
@@ -362,8 +364,13 @@
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th></th><th>Project Name</th><th>Project ID</th>
-            <th>Upstream URL</th><th>Status</th><th>Created</th><th>Actions</th>
+            <th></th>
+            <th class="sortable" onclick="setProjectsSort('project_key')">Project Name <span id="sort-project_key"></span></th>
+            <th class="sortable" onclick="setProjectsSort('project_id')">Project ID <span id="sort-project_id"></span></th>
+            <th class="sortable" onclick="setProjectsSort('upstream_url')">Upstream URL <span id="sort-upstream_url"></span></th>
+            <th class="sortable" onclick="setProjectsSort('is_active')">Status <span id="sort-is_active"></span></th>
+            <th class="sortable" onclick="setProjectsSort('created_at')">Created <span id="sort-created_at"></span></th>
+            <th>Actions</th>
           </tr></thead>
           <tbody id="projects-body"></tbody>
         </table>
@@ -379,7 +386,12 @@
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>ID</th><th>Username</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th>
+            <th class="sortable" onclick="setUsersSort('id')">ID <span id="sort-user-id"></span></th>
+            <th class="sortable" onclick="setUsersSort('username')">Username <span id="sort-user-username"></span></th>
+            <th class="sortable" onclick="setUsersSort('role')">Role <span id="sort-user-role"></span></th>
+            <th class="sortable" onclick="setUsersSort('is_active')">Status <span id="sort-user-is_active"></span></th>
+            <th class="sortable" onclick="setUsersSort('created_at')">Created <span id="sort-user-created_at"></span></th>
+            <th>Actions</th>
           </tr></thead>
           <tbody id="users-body"></tbody>
         </table>
@@ -491,6 +503,66 @@
 let _jwt = localStorage.getItem('cg_jwt') || '';
 let _me = null;
 let _currentProjectId = null;
+let _projectsSort = { key: 'created_at', dir: 'desc' };
+let _usersSort = { key: 'id', dir: 'asc' };
+
+function _compareValues(a, b) {
+  if (typeof a === 'boolean' || typeof b === 'boolean') {
+    return Number(Boolean(a)) - Number(Boolean(b));
+  }
+  const na = Number(a);
+  const nb = Number(b);
+  if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+  return String(a ?? '').localeCompare(String(b ?? ''));
+}
+
+function _sortRows(rows, sortState) {
+  return [...rows].sort((a, b) => {
+    const cmp = _compareValues(a[sortState.key], b[sortState.key]);
+    return sortState.dir === 'asc' ? cmp : -cmp;
+  });
+}
+
+function _sortIcon(state, key) {
+  if (state.key !== key) return '';
+  return state.dir === 'asc' ? '&#9650;' : '&#9660;';
+}
+
+function _renderProjectsSortIcons() {
+  const keys = ['project_key', 'project_id', 'upstream_url', 'is_active', 'created_at'];
+  keys.forEach(k => {
+    const el = document.getElementById('sort-' + k);
+    if (el) el.innerHTML = _sortIcon(_projectsSort, k);
+  });
+}
+
+function _renderUsersSortIcons() {
+  const keys = ['id', 'username', 'role', 'is_active', 'created_at'];
+  keys.forEach(k => {
+    const el = document.getElementById('sort-user-' + k);
+    if (el) el.innerHTML = _sortIcon(_usersSort, k);
+  });
+}
+
+function setProjectsSort(key) {
+  if (_projectsSort.key === key) {
+    _projectsSort.dir = _projectsSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    _projectsSort.key = key;
+    _projectsSort.dir = 'asc';
+  }
+  filterProjects(document.getElementById('project-search')?.value || '');
+}
+
+function setUsersSort(key) {
+  if (_usersSort.key === key) {
+    _usersSort.dir = _usersSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    _usersSort.key = key;
+    _usersSort.dir = 'asc';
+  }
+  loadUsers();
+}
 
 async function api(method, path, body) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
@@ -629,7 +701,7 @@ async function loadProjects() {
 function filterProjects(q) {
   const tbody = document.getElementById('projects-body');
   const kw = q.trim().toLowerCase();
-  const rows = kw
+  const filteredRows = kw
     ? _allProjects.filter(p => {
         const tokens = _tokensCache[p.id] || [];
         const tokenStr = tokens.map(t => `#${t.id} ${t.token_hint} ${t.token_type} ${t.created_at}`).join(' ');
@@ -637,6 +709,9 @@ function filterProjects(q) {
           .join(' ').toLowerCase().includes(kw);
       })
     : _allProjects;
+  const rows = _sortRows(filteredRows, _projectsSort);
+
+  _renderProjectsSortIcons();
 
   if (!rows.length) {
     tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">${kw ? 'No matching projects' : 'No projects yet'}</div></td></tr>`;
@@ -801,7 +876,9 @@ async function rotateToken(tokenId,projectId) {
 }
 
 async function loadUsers() {
-  const rows=await api('GET','/auth/users');
+  const data = await api('GET','/auth/users');
+  const rows = _sortRows(data, _usersSort);
+  _renderUsersSortIcons();
   document.getElementById('users-body').innerHTML=rows.map(u=>`
     <tr>
       <td>${u.id}</td>
