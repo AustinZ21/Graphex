@@ -22,6 +22,7 @@ from backend.auth.models import (
     ProjectUpdate,
     TokenResponse,
     UserCreate,
+    PaginatedAuditOut,
     UserOut,
     UserProfileUpdate,
 )
@@ -497,3 +498,63 @@ async def list_audit_logs(
     async with db.execute(sql, tuple(params)) as cur:
         rows = await cur.fetchall()
     return [AuditLogOut(**dict(r)) for r in rows]
+
+
+@router.get("/audit/paged", response_model=PaginatedAuditOut)
+async def list_audit_logs_paged(
+    page: int = 1,
+    page_size: int = 25,
+    scope: str | None = None,
+    actor: str | None = None,
+    project_key: str | None = None,
+    path_like: str | None = None,
+    _: dict = Depends(require_admin),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    safe_page = max(1, page)
+    safe_page_size = max(1, min(page_size, 200))
+    safe_offset = (safe_page - 1) * safe_page_size
+
+    clauses: list[str] = []
+    params: list[object] = []
+
+    if scope:
+        clauses.append("scope = ?")
+        params.append(scope.strip().lower())
+    if actor:
+        clauses.append("LOWER(COALESCE(actor_name, '')) LIKE ?")
+        params.append(f"%{actor.strip().lower()}%")
+    if project_key:
+        clauses.append("LOWER(COALESCE(project_key, '')) LIKE ?")
+        params.append(f"%{project_key.strip().lower()}%")
+    if path_like:
+        clauses.append("LOWER(path) LIKE ?")
+        params.append(f"%{path_like.strip().lower()}%")
+
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+    count_sql = f"SELECT COUNT(*) AS total FROM audit_logs {where_sql}"
+    async with db.execute(count_sql, tuple(params)) as cur:
+        count_row = await cur.fetchone()
+    total = int(count_row["total"]) if count_row else 0
+
+    data_sql = f"""
+        SELECT id, created_at, scope, method, path, status_code, duration_ms,
+               actor_type, actor_id, actor_name,
+               project_id, project_key, token_id,
+               client_ip, user_agent, query_string, request_body, response_error, details_json, token_usage_total
+        FROM audit_logs
+        {where_sql}
+        ORDER BY id DESC
+        LIMIT ? OFFSET ?
+    """
+    data_params = [*params, safe_page_size, safe_offset]
+    async with db.execute(data_sql, tuple(data_params)) as cur:
+        rows = await cur.fetchall()
+
+    return PaginatedAuditOut(
+        items=[AuditLogOut(**dict(r)) for r in rows],
+        total=total,
+        page=safe_page,
+        page_size=safe_page_size,
+    )

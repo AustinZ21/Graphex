@@ -184,3 +184,10 @@ class AuditLogOut(BaseModel):
     response_error: str | None = None
     details_json: str | None = None
     token_usage_total: int | None = None
+
+
+class PaginatedAuditOut(BaseModel):
+    items: list[AuditLogOut]
+    total: int
+    page: int
+    page_size: int

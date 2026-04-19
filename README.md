@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.27  
+**Version:** 1.29.28  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-19 (users: show activate for inactive accounts and support activation)
+**Date:** 2026-04-19 (ui: add default 25-row pagination for projects/users/audit with page jump)
 
 ## 1. Introduction
 
