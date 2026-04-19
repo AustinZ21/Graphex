@@ -1,0 +1,6 @@
+graph TD;
+    Client-->API_Gateway;
+    API_Gateway-->Auth_Service;
+    API_Gateway-->Core_Engine;
+    Core_Engine-->PostgreSQL[(Database)];
+    Core_Engine-->Redis[(Cache)];

@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant U as User (Client)
+    participant A as API Gateway
+    participant C as Core Engine
+    participant DB as Database
+    
+    U->>A: POST /orders (Payload)
+    A->>C: Validate & Route Request
+    C->>DB: INSERT INTO orders
+    DB-->>C: Return Order ID
+    C-->>A: Format Response (JSON)
+    A-->>U: 201 Created (Order ID)

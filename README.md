@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.0  
+**Version:** 1.29.2  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-18 (startup reliability: auto port fallback)
+**Date:** 2026-04-18 (ADC token policy + endpoint-first standard alignment)
 
 ## 1. Introduction
 
