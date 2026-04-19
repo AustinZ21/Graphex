@@ -1,8 +1,23 @@
 # ──────────────────────────────────────────────────────────────────────────────
-# Local dev profile (Docker Desktop)
+# ContextGraph Docker Compose
+#
+# PORT REGISTRY (ADC standard — do not change without updating ADC)
+# ┌──────────────────────────────────────────────────────────────────────────┐
+# │  Host Port │ Container Port │ Service                  │ Profile        │
+# ├──────────────────────────────────────────────────────────────────────────┤
+# │  8000      │ 8000           │ ContextGraph API         │ prod           │
+# │  8080      │ 8080           │ Gateway (nginx)          │ prod           │
+# │  3001      │ 3000           │ Frontend (Next.js)       │ prod           │
+# │  16379     │ 6379           │ FalkorDB (Redis proto)   │ dev + prod     │
+# │  13000     │ 3000           │ FalkorDB Browser UI      │ dev + prod     │
+# │  6380      │ 6379           │ Redis (dev)              │ dev            │
+# └──────────────────────────────────────────────────────────────────────────┘
+#
+# Dev profile (local native API):
 #   docker compose --profile dev up
-#   Starts: falkordb (port 16379) + redis (port 6380) only.
-#   App runs natively: uvicorn src/backend/main.py (set env vars below).
+#   Then: uvicorn backend.main:app --port 8000 (with env vars)
+#   Admin UI : http://localhost:8000/admin
+#   FalkorDB Browser: http://localhost:13000
 # ──────────────────────────────────────────────────────────────────────────────
 services:
 
