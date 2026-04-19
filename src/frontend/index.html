@@ -30,6 +30,7 @@
 
     /* ── Login ── */
     #login-screen {
+      position: relative;
       display: flex; align-items: center; justify-content: center;
       min-height: 100vh; padding: 24px;
     }
@@ -85,7 +86,7 @@
     .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
     .tab-btn:hover:not(.active) { color: var(--text); }
 
-    .tab-content { padding: 24px; flex: 1; }
+    .tab-content { padding: 24px; padding-bottom: 72px; flex: 1; }
     .pane { display: none; }
     .pane.active { display: block; }
 
@@ -275,6 +276,7 @@
       <button type="submit" class="btn btn-primary" style="width:100%">Sign in</button>
     </form>
   </div>
+  <footer class="footer" style="position:absolute;left:0;right:0;bottom:0;">Created by Nate Scott (NASCO)</footer>
 </div>
 
 <!-- APP -->
@@ -318,7 +320,7 @@
             <span id="dd-email"></span>
           </div>
           <button class="user-dropdown-item" onclick="openProfile(); closeUserMenu()">&#9998; Profile</button>
-          <button class="user-dropdown-item" id="dd-users-link" onclick="switchTab('users', document.querySelector('[onclick*=users]')); closeUserMenu()">&#128100; Users</button>
+          <button class="user-dropdown-item" id="dd-users-link" onclick="switchTab('users'); closeUserMenu()">&#128100; Users</button>
           <div class="user-dropdown-divider"></div>
           <button class="user-dropdown-item danger" onclick="logout()">&#10148; Sign out</button>
         </div>
@@ -327,8 +329,7 @@
   </div>
 
   <div class="tabs">
-    <button class="tab-btn active" onclick="switchTab('projects',this)">Projects &amp; Tokens</button>
-    <button class="tab-btn" id="tab-users-btn" onclick="switchTab('users',this)">Users</button>
+    <button class="tab-btn active" id="tab-projects-btn" onclick="switchTab('projects',this)">Projects &amp; Tokens</button>
   </div>
 
   <div class="tab-content">
@@ -368,6 +369,8 @@
       </div>
     </div>
   </div>
+
+  <footer class="footer" style="position:fixed;left:0;right:0;bottom:0;background:rgba(10,14,29,.92);backdrop-filter:blur(4px);">Created by Nate Scott (NASCO)</footer>
 </div>
 
 <!-- MODAL: New / Edit Project -->
@@ -467,7 +470,6 @@
       <button class="btn btn-primary" onclick="submitProfile()">Save</button>
     </div>
   </div>
-  <footer class="footer">Created by Nate Scott (NASCO)</footer>
 </div>
 
 <div id="toast-area"></div>
@@ -525,7 +527,6 @@ async function initApp() {
   roleEl.textContent = _me.role;
   roleEl.className = 'role-tag' + (_me.role === 'admin' ? '' : ' viewer');
   if (_me.role !== 'admin') {
-    document.getElementById('tab-users-btn').style.display = 'none';
     document.getElementById('new-project-btn').style.display = 'none';
     document.getElementById('dd-users-link').style.display = 'none';
   }
@@ -594,7 +595,11 @@ function switchTab(name, btn) {
   document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('pane-' + name).classList.add('active');
-  btn.classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (!btn && name === 'projects') {
+    const projectsTabBtn = document.getElementById('tab-projects-btn');
+    if (projectsTabBtn) projectsTabBtn.classList.add('active');
+  }
   if (name === 'users') loadUsers();
 }
 
