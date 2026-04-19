@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.6  
+**Version:** 1.29.7  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-19 (perf: adaptive concurrent workers + index_full parallelized)
+**Date:** 2026-04-19 (docs: add token efficiency benchmark section with BA + OSA results)
 
 ## 1. Introduction
 
@@ -267,6 +267,58 @@ For high-end autonomous systems, deterministic checklists prevent AI from cuttin
 
 ### 3.21 `amendments.md` (Constitutional Amendment Protocol)
 Since the ADC acts as the absolute Digital Constitution, altering core rules (like testing enforcement or security boundaries) requires a formalized "Constitutional Amendment" process.
+
+---
+
+## 4. Token Efficiency — CG Context vs. Full Source
+
+ContextGraph's graph-indexed retrieval delivers **precise, structured context** (type signatures, call edges, dependency subgraphs) instead of raw source files. This directly reduces the token budget consumed by each AI Agent turn.
+
+### 4.1 Why Token Savings Matter
+
+| Effect | Mechanism |
+|---|---|
+| **Faster response** | Fewer input tokens → lower first-token latency and shorter generation time |
+| **Higher quality** | Focused context prevents attention dilution by irrelevant code; lower hallucination rate |
+| **Wider coverage** | Same context-window budget covers ~3× more modules when using CG snapshots |
+| **Longer sessions** | Compressed context delays context-window exhaustion in multi-turn Agent workflows |
+
+Token savings are not just an efficiency metric — they are a direct proxy for **response speed, reasoning accuracy, and the breadth of codebase an Agent can reason about in a single turn**.
+
+### 4.2 Benchmark Results
+
+All scenarios use `heuristic-char-mix-v1` (non-CJK ~4 chars/token, CJK ~1.6 chars/token).  
+API: `POST http://localhost:8001/api/benchmark/token-efficiency` (shared cross-project endpoint).
+
+#### BrowserAgent (BA) — 2026-04-19
+
+| Scenario | Baseline (tokens) | CG (tokens) | Saved | Ratio |
+|---|---:|---:|---:|---:|
+| ba-server HTTP 路由 | — | — | 50.8% | 2.03x |
+| BA 工作流执行函数签名 | — | — | 57.2% | 2.34x |
+| 并行工作流定义 | — | — | 77.5% | 4.45x |
+| batch+monitor | — | — | 84.8% | 6.60x |
+| **TOTAL** | — | — | **69.0%** | **3.22x** |
+
+#### OSAgent (OSA) — 2026-04-19
+
+| Scenario | Baseline (tokens) | CG (tokens) | Saved | Ratio |
+|---|---:|---:|---:|---:|
+| protocol.rs 消息认证函数 | 797 | 167 | 79.0% | 4.77x |
+| security.rs 安全配置类型 | 889 | 305 | 65.7% | 2.92x |
+| osa-ca/lib.rs CA 工作流类型 + trait | 609 | 200 | 67.2% | 3.04x |
+| roles.rs 跨 crate 共享角色类型 | 326 | 171 | 47.5% | 1.91x |
+| **TOTAL** | **2621** | **843** | **67.8%** | **3.11x** |
+
+### 4.3 Cross-Project Summary
+
+| Project | Token Savings | Ratio | Stack |
+|---|---:|---:|---|
+| BrowserAgent | 69.0% | 3.22x | PowerShell + Chrome MV3 |
+| OSAgent | 67.8% | 3.11x | Rust (CA/EA/IA/VA) |
+| **Average** | **68.4%** | **3.17x** | — |
+
+Both projects converge near **~68–69% savings / ~3.1–3.2x ratio**, suggesting this is a reliable baseline for ADC-compliant Rust and scripting-language codebases using CG graph retrieval.
 **Example constraints to include:**
 - **Amendment Proposals**: "Any change to the `.adc/` directory by an AI Agent MUST be submitted as an independent Pull Request titled prefix `[AMENDMENT]`. AI Agents are strictly forbidden from committing changes directly to the `main` branch if they affect the `.adc/` ruleset."
 - **Human Ratification**: "An AI Agent CANNOT self-approve amendments. All changes to the Constitution require explicit human review and approval."
