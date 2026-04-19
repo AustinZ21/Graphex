@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.28  
+**Version:** 1.29.29  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-19 (ui: add default 25-row pagination for projects/users/audit with page jump)
+**Date:** 2026-04-19 (ui: add cyber background image for login page only)
 
 ## 1. Introduction
 
