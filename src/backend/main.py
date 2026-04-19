@@ -23,6 +23,7 @@ from pathlib import Path
 import structlog
 import uvicorn
 from fastapi import FastAPI
+from fastapi import HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -33,6 +34,7 @@ from backend.graph.registry import GraphRegistry
 from backend.indexer.consumer import IndexerConsumer
 from backend.tools.producer import MCPProducer
 from backend.tools import server as mcp_server
+from backend.perf.token_efficiency import benchmark_token_efficiency, TokenBenchmarkInputError
 
 log = structlog.get_logger()
 
@@ -41,6 +43,7 @@ FALKORDB_PORT = int(os.getenv("FALKORDB_PORT", "6379"))
 QUEUE_REDIS_URL = os.getenv("QUEUE_REDIS_URL", "redis://localhost:6380/1")
 CACHE_REDIS_URL = os.getenv("CACHE_REDIS_URL", "redis://localhost:6380")  # db=2 set in QueryCache
 TRACE_ENABLED = os.getenv("TRACE_ENABLED", "true").lower() == "true"
+REPO_ROOT = Path(os.getenv("CONTEXTGRAPH_REPO_ROOT", ".")).resolve()
 
 _registry = GraphRegistry(host=FALKORDB_HOST, port=FALKORDB_PORT)
 _producer = MCPProducer(redis_url=QUEUE_REDIS_URL)
@@ -137,6 +140,18 @@ async def mcp_info() -> dict:
             "notes": "Bearer token must be an active mcp token bound to the provided project_id",
         },
     }
+
+
+@app.post("/api/benchmark/token-efficiency")
+async def api_benchmark_token_efficiency(payload: dict) -> dict:
+    """Benchmark estimated token savings between baseline and CG/MCP contexts.
+
+    Shared API intended for any downstream project, not tied to a specific repository.
+    """
+    try:
+        return benchmark_token_efficiency(payload=payload, repo_root=REPO_ROOT)
+    except TokenBenchmarkInputError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # ── MCP SSE transport ──────────────────────────────────────────────────────

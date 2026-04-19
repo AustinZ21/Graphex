@@ -32,6 +32,7 @@ from backend.agent.query_strategy import run_cg_first_strategy
 from backend.graph.client import GraphClient
 from backend.graph.registry import GraphRegistry
 from backend.graph import schema as S
+from backend.perf.token_efficiency import benchmark_token_efficiency as run_token_efficiency_benchmark
 from backend.tools.producer import MCPProducer
 
 log = structlog.get_logger()
@@ -615,6 +616,45 @@ def clear_cache() -> dict:
     deleted = _cache.invalidate_all()
     log.info("cache.cleared", keys_deleted=deleted)
     return {"status": "ok", "deleted": deleted}
+
+
+@mcp.tool()
+def benchmark_token_efficiency(
+    query: str = "",
+    baseline_text: str = "",
+    cg_text: str = "",
+    baseline_snippets: list[str] | None = None,
+    cg_snippets: list[str] | None = None,
+    baseline_file_paths: list[str] | None = None,
+    cg_file_paths: list[str] | None = None,
+    notes: str = "",
+) -> dict:
+    """Estimate token savings from CG/MCP reduced context versus baseline context.
+
+    This tool is repository-agnostic and intended for cross-project efficiency benchmarking.
+    """
+    payload = {
+        "query": query,
+        "notes": notes,
+        "baseline": {},
+        "cg": {},
+    }
+
+    if baseline_text:
+        payload["baseline"]["text"] = baseline_text
+    if baseline_snippets:
+        payload["baseline"]["snippets"] = baseline_snippets
+    if baseline_file_paths:
+        payload["baseline"]["filePaths"] = baseline_file_paths
+
+    if cg_text:
+        payload["cg"]["text"] = cg_text
+    if cg_snippets:
+        payload["cg"]["snippets"] = cg_snippets
+    if cg_file_paths:
+        payload["cg"]["filePaths"] = cg_file_paths
+
+    return run_token_efficiency_benchmark(payload=payload, repo_root=_repo_root)
 
 
 # ---------------------------------------------------------------------------

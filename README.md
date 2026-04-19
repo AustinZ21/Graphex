@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.3  
+**Version:** 1.29.4  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-18 (project token registry JSON + token model clarification)
+**Date:** 2026-04-19 (added shared CG-side token-efficiency benchmark API and MCP tool)
 
 ## 1. Introduction
 
