@@ -1358,7 +1358,7 @@ async function submitProjectModal() {
 }
 async function deleteProject(id) {
   if (!confirm('Delete this project and all its tokens?')) return;
-  try { await api('DELETE',`/auth/projects/${id}`); toast('Project deleted'); await loadProjects(); }
+  try { await api('DELETE',`/auth/projects/${id}`); toast('Project deleted'); location.reload(); }
   catch(e) { toast(e.message,'error'); }
 }
 
