@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from backend.auth.database import get_db
 from backend.auth.dependencies import get_current_user, require_admin
 from backend.auth.models import (
+    AdminUserUpdate,
     GenerateTokenRequest,
     LoginRequest,
     ProjectCreate,
@@ -75,6 +76,9 @@ async def update_me(
     user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
+    if body.username is not None and body.username != user["username"]:
+        raise HTTPException(status_code=400, detail="You cannot change your own username")
+
     if body.new_password:
         if not body.current_password:
             raise HTTPException(status_code=400, detail="current_password required to set a new password")
@@ -159,6 +163,42 @@ async def delete_user(
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
     await db.execute("UPDATE users SET is_active = 0 WHERE id = ?", (user_id,))
     await db.commit()
+
+
+@router.patch("/users/{user_id}", response_model=UserOut)
+async def update_user(
+    user_id: int,
+    body: AdminUserUpdate,
+    current: dict = Depends(require_admin),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    async with db.execute(
+        "SELECT id, username, email, role, created_at, is_active FROM users WHERE id = ?",
+        (user_id,),
+    ) as cur:
+        row = await cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if row["id"] == current["id"] and body.username != row["username"]:
+        raise HTTPException(status_code=400, detail="You cannot change your own username")
+
+    if row["role"] != "viewer" and body.username != row["username"]:
+        raise HTTPException(status_code=400, detail="Only viewer usernames can be changed")
+
+    if body.username != row["username"]:
+        try:
+            await db.execute("UPDATE users SET username = ? WHERE id = ?", (body.username, user_id))
+            await db.commit()
+        except aiosqlite.IntegrityError:
+            raise HTTPException(status_code=409, detail="Username already exists")
+
+    async with db.execute(
+        "SELECT id, username, email, role, created_at, is_active FROM users WHERE id = ?",
+        (user_id,),
+    ) as cur:
+        updated = await cur.fetchone()
+    return UserOut(**dict(updated))
 
 
 # ── Projects ───────────────────────────────────────────────────────────────

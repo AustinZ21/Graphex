@@ -63,6 +63,24 @@
       transition: background .15s;
     }
     .topbar .logo:hover { background: rgba(255,255,255,.05); }
+    .topbar-nav { display: flex; align-items: center; margin-left: 4px; }
+    .topbar-nav .tab-btn {
+      padding: 6px 12px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: color .15s, border-color .15s, background .15s;
+    }
+    .topbar-nav .tab-btn.active {
+      color: var(--accent);
+      background: var(--accent-soft);
+      border-color: rgba(74,227,135,.3);
+    }
+    .topbar-nav .tab-btn:hover:not(.active) { color: var(--text); background: rgba(255,255,255,.05); }
     .topbar .user-badge { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
     .role-tag {
       padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
@@ -307,6 +325,10 @@
     </a>
     <span style="font-size:11px;color:var(--muted);padding-left:6px;align-self:center">v0.0.4</span>
     <div style="flex:1"></div>
+    <div class="topbar-nav">
+      <button class="tab-btn active" id="tab-projects-btn" onclick="switchTab('projects',this)">Projects &amp; Tokens</button>
+      <button class="tab-btn" id="tab-users-btn" onclick="switchTab('users',this)">Users</button>
+    </div>
     <div class="user-badge">
       <div class="user-menu-wrap" id="user-menu-wrap">
         <button class="user-menu-btn" id="user-menu-btn" onclick="toggleUserMenu()">
@@ -320,16 +342,11 @@
             <span id="dd-email"></span>
           </div>
           <button class="user-dropdown-item" onclick="openProfile(); closeUserMenu()">&#9998; Profile</button>
-          <button class="user-dropdown-item" id="dd-users-link" onclick="switchTab('users'); closeUserMenu()">&#128100; Users</button>
           <div class="user-dropdown-divider"></div>
           <button class="user-dropdown-item danger" onclick="logout()">&#10148; Sign out</button>
         </div>
       </div>
     </div>
-  </div>
-
-  <div class="tabs">
-    <button class="tab-btn active" id="tab-projects-btn" onclick="switchTab('projects',this)">Projects &amp; Tokens</button>
   </div>
 
   <div class="tab-content">
@@ -444,12 +461,8 @@
   <div class="modal" style="width:min(480px,100%)">
     <h3>Profile</h3>
     <div class="form-group">
-      <label>Username</label>
-      <input id="pf-username" type="text" autocomplete="username" />
-    </div>
-    <div class="form-group">
-      <label>Email</label>
-      <input id="pf-email" type="email" autocomplete="email" placeholder="Optional" />
+      <label>Username (read-only)</label>
+      <input id="pf-username" type="text" autocomplete="username" readonly />
     </div>
     <hr style="border-color:var(--border);margin:16px 0" />
     <p style="color:var(--muted);font-size:12px;margin-bottom:12px">Change password (leave blank to keep current)</p>
@@ -528,7 +541,7 @@ async function initApp() {
   roleEl.className = 'role-tag' + (_me.role === 'admin' ? '' : ' viewer');
   if (_me.role !== 'admin') {
     document.getElementById('new-project-btn').style.display = 'none';
-    document.getElementById('dd-users-link').style.display = 'none';
+    document.getElementById('tab-users-btn').style.display = 'none';
   }
   await loadProjects();
 }
@@ -563,22 +576,16 @@ document.addEventListener('click', e => {
 // ── Profile ───────────────────────────────────────────────────────────────
 function openProfile() {
   document.getElementById('pf-username').value = _me.username;
-  document.getElementById('pf-email').value = _me.email || '';
   ['pf-cur-pass','pf-new-pass','pf-confirm-pass'].forEach(id => document.getElementById(id).value='');
   openModal('modal-profile');
 }
 async function submitProfile() {
-  const username = document.getElementById('pf-username').value.trim();
-  const email    = document.getElementById('pf-email').value.trim();
   const curPass  = document.getElementById('pf-cur-pass').value;
   const newPass  = document.getElementById('pf-new-pass').value;
   const confirmP = document.getElementById('pf-confirm-pass').value;
-  if (!username) { toast('Username is required', 'error'); return; }
   if (newPass && newPass !== confirmP) { toast('Passwords do not match', 'error'); return; }
   if (newPass && newPass.length < 8) { toast('New password must be at least 8 characters', 'error'); return; }
   const body = {};
-  if (username !== _me.username) body.username = username;
-  if (email !== (_me.email||'')) body.email = email;
   if (newPass) { body.current_password = curPass; body.new_password = newPass; }
   if (!Object.keys(body).length) { toast('No changes'); closeModal('modal-profile'); return; }
   try {
@@ -802,7 +809,12 @@ async function loadUsers() {
       <td><span class="role-tag${u.role==='admin'?'':' viewer'}">${u.role}</span></td>
       <td><span class="${u.is_active?'badge-active':'badge-inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
       <td style="color:var(--muted);font-size:12px;font-family:monospace">${u.created_at}</td>
-      <td>${u.id!==_me?.id?`<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">Deactivate</button>`:'<span style="color:var(--muted);font-size:12px">You</span>'}</td>
+      <td>${u.id!==_me?.id
+        ? `${u.role==='viewer'
+            ? `<button class="btn btn-sm" style="margin-right:4px" onclick='editUsername(${u.id}, ${JSON.stringify(u.username)})'>Edit Username</button>`
+            : ''}
+           <button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">Deactivate</button>`
+        : '<span style="color:var(--muted);font-size:12px">You</span>'}</td>
     </tr>`).join('');
 }
 function openNewUser() {
@@ -823,6 +835,20 @@ async function deleteUser(id) {
   if (!confirm('Deactivate this user?')) return;
   try { await api('DELETE',`/auth/users/${id}`); toast('User deactivated'); await loadUsers(); }
   catch(e) { toast(e.message,'error'); }
+}
+
+async function editUsername(id, currentUsername) {
+  const next = prompt('New username', currentUsername);
+  if (next === null) return;
+  const username = next.trim();
+  if (!username || username === currentUsername) return;
+  try {
+    await api('PATCH', `/auth/users/${id}`, { username });
+    toast('Username updated');
+    await loadUsers();
+  } catch(e) {
+    toast(e.message, 'error');
+  }
 }
 
 function esc(s) {

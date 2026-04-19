@@ -39,6 +39,10 @@ class UserProfileUpdate(BaseModel):
     new_password: str | None = Field(default=None, min_length=8)
 
 
+class AdminUserUpdate(BaseModel):
+    username: str = Field(min_length=3, max_length=64)
+
+
 class ProjectCreate(BaseModel):
     project_key: str = Field(min_length=3, max_length=64)
     upstream_url: str = Field(default="")
