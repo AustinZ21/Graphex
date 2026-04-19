@@ -53,7 +53,15 @@
       background: rgba(255,255,255,.02);
       position: sticky; top: 0; z-index: 10;
     }
-    .topbar .logo { font-weight: 700; font-size: 15px; }
+    .topbar .logo {
+      display: flex; align-items: center; gap: 9px;
+      font-weight: 700; font-size: 15px;
+      text-decoration: none; color: var(--text);
+      cursor: pointer; border-radius: 8px;
+      padding: 4px 8px; margin: -4px -8px;
+      transition: background .15s;
+    }
+    .topbar .logo:hover { background: rgba(255,255,255,.05); }
     .topbar .user-badge { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
     .role-tag {
       padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
@@ -202,9 +210,15 @@
       position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
       font-size: 13px; pointer-events: none; opacity: .5;
     }
-    .search-highlight { background: rgba(74,227,135,.18); border-radius: 2px; }
-
-    /* ── User dropdown ── */
+    .footer {
+      text-align: center;
+      padding: 20px 24px;
+      font-size: 12px;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      margin-top: auto;
+    }
+  
     .user-menu-wrap { position: relative; }
     .user-menu-btn {
       display: flex; align-items: center; gap: 6px;
@@ -266,7 +280,29 @@
 <!-- APP -->
 <div id="app">
   <div class="topbar">
-    <span class="logo">ContextGraph Admin</span>
+    <a class="logo" onclick="goHome()" href="#">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- outer ring -->
+        <circle cx="14" cy="14" r="13" stroke="#4ae387" stroke-width="1.5" opacity="0.35"/>
+        <!-- center node -->
+        <circle cx="14" cy="14" r="3.2" fill="#4ae387"/>
+        <!-- satellite nodes -->
+        <circle cx="14" cy="4.5"  r="2.2" fill="#4ae387" opacity="0.8"/>
+        <circle cx="23.1" cy="9.5" r="2.2" fill="#4ae387" opacity="0.8"/>
+        <circle cx="23.1" cy="18.5" r="2.2" fill="#4ae387" opacity="0.8"/>
+        <circle cx="14" cy="23.5" r="2.2" fill="#4ae387" opacity="0.8"/>
+        <circle cx="4.9" cy="18.5" r="2.2" fill="#4ae387" opacity="0.8"/>
+        <circle cx="4.9" cy="9.5"  r="2.2" fill="#4ae387" opacity="0.8"/>
+        <!-- edges center -> satellites -->
+        <line x1="14" y1="14" x2="14"   y2="6.7"  stroke="#4ae387" stroke-width="1" opacity="0.5"/>
+        <line x1="14" y1="14" x2="21.3" y2="10.5" stroke="#4ae387" stroke-width="1" opacity="0.5"/>
+        <line x1="14" y1="14" x2="21.3" y2="17.5" stroke="#4ae387" stroke-width="1" opacity="0.5"/>
+        <line x1="14" y1="14" x2="14"   y2="21.3" stroke="#4ae387" stroke-width="1" opacity="0.5"/>
+        <line x1="14" y1="14" x2="6.7"  y2="17.5" stroke="#4ae387" stroke-width="1" opacity="0.5"/>
+        <line x1="14" y1="14" x2="6.7"  y2="10.5" stroke="#4ae387" stroke-width="1" opacity="0.5"/>
+      </svg>
+      ContextGraph Admin
+    </a>
     <span style="font-size:11px;color:var(--muted);padding-left:6px;align-self:center">v0.0.4</span>
     <div style="flex:1"></div>
     <div class="user-badge">
@@ -431,6 +467,7 @@
       <button class="btn btn-primary" onclick="submitProfile()">Save</button>
     </div>
   </div>
+  <footer class="footer">Created by Nate Scott (NASCO)</footer>
 </div>
 
 <div id="toast-area"></div>
@@ -493,6 +530,11 @@ async function initApp() {
     document.getElementById('dd-users-link').style.display = 'none';
   }
   await loadProjects();
+}
+
+function goHome() {
+  const btn = document.querySelector('.tab-btn');
+  if (btn) switchTab('projects', btn);
 }
 
 function logout() {
