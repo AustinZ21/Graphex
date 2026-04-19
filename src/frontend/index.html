@@ -195,6 +195,7 @@
       background: var(--accent-soft);
       color: var(--accent);
       white-space: nowrap;
+      justify-self: center;
     }
     .token-status-chip.revoked {
       border-color: rgba(227,90,90,.35);
@@ -203,6 +204,13 @@
     }
     .token-actions { display: flex; align-items: center; gap: 8px; justify-content: center; }
     .actions-col-header { text-align: center; }
+    .center-col-header { text-align: center; }
+    .tokens-grid-header .center-col-header {
+      display: block;
+      justify-self: stretch;
+      width: 100%;
+      text-align: center;
+    }
     .project-actions { display: flex; justify-content: center; align-items: center; gap: 6px; }
     .token-type-badge {
       padding: 2px 8px; border-radius: 999px; font-size: 11px;
@@ -471,7 +479,7 @@
             <th class="sortable" onclick="setProjectsSort('project_id')">Project ID <span id="sort-project_id"></span></th>
             <th class="sortable" onclick="setProjectsSort('project_key')">Project Name <span id="sort-project_key"></span></th>
             <th class="sortable" onclick="setProjectsSort('upstream_url')">Upstream URL <span id="sort-upstream_url"></span></th>
-            <th class="sortable" onclick="setProjectsSort('is_active')">Status <span id="sort-is_active"></span></th>
+            <th class="sortable center-col-header" onclick="setProjectsSort('is_active')">Status <span id="sort-is_active"></span></th>
             <th class="sortable" onclick="setProjectsSort('created_at')">Created <span id="sort-created_at"></span></th>
             <th class="actions-col-header">Actions</th>
           </tr></thead>
@@ -975,7 +983,7 @@ function filterProjects(q) {
         ` : ''}
       </td>
       <td style="color:var(--muted)">${esc(p.upstream_url||'—')}</td>
-      <td><span class="${p.is_active?'badge-active':'badge-inactive'}">${p.is_active?'Active':'Inactive'}</span></td>
+      <td style="text-align:center"><span class="${p.is_active?'badge-active':'badge-inactive'}">${p.is_active?'Active':'Inactive'}</span></td>
       <td style="color:var(--muted);font-size:12px;font-family:monospace">${esc(p.created_at)}</td>
       <td>
         <div class="project-actions">
@@ -1049,7 +1057,7 @@ function renderTokensPanel(panel, tokens, projectId) {
       <span>Type</span>
       <span>Token Hint</span>
       <span>Purpose</span>
-      <span>Status</span>
+      <span class="center-col-header">Status</span>
       <span class="actions-col-header">Actions</span>
     </div>
     ${tokens.map(t=>`
