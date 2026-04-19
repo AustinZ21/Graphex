@@ -15,6 +15,7 @@ from backend.auth.models import (
     ProjectCreate,
     ProjectOut,
     ProjectTokenOut,
+    ProjectUpdate,
     TokenResponse,
     UserCreate,
     UserOut,
@@ -154,6 +155,41 @@ async def delete_project(
 ):
     await db.execute("UPDATE projects SET is_active = 0 WHERE id = ?", (project_id,))
     await db.commit()
+
+
+@router.patch("/projects/{project_id}", response_model=ProjectOut)
+async def update_project(
+    project_id: int,
+    body: ProjectUpdate,
+    _: dict = Depends(require_admin),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    fields, values = [], []
+    if body.project_key is not None:
+        fields.append("project_key = ?")
+        values.append(body.project_key)
+    if body.upstream_url is not None:
+        fields.append("upstream_url = ?")
+        values.append(body.upstream_url)
+    if body.description is not None:
+        fields.append("description = ?")
+        values.append(body.description)
+    if not fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    values.append(project_id)
+    try:
+        await db.execute(f"UPDATE projects SET {', '.join(fields)} WHERE id = ?", values)
+        await db.commit()
+    except aiosqlite.IntegrityError:
+        raise HTTPException(status_code=409, detail="project_key already exists")
+    async with db.execute(
+        "SELECT id, project_key, project_id, upstream_url, description, created_at, is_active FROM projects WHERE id = ?",
+        (project_id,),
+    ) as cur:
+        row = await cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return ProjectOut(**dict(row))
 
 
 # ── Tokens ─────────────────────────────────────────────────────────────────

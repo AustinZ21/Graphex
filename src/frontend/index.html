@@ -217,7 +217,7 @@
 <div id="app">
   <div class="topbar">
     <span class="logo">ContextGraph Admin</span>
-    <span style="font-size:11px;color:var(--muted);margin-right:auto;padding-left:8px">v0.0.2</span>
+    <span style="font-size:11px;color:var(--muted);margin-right:auto;padding-left:8px">v0.0.3</span>
     <div class="user-badge">
       <span id="topbar-user"></span>
       <span id="topbar-role" class="role-tag"></span>
@@ -266,12 +266,12 @@
   </div>
 </div>
 
-<!-- MODAL: New Project -->
+<!-- MODAL: New / Edit Project -->
 <div class="overlay" id="modal-project">
   <div class="modal">
-    <h3>New Project</h3>
+    <h3 id="modal-project-title">新建项目</h3>
     <div class="form-group">
-      <label>Project Name</label>
+      <label>项目名称</label>
       <input id="np-key" placeholder="e.g. osagent-local" />
     </div>
     <div class="form-group">
@@ -279,12 +279,12 @@
       <input id="np-url" placeholder="http://localhost:8000" />
     </div>
     <div class="form-group">
-      <label>Description</label>
-      <textarea id="np-desc" placeholder="Optional" rows="3" style="resize:vertical"></textarea>
+      <label>描述</label>
+      <textarea id="np-desc" placeholder="可选" rows="3" style="resize:vertical"></textarea>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
-      <button class="btn btn-ghost" onclick="closeModal('modal-project')">Cancel</button>
-      <button class="btn btn-primary" onclick="submitNewProject()">Create</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-project')">取消</button>
+      <button class="btn btn-primary" id="modal-project-submit" onclick="submitProjectModal()">创建</button>
     </div>
   </div>
 </div>
@@ -426,7 +426,9 @@ async function loadProjects() {
       <td style="color:var(--muted)">${p.created_at.slice(0,10)}</td>
       <td>
         <button class="btn btn-sm btn-ghost" style="margin-right:4px" onclick="openGenerateToken(${p.id})">+ Token</button>
-        ${_me?.role==='admin'?`<button class="btn btn-sm btn-danger" onclick="deleteProject(${p.id})">Delete</button>`:''}
+        ${_me?.role==='admin'?`
+          <button class="btn btn-sm" style="margin-right:4px" onclick="openEditProject(${p.id},'${esc(p.project_key)}','${esc(p.upstream_url||'')}',${JSON.stringify(p.description||'')})">编辑</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteProject(${p.id})">删除</button>`:''}
       </td>
     </tr>
     <tr id="tokens-row-${p.id}" style="display:none">
@@ -472,25 +474,47 @@ function renderTokensPanel(panel, tokens, projectId) {
   </div>`;
 }
 
+let _editProjectId = null;
 function openNewProject() {
+  _editProjectId = null;
+  document.getElementById('modal-project-title').textContent = '新建项目';
+  document.getElementById('modal-project-submit').textContent = '创建';
   ['np-key','np-url','np-desc'].forEach(id=>document.getElementById(id).value='');
   openModal('modal-project');
 }
-async function submitNewProject() {
-  const key=document.getElementById('np-key').value.trim();
-  if (!key) { toast('Project name required','error'); return; }
+function openEditProject(id, key, url, desc) {
+  _editProjectId = id;
+  document.getElementById('modal-project-title').textContent = '编辑项目';
+  document.getElementById('modal-project-submit').textContent = '保存';
+  document.getElementById('np-key').value = key;
+  document.getElementById('np-url').value = url;
+  document.getElementById('np-desc').value = desc;
+  openModal('modal-project');
+}
+async function submitProjectModal() {
+  const key = document.getElementById('np-key').value.trim();
+  if (!key) { toast('项目名称不能为空','error'); return; }
   try {
-    await api('POST','/auth/projects',{
-      project_key:key,
-      upstream_url:document.getElementById('np-url').value.trim(),
-      description:document.getElementById('np-desc').value.trim()
-    });
-    closeModal('modal-project'); toast('Project created'); await loadProjects();
+    if (_editProjectId) {
+      await api('PATCH',`/auth/projects/${_editProjectId}`,{
+        project_key: key,
+        upstream_url: document.getElementById('np-url').value.trim(),
+        description: document.getElementById('np-desc').value.trim()
+      });
+      closeModal('modal-project'); toast('项目已更新'); await loadProjects();
+    } else {
+      await api('POST','/auth/projects',{
+        project_key: key,
+        upstream_url: document.getElementById('np-url').value.trim(),
+        description: document.getElementById('np-desc').value.trim()
+      });
+      closeModal('modal-project'); toast('项目已创建'); await loadProjects();
+    }
   } catch(e) { toast(e.message,'error'); }
 }
 async function deleteProject(id) {
-  if (!confirm('Delete this project and all its tokens?')) return;
-  try { await api('DELETE',`/auth/projects/${id}`); toast('Project deleted'); await loadProjects(); }
+  if (!confirm('删除该项目及其所有 Token？')) return;
+  try { await api('DELETE',`/auth/projects/${id}`); toast('项目已删除'); await loadProjects(); }
   catch(e) { toast(e.message,'error'); }
 }
 

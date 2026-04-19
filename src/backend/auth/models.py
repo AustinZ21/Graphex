@@ -37,6 +37,12 @@ class ProjectCreate(BaseModel):
     description: str = Field(default="")
 
 
+class ProjectUpdate(BaseModel):
+    project_key: str | None = Field(default=None, min_length=3, max_length=64)
+    upstream_url: str | None = None
+    description: str | None = None
+
+
 class ProjectOut(BaseModel):
     id: int
     project_key: str
