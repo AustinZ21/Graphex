@@ -14,6 +14,8 @@ All graph writes use MERGE so re-indexing is safe and idempotent.
 from __future__ import annotations
 
 import ast
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import structlog
@@ -23,6 +25,8 @@ from backend.graph import schema as S
 from backend.indexer.call_analyzer import CallAnalyzer, RawCall
 from backend.indexer.hasher import file_changed, hash_variable_flows, sha256_file
 from backend.indexer.parser import ParsedFile, SUPPORTED_EXTENSIONS, SourceParser, discover_files, path_to_module
+
+_CONCURRENT_WORKERS = 8
 
 log = structlog.get_logger()
 
@@ -96,6 +100,7 @@ class IndexPipeline:
         self._graph = graph
         self._parser = SourceParser()
         self._call_analyzer = CallAnalyzer()
+        self._graph_lock = threading.Lock()
 
     def index_full(self, repo_path: str) -> dict:
         resolved_repo_path = _normalize_repo_path(repo_path)
@@ -117,6 +122,8 @@ class IndexPipeline:
         self._upsert_repo(repo_path)
         stats: dict = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "imports": 0, "variables": 0, "variable_flows": 0, "errors": 0}
         symbol_map = self._load_symbol_map()
+
+        valid_paths: list[str] = []
         for fpath in changed_paths:
             normalized_fpath = fpath
             if not Path(normalized_fpath).exists():
@@ -125,11 +132,26 @@ class IndexPipeline:
                     rel = rel[len("D:/Repos/"):]
                 mapped_file = Path("/repos") / rel
                 normalized_fpath = str(mapped_file)
-
             if Path(normalized_fpath).suffix.lower() not in SUPPORTED_EXTENSIONS:
                 continue
-            result = self._index_file(repo_path, normalized_fpath, symbol_map, force=False)
-            self._accumulate(stats, result)
+            valid_paths.append(normalized_fpath)
+
+        workers = min(_CONCURRENT_WORKERS, max(1, len(valid_paths)))
+        symbol_map_lock = threading.Lock()
+
+        def _process(fpath: str) -> dict:
+            result = self._index_file(repo_path, fpath, symbol_map, force=False, symbol_map_lock=symbol_map_lock)
+            return result
+
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {executor.submit(_process, fp): fp for fp in valid_paths}
+            for future in as_completed(futures):
+                try:
+                    self._accumulate(stats, future.result())
+                except Exception as exc:
+                    log.error("pipeline.incremental.worker_error", path=futures[future], error=str(exc))
+                    stats["errors"] = stats.get("errors", 0) + 1
+
         stats["symbols"] = self._count_symbols()
         log.info("pipeline.incremental.done", **stats)
         return stats
@@ -144,6 +166,7 @@ class IndexPipeline:
         file_path: str,
         symbol_map: dict[str, str],
         force: bool,
+        symbol_map_lock: threading.Lock | None = None,
     ) -> dict:
         result = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "imports": 0, "variables": 0, "variable_flows": 0, "errors": 0}
         try:
@@ -171,42 +194,51 @@ class IndexPipeline:
             imports_changed = stored_hashes.get("imports_hash") != current_imports_hash
             variables_changed = stored_hashes.get("variables_hash") != current_variables_hash
 
-            self._graph.query(
-                S.MERGE_FILE,
-                {
-                    "path": file_path,
-                    "language": parsed.language,
-                    "content_hash": current_hash,
-                    "symbols_hash": current_symbols_hash,
-                    "calls_hash": current_calls_hash,
-                    "imports_hash": current_imports_hash,
-                    "variables_hash": current_variables_hash,
-                },
-            )
-            self._graph.query(
-                S.EDGE_REPO_CONTAINS_FILE,
-                {"repo_path": repo_path, "file_path": file_path},
-            )
+            with self._graph_lock:
+                self._graph.query(
+                    S.MERGE_FILE,
+                    {
+                        "path": file_path,
+                        "language": parsed.language,
+                        "content_hash": current_hash,
+                        "symbols_hash": current_symbols_hash,
+                        "calls_hash": current_calls_hash,
+                        "imports_hash": current_imports_hash,
+                        "variables_hash": current_variables_hash,
+                    },
+                )
+                self._graph.query(
+                    S.EDGE_REPO_CONTAINS_FILE,
+                    {"repo_path": repo_path, "file_path": file_path},
+                )
 
             if symbols_changed:
-                for sym in parsed.symbols:
-                    self._graph.query(
-                        S.MERGE_SYMBOL,
-                        {
-                            "qualified_name": sym.qualified_name,
-                            "name": sym.name,
-                            "symbol_type": sym.symbol_type,
-                            "file_path": sym.file_path,
-                            "line_start": sym.line_start,
-                            "line_end": sym.line_end,
-                        },
-                    )
-                    self._graph.query(
-                        S.EDGE_FILE_DEFINES_SYMBOL,
-                        {"file_path": file_path, "qualified_name": sym.qualified_name},
-                    )
-                    symbol_map[sym.name] = sym.qualified_name
-                    result["symbols"] += 1
+                sym_rows = [
+                    {
+                        "qualified_name": sym.qualified_name,
+                        "name": sym.name,
+                        "symbol_type": sym.symbol_type,
+                        "file_path": sym.file_path,
+                        "line_start": sym.line_start,
+                        "line_end": sym.line_end,
+                    }
+                    for sym in parsed.symbols
+                ]
+                def_rows = [
+                    {"file_path": file_path, "qualified_name": sym.qualified_name}
+                    for sym in parsed.symbols
+                ]
+                if sym_rows:
+                    with self._graph_lock:
+                        self._graph.query(S.BATCH_MERGE_SYMBOLS, {"rows": sym_rows})
+                        self._graph.query(S.BATCH_EDGE_FILE_DEFINES_SYMBOL, {"rows": def_rows})
+                new_symbols = {sym.name: sym.qualified_name for sym in parsed.symbols}
+                if symbol_map_lock:
+                    with symbol_map_lock:
+                        symbol_map.update(new_symbols)
+                else:
+                    symbol_map.update(new_symbols)
+                result["symbols"] += len(sym_rows)
 
             python_raw_calls: list[RawCall] = []
             if parsed.language == "python" and (calls_changed or variables_changed):
@@ -241,6 +273,11 @@ class IndexPipeline:
             result["errors"] = 1
         return result
 
+    def _locked_query(self, cypher: str, params: dict | None = None):
+        """Execute a graph query under the pipeline-level lock."""
+        with self._graph_lock:
+            return self._graph.query(cypher, params)
+
     def _extract_python_raw_calls(self, file_path: str) -> list[RawCall]:
         try:
             source = Path(file_path).read_text(encoding="utf-8", errors="replace")
@@ -251,155 +288,150 @@ class IndexPipeline:
         module_qname = path_to_module(file_path)
         return self._call_analyzer.extract(tree, file_path, module_qname)
 
+    def _write_call_edges_batch(self, raw_calls: list[RawCall], symbol_map: dict[str, str]) -> int:
+        rows = [
+            {"caller_qname": rc.caller_qname, "callee_qname": callee_qname}
+            for rc in raw_calls
+            if (callee_qname := symbol_map.get(rc.callee_name)) and callee_qname != rc.caller_qname
+        ]
+        if rows:
+            try:
+                with self._graph_lock:
+                    self._graph.query(S.BATCH_EDGE_SYMBOL_CALLS, {"rows": rows})
+            except Exception:
+                pass
+        return len(rows)
+
     def _write_python_call_edges(self, raw_calls: list[RawCall], symbol_map: dict[str, str]) -> int:
-        written = 0
-        for rc in raw_calls:
-            callee_qname = symbol_map.get(rc.callee_name)
-            if callee_qname and callee_qname != rc.caller_qname:
-                try:
-                    self._graph.query(
-                        S.EDGE_SYMBOL_CALLS,
-                        {"caller_qname": rc.caller_qname, "callee_qname": callee_qname},
-                    )
-                    written += 1
-                except Exception:
-                    pass
-        return written
+        return self._write_call_edges_batch(raw_calls, symbol_map)
 
     def _write_ts_js_call_edges(self, raw_calls: list[RawCall], symbol_map: dict[str, str]) -> int:
-        """Write CALLS edges for TS/JS calls."""
-        written = 0
-        for rc in raw_calls:
-            callee_qname = symbol_map.get(rc.callee_name)
-            if callee_qname and callee_qname != rc.caller_qname:
-                try:
-                    self._graph.query(
-                        S.EDGE_SYMBOL_CALLS,
-                        {"caller_qname": rc.caller_qname, "callee_qname": callee_qname},
-                    )
-                    written += 1
-                except Exception:
-                    pass
-        return written
+        return self._write_call_edges_batch(raw_calls, symbol_map)
 
     def _write_import_edges(self, file_path: str, parsed: ParsedFile, repo_path: str) -> int:
         """Resolve and write IMPORTS edges for local imports."""
-        written = 0
-        for imp in parsed.imports:
-            target_path = _resolve_import_path(file_path, imp.imported_module, repo_path)
-            if target_path:
-                try:
-                    self._graph.query(
-                        S.EDGE_FILE_IMPORTS,
-                        {"src_path": file_path, "target_path": target_path},
-                    )
-                    written += 1
-                except Exception:
-                    pass
-        return written
+        rows = [
+            {"src_path": file_path, "target_path": target_path}
+            for imp in parsed.imports
+            if (target_path := _resolve_import_path(file_path, imp.imported_module, repo_path))
+        ]
+        if rows:
+            try:
+                with self._graph_lock:
+                    self._graph.query(S.BATCH_EDGE_FILE_IMPORTS, {"rows": rows})
+            except Exception:
+                pass
+        return len(rows)
 
     def _write_variable_flow_edges(self, parsed: ParsedFile) -> dict[str, int]:
         stats = {"variables": 0, "variable_flows": 0}
-        for variable in parsed.variables:
+        var_rows = [
+            {
+                "qualified_name": v.qualified_name,
+                "name": v.name,
+                "scope_qname": v.scope_qname,
+                "file_path": v.file_path,
+                "line_number": v.line_number,
+                "role": v.role,
+            }
+            for v in parsed.variables
+        ]
+        has_var_rows = [
+            {"scope_qname": v.scope_qname, "variable_qname": v.qualified_name}
+            for v in parsed.variables
+        ]
+        if var_rows:
             try:
-                self._graph.query(
-                    S.MERGE_VARIABLE,
-                    {
-                        "qualified_name": variable.qualified_name,
-                        "name": variable.name,
-                        "scope_qname": variable.scope_qname,
-                        "file_path": variable.file_path,
-                        "line_number": variable.line_number,
-                        "role": variable.role,
-                    },
-                )
-                self._graph.query(
-                    S.EDGE_SYMBOL_HAS_VARIABLE,
-                    {"scope_qname": variable.scope_qname, "variable_qname": variable.qualified_name},
-                )
-                stats["variables"] += 1
+                with self._graph_lock:
+                    self._graph.query(S.BATCH_MERGE_VARIABLES, {"rows": var_rows})
+                    self._graph.query(S.BATCH_EDGE_SYMBOL_HAS_VARIABLE, {"rows": has_var_rows})
+                stats["variables"] = len(var_rows)
             except Exception:
                 pass
 
-        for flow in parsed.variable_flows:
+        flow_rows = [
+            {
+                "source_qname": flow.source_qname,
+                "target_qname": flow.target_qname,
+                "scope_qname": flow.scope_qname,
+                "line_number": flow.line_number,
+                "flow_type": flow.flow_type,
+            }
+            for flow in parsed.variable_flows
+        ]
+        if flow_rows:
             try:
-                self._graph.query(
-                    S.EDGE_VARIABLE_FLOWS,
-                    {
-                        "source_qname": flow.source_qname,
-                        "target_qname": flow.target_qname,
-                        "scope_qname": flow.scope_qname,
-                        "line_number": flow.line_number,
-                        "flow_type": flow.flow_type,
-                    },
-                )
-                stats["variable_flows"] += 1
+                with self._graph_lock:
+                    self._graph.query(S.BATCH_EDGE_VARIABLE_FLOWS, {"rows": flow_rows})
+                stats["variable_flows"] = len(flow_rows)
             except Exception:
                 pass
         return stats
 
     def _write_cross_scope_variable_flows(self, raw_calls: list[RawCall], symbol_map: dict[str, str]) -> int:
-        written = 0
-        parameter_cache: dict[str, list[str]] = {}
-        for call in raw_calls:
-            callee_qname = symbol_map.get(call.callee_name)
-            if not callee_qname:
-                continue
+        # Resolve callees and collect unique ones for batch parameter lookup
+        resolved: list[tuple[RawCall, str]] = [
+            (call, callee_qname)
+            for call in raw_calls
+            if (callee_qname := symbol_map.get(call.callee_name))
+        ]
+        if not resolved:
+            return 0
 
-            if callee_qname not in parameter_cache:
-                parameter_cache[callee_qname] = self._get_scope_parameter_qnames(callee_qname)
+        unique_callees = list({cq for _, cq in resolved})
+        parameter_cache = self._get_scope_parameters_batch(unique_callees)
 
-            callee_params = parameter_cache[callee_qname]
-            arg_names = call.arg_names or []
-            for index, arg_name in enumerate(arg_names[: len(callee_params)]):
-                source_qname = f"{call.caller_qname}:{arg_name}"
-                target_qname = callee_params[index]
-                try:
-                    self._graph.query(
-                        S.EDGE_VARIABLE_FLOWS,
-                        {
-                            "source_qname": source_qname,
-                            "target_qname": target_qname,
-                            "scope_qname": call.caller_qname,
-                            "line_number": 0,
-                            "flow_type": "argument",
-                        },
-                    )
-                    written += 1
-                except Exception:
-                    pass
-
+        flow_rows: list[dict] = []
+        for call, callee_qname in resolved:
+            callee_params = parameter_cache.get(callee_qname, [])
+            for index, arg_name in enumerate((call.arg_names or [])[: len(callee_params)]):
+                flow_rows.append({
+                    "source_qname": f"{call.caller_qname}:{arg_name}",
+                    "target_qname": callee_params[index],
+                    "scope_qname": call.caller_qname,
+                    "line_number": 0,
+                    "flow_type": "argument",
+                })
             if call.result_var_name:
-                source_qname = f"{callee_qname}:__return__"
-                target_qname = f"{call.caller_qname}:{call.result_var_name}"
-                try:
-                    self._graph.query(
-                        S.EDGE_VARIABLE_FLOWS,
-                        {
-                            "source_qname": source_qname,
-                            "target_qname": target_qname,
-                            "scope_qname": call.caller_qname,
-                            "line_number": 0,
-                            "flow_type": "call_return",
-                        },
-                    )
-                    written += 1
-                except Exception:
-                    pass
-        return written
+                flow_rows.append({
+                    "source_qname": f"{callee_qname}:__return__",
+                    "target_qname": f"{call.caller_qname}:{call.result_var_name}",
+                    "scope_qname": call.caller_qname,
+                    "line_number": 0,
+                    "flow_type": "call_return",
+                })
+        if flow_rows:
+            try:
+                with self._graph_lock:
+                    self._graph.query(S.BATCH_EDGE_VARIABLE_FLOWS, {"rows": flow_rows})
+            except Exception:
+                pass
+        return len(flow_rows)
 
     def _get_scope_parameter_qnames(self, scope_qname: str) -> list[str]:
+        cache = self._get_scope_parameters_batch([scope_qname])
+        return cache.get(scope_qname, [])
+
+    def _get_scope_parameters_batch(self, scope_qnames: list[str]) -> dict[str, list[str]]:
+        """Batch-load parameter qnames for multiple scopes in a single query."""
+        if not scope_qnames:
+            return {}
         try:
             result = self._graph.query(
-                "MATCH (:Symbol {qualified_name: $scope_qname})-[:USES_VARIABLE]->(v:Variable {role: 'parameter'}) RETURN v.qualified_name ORDER BY v.line_number, v.name",
-                {"scope_qname": scope_qname},
+                S.BATCH_QUERY_SCOPE_PARAMETERS,
+                {"scope_qnames": scope_qnames},
             )
-            return [row[0] for row in result.result_set if row and row[0]]
+            cache: dict[str, list[str]] = {}
+            for row in result.result_set:
+                if row and len(row) >= 2 and row[0] and row[1]:
+                    cache.setdefault(row[0], []).append(row[1])
+            return cache
         except Exception:
-            return []
+            return {}
 
     def _get_stored_hash(self, file_path: str) -> str | None:
-        result = self._graph.query(S.QUERY_FILE_HASH, {"path": file_path})
+        with self._graph_lock:
+            result = self._graph.query(S.QUERY_FILE_HASH, {"path": file_path})
         rows = result.result_set
         if rows and rows[0][0]:
             return rows[0][0]
@@ -408,7 +440,8 @@ class IndexPipeline:
     def _get_stored_symbol_hashes(self, file_path: str) -> dict[str, str]:
         """Get stored symbol-level hashes for fine-grained incremental tracking."""
         try:
-            result = self._graph.query(S.QUERY_FILE_SYMBOL_HASHES, {"path": file_path})
+            with self._graph_lock:
+                result = self._graph.query(S.QUERY_FILE_SYMBOL_HASHES, {"path": file_path})
             if result.result_set and len(result.result_set[0]) >= 5:
                 row = result.result_set[0]
                 return {

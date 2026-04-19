@@ -303,3 +303,69 @@ RETURN f.path AS file_path, f.language AS language, internal_imports, count(DIST
 ORDER BY internal_imports DESC, incoming_imports DESC
 LIMIT $limit
 """
+
+# ---------------------------------------------------------------------------
+# Batch UNWIND write queries (perf: replaces N round-trips with 1 per type)
+# ---------------------------------------------------------------------------
+
+BATCH_MERGE_SYMBOLS = """
+UNWIND $rows AS row
+MERGE (s:Symbol {qualified_name: row.qualified_name})
+SET s.name        = row.name,
+    s.symbol_type = row.symbol_type,
+    s.file_path   = row.file_path,
+    s.line_start  = row.line_start,
+    s.line_end    = row.line_end
+"""
+
+BATCH_EDGE_FILE_DEFINES_SYMBOL = """
+UNWIND $rows AS row
+MATCH (f:File {path: row.file_path})
+MATCH (s:Symbol {qualified_name: row.qualified_name})
+MERGE (f)-[:DEFINES]->(s)
+"""
+
+BATCH_MERGE_VARIABLES = """
+UNWIND $rows AS row
+MERGE (v:Variable {qualified_name: row.qualified_name})
+SET v.name        = row.name,
+    v.scope_qname = row.scope_qname,
+    v.file_path   = row.file_path,
+    v.line_number = row.line_number,
+    v.role        = row.role
+"""
+
+BATCH_EDGE_SYMBOL_HAS_VARIABLE = """
+UNWIND $rows AS row
+MATCH (s:Symbol {qualified_name: row.scope_qname})
+MATCH (v:Variable {qualified_name: row.variable_qname})
+MERGE (s)-[:USES_VARIABLE]->(v)
+"""
+
+BATCH_EDGE_VARIABLE_FLOWS = """
+UNWIND $rows AS row
+MATCH (source:Variable {qualified_name: row.source_qname})
+MATCH (target:Variable {qualified_name: row.target_qname})
+MERGE (source)-[:FLOWS_TO {scope_qname: row.scope_qname, line_number: row.line_number, flow_type: row.flow_type}]->(target)
+"""
+
+BATCH_EDGE_SYMBOL_CALLS = """
+UNWIND $rows AS row
+MATCH (caller:Symbol {qualified_name: row.caller_qname})
+MATCH (callee:Symbol {qualified_name: row.callee_qname})
+MERGE (caller)-[:CALLS]->(callee)
+"""
+
+BATCH_EDGE_FILE_IMPORTS = """
+UNWIND $rows AS row
+MATCH (src:File {path: row.src_path})
+MATCH (tgt:File {path: row.target_path})
+MERGE (src)-[:IMPORTS]->(tgt)
+"""
+
+BATCH_QUERY_SCOPE_PARAMETERS = """
+UNWIND $scope_qnames AS sq
+MATCH (:Symbol {qualified_name: sq})-[:USES_VARIABLE]->(v:Variable {role: 'parameter'})
+RETURN sq, v.qualified_name, v.line_number, v.name
+ORDER BY sq, v.line_number, v.name
+"""
