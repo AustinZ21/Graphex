@@ -183,7 +183,13 @@
       color: var(--muted); font-size: 11px;
       background: var(--surface2); padding: 1px 5px; border-radius: 4px;
     }
-    .token-created { color: var(--muted); font-size: 12px; font-family: monospace; }
+    .token-created {
+      color: var(--muted);
+      font-size: 12px;
+      font-family: monospace;
+      justify-self: center;
+      text-align: center;
+    }
     .token-info { display: contents; }
     .token-hint { font-family: monospace; color: var(--accent); }
     .token-purpose { color: var(--muted); font-size: 12px; white-space: nowrap; }
@@ -480,7 +486,7 @@
             <th class="sortable" onclick="setProjectsSort('project_key')">Project Name <span id="sort-project_key"></span></th>
             <th class="sortable" onclick="setProjectsSort('upstream_url')">Upstream URL <span id="sort-upstream_url"></span></th>
             <th class="sortable center-col-header" onclick="setProjectsSort('is_active')">Status <span id="sort-is_active"></span></th>
-            <th class="sortable" onclick="setProjectsSort('created_at')">Created <span id="sort-created_at"></span></th>
+            <th class="sortable center-col-header" onclick="setProjectsSort('created_at')">Created <span id="sort-created_at"></span></th>
             <th class="actions-col-header">Actions</th>
           </tr></thead>
           <tbody id="projects-body"></tbody>
@@ -984,7 +990,7 @@ function filterProjects(q) {
       </td>
       <td style="color:var(--muted)">${esc(p.upstream_url||'—')}</td>
       <td style="text-align:center"><span class="${p.is_active?'badge-active':'badge-inactive'}">${p.is_active?'Active':'Inactive'}</span></td>
-      <td style="color:var(--muted);font-size:12px;font-family:monospace">${esc(p.created_at)}</td>
+      <td style="color:var(--muted);font-size:12px;font-family:monospace;text-align:center">${esc(p.created_at)}</td>
       <td>
         <div class="project-actions">
           <button class="btn btn-sm btn-ghost" onclick="openGenerateToken(${p.id})">+ Token</button>
@@ -1053,7 +1059,7 @@ function renderTokensPanel(panel, tokens, projectId) {
     <div class="tokens-grid-header">
       <span>ID</span>
       <span>Ver</span>
-      <span>Created</span>
+      <span class="center-col-header">Created</span>
       <span>Type</span>
       <span>Token Hint</span>
       <span>Purpose</span>

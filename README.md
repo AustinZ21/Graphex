@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.19  
+**Version:** 1.29.20  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-19 (ui: enforce centered status header cell in token grid)
+**Date:** 2026-04-19 (ui: center align created headers and content)
 
 ## 1. Introduction
 
