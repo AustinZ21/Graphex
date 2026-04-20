@@ -1503,6 +1503,16 @@ async function triggerProjectIndex(projectId) {
   }
 }
 
+async function triggerProjectFullIndex(projectId) {
+  try {
+    const result = await api('POST', `/auth/projects/${projectId}/index-full`);
+    toast('Full index queued');
+    await updateIndexStatus();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
 function relativeTimeLabel(value) {
   if (!value) return 'unknown';
   try {
@@ -1720,6 +1730,7 @@ function filterProjects(q) {
           <button class="btn btn-sm btn-ghost" onclick="openGenerateToken(${p.id})">+ Token</button>
           ${_me?.role==='admin'?`
             <button class="btn btn-sm btn-ghost" onclick="triggerProjectIndex(${p.id})" ${isProcessing ? 'disabled title="Index job already running"' : ''}>Reindex</button>
+            <button class="btn btn-sm btn-ghost" onclick="triggerProjectFullIndex(${p.id})" ${isProcessing ? 'disabled title="Index job already running"' : ''}>Full Index</button>
             <button class="btn btn-sm" onclick="openEditProject(${p.id})">Edit</button>
             <button class="btn btn-sm btn-danger" onclick="deleteProject(${p.id})">Delete</button>`:''}
         </div>

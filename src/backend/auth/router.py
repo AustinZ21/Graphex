@@ -859,6 +859,46 @@ async def trigger_project_index(
     )
 
 
+@router.post("/projects/{project_id}/index-full", response_model=ProjectIndexTriggerOut)
+async def trigger_project_full_index(
+    project_id: int,
+    _: dict = Depends(require_admin),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    async with db.execute(
+        "SELECT id, project_name, project_id, is_active FROM projects WHERE id = ?",
+        (project_id,),
+    ) as cur:
+        row = await cur.fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project = dict(row)
+    if not project.get("is_active"):
+        raise HTTPException(status_code=400, detail="Project is inactive")
+
+    repo_path = _resolve_repo_path(project["project_name"])
+    if not repo_path:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Repository path not found for project_name '{project['project_name']}'",
+        )
+
+    result = await mcp_server.index_full(repo_path=repo_path, project_name=project["project_name"])
+    return ProjectIndexTriggerOut(
+        project_id=project["id"],
+        project_name=project["project_name"],
+        repo_path=repo_path,
+        status=result.get("status", "queued"),
+        mode="full",
+        job_id=result.get("job_id"),
+        stream_id=result.get("stream_id"),
+        changed_count=0,
+        destructive_count=0,
+        reason="admin_triggered_full",
+    )
+
+
 @router.get("/audit", response_model=list[AuditLogOut])
 async def list_audit_logs(
     limit: int = 100,
