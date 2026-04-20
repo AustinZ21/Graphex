@@ -104,6 +104,7 @@ async def lifespan(app: FastAPI):
 
     mcp_server.init(registry=_registry, producer=_producer, cache=cache, recorder=recorder)
     _consumer = IndexerConsumer(redis_url=QUEUE_REDIS_URL, registry=_registry)
+    mcp_server.set_consumer(_consumer)  # Wire consumer for MCP queue enrichment
     _consumer_task = asyncio.create_task(_consumer.start())
     
     # Make consumer available via app state for API endpoints

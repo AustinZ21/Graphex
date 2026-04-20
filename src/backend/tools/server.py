@@ -24,6 +24,7 @@ from __future__ import annotations
 import os
 import subprocess
 import time
+from datetime import datetime
 from pathlib import Path
 
 import structlog
@@ -35,6 +36,7 @@ from backend.graph.registry import GraphRegistry
 from backend.graph import schema as S
 from backend.perf.token_efficiency import benchmark_token_efficiency as run_token_efficiency_benchmark
 from backend.tools.producer import MCPProducer
+from backend.queue.streams import JobConsumer
 
 log = structlog.get_logger()
 
@@ -42,6 +44,7 @@ mcp = FastMCP("contextgraph")
 
 _registry: GraphRegistry | None = None
 _producer: MCPProducer | None = None
+_consumer: JobConsumer | None = None
 _cache = None           # QueryCache | None  – set via init()
 _recorder = None        # TraceRecorder | None  – set via init()
 _repo_root = Path(os.getenv("CONTEXTGRAPH_REPO_ROOT", ".")).resolve()
@@ -132,13 +135,77 @@ def init(
     producer: MCPProducer,
     cache=None,
     recorder=None,
+    consumer=None,
 ) -> None:
     """Wire dependencies after app startup."""
-    global _registry, _producer, _cache, _recorder
+    global _registry, _producer, _cache, _recorder, _consumer
     _registry = registry
     _producer = producer
     _cache = cache
     _recorder = recorder
+    _consumer = consumer
+
+
+def set_consumer(consumer) -> None:
+    """Set the consumer after initialization (useful when consumer is created after init)."""
+    global _consumer
+    _consumer = consumer
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Queue status enrichment helpers (for MCP tool responses)
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def _enrich_job_response(job_id: str, base_response: dict) -> dict:
+    """Enrich job response with queue_position and eta_seconds.
+    
+    Queries the current queue snapshot to compute:
+    - queue_position: 0-based position in pending queue (None if done/failed/processing)
+    - eta_seconds: estimated seconds until completion (None if not queued)
+    - created_at: ISO timestamp when job was created
+    - updated_at: ISO timestamp when job status last changed
+    """
+    if not _consumer:
+        return base_response  # No consumer available; return base response
+    
+    try:
+        # Get current queue snapshot for avg duration and pending jobs list
+        snapshot = await _consumer.get_queue_snapshot()
+        pending_jobs = snapshot.get("pending_jobs", [])
+        avg_duration_sec = snapshot.get("avg_duration_sec", 30)
+        
+        # Find queue position for this job_id
+        queue_position = None
+        eta_seconds = None
+        created_at = None
+        updated_at = None
+        
+        for idx, job in enumerate(pending_jobs):
+            if job.get("job_id") == job_id:
+                queue_position = idx
+                # ETA = (queue_position + 1) * avg_duration + current_processing_time
+                # For simplicity, estimate as (queue_position + 1) * avg_duration
+                if queue_position is not None:
+                    eta_seconds = (queue_position + 1) * avg_duration_sec
+                created_at = job.get("created_at")
+                updated_at = job.get("updated_at")
+                break
+        
+        # Enrich base response
+        enriched = {**base_response}
+        if queue_position is not None:
+            enriched["queue_position"] = queue_position
+        if eta_seconds is not None:
+            enriched["eta_seconds"] = eta_seconds
+        if created_at:
+            enriched["created_at"] = created_at
+        if updated_at:
+            enriched["updated_at"] = updated_at
+        
+        return enriched
+    except Exception as e:
+        log.warning("enrich_job_response.failed", error=str(e))
+        return base_response  # Return base response on any error
 
 
 # ---------------------------------------------------------------------------
@@ -228,12 +295,14 @@ async def index_full(repo_path: str) -> dict:
     # Invalidate cache so stale reads are avoided after re-index
     if _cache:
         _cache.invalidate_all()
-    return {
+    base_response = {
         "status": "queued",
         "stream_id": submitted["stream_id"],
         "job_id": submitted["job_id"],
         "repo_path": repo_path,
     }
+    # Enrich with queue position and ETA
+    return await _enrich_job_response(submitted["job_id"], base_response)
 
 
 @mcp.tool()
@@ -248,12 +317,14 @@ async def index_incremental(repo_path: str, changed_paths: list[str]) -> dict:
     )
     if _cache:
         _cache.invalidate_all()
-    return {
+    base_response = {
         "status": "queued",
         "stream_id": submitted["stream_id"],
         "job_id": submitted["job_id"],
         "changed_count": len(changed_paths),
     }
+    # Enrich with queue position and ETA
+    return await _enrich_job_response(submitted["job_id"], base_response)
 
 
 @mcp.tool()
@@ -288,7 +359,7 @@ async def index_repo_changes(
         submitted = await _producer.submit_full_index(repo_path, project_key=project_key)
         if _cache:
             _cache.invalidate_all()
-        return {
+        base_response = {
             "status": "queued",
             "mode": "full",
             "reason": "git_unavailable",
@@ -298,6 +369,8 @@ async def index_repo_changes(
             "destructive_count": 0,
             "repo_path": repo_path,
         }
+        # Enrich with queue position and ETA
+        return await _enrich_job_response(submitted["job_id"], base_response)
     except RuntimeError as exc:
         log.warning(
             "index_repo_changes.git_status_failed",
@@ -308,7 +381,7 @@ async def index_repo_changes(
         submitted = await _producer.submit_full_index(repo_path, project_key=project_key)
         if _cache:
             _cache.invalidate_all()
-        return {
+        base_response = {
             "status": "queued",
             "mode": "full",
             "reason": "git_status_failed",
@@ -318,6 +391,8 @@ async def index_repo_changes(
             "destructive_count": 0,
             "repo_path": repo_path,
         }
+        # Enrich with queue position and ETA
+        return await _enrich_job_response(submitted["job_id"], base_response)
 
     changed_paths = discovered["changed_paths"]
     destructive_paths = discovered["destructive_paths"]
@@ -340,7 +415,7 @@ async def index_repo_changes(
         submitted = await _producer.submit_full_index(repo_path, project_key=project_key)
         if _cache:
             _cache.invalidate_all()
-        return {
+        base_response = {
             "status": "queued",
             "mode": "full",
             "reason": "destructive_git_change",
@@ -350,6 +425,8 @@ async def index_repo_changes(
             "destructive_count": len(destructive_paths),
             "repo_path": repo_path,
         }
+        # Enrich with queue position and ETA
+        return await _enrich_job_response(submitted["job_id"], base_response)
 
     submitted = await _producer.submit_incremental_index(
         repo_path,
@@ -358,7 +435,7 @@ async def index_repo_changes(
     )
     if _cache:
         _cache.invalidate_all()
-    return {
+    base_response = {
         "status": "queued",
         "mode": "incremental",
         "stream_id": submitted["stream_id"],
@@ -367,17 +444,20 @@ async def index_repo_changes(
         "destructive_count": len(destructive_paths),
         "repo_path": repo_path,
     }
+    # Enrich with queue position and ETA
+    return await _enrich_job_response(submitted["job_id"], base_response)
 
 
 @mcp.tool()
 async def get_index_job_status(job_id: str) -> dict:
-    """Get status for an indexing job id."""
+    """Get status for an indexing job id, including queue position and ETA if queued."""
     if not _producer:
         raise RuntimeError("MCP server not initialized")
     status = await _producer.get_job_status(job_id)
     if status is None:
         return {"job_id": job_id, "status": "not_found"}
-    return status
+    # Enrich with queue position and ETA
+    return await _enrich_job_response(job_id, status)
 
 
 @mcp.tool()
