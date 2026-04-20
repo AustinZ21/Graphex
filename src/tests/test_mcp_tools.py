@@ -212,7 +212,18 @@ async def test_index_full_queues_job():
     assert result["job_id"] == "job-1"
     mcp_srv._producer.submit_full_index.assert_awaited_once_with(
         "/repo/myproject",
-        project_key="contextgraph",
+        project_name="contextgraph",
+    )
+
+
+@pytest.mark.asyncio
+async def test_index_full_uses_explicit_project_name_override():
+    mcp_srv._producer = _mock_producer("5000-1")
+    result = await mcp_srv.index_full(repo_path="/repo/osagent", project_name="osagent")
+    assert result["job_id"] == "job-1"
+    mcp_srv._producer.submit_full_index.assert_awaited_once_with(
+        "/repo/osagent",
+        project_name="osagent",
     )
 
 
@@ -225,6 +236,38 @@ async def test_index_incremental_queues_job():
     assert result["changed_count"] == 2
     assert result["job_id"] == "job-2"
     mcp_srv._producer.submit_incremental_index.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_index_incremental_uses_explicit_project_name_override():
+    mcp_srv._producer = _mock_producer("5001-1")
+    result = await mcp_srv.index_incremental(
+        repo_path="/repo",
+        changed_paths=["a.py"],
+        project_name="osagent",
+    )
+    assert result["changed_count"] == 1
+    mcp_srv._producer.submit_incremental_index.assert_awaited_once_with(
+        "/repo",
+        ["a.py"],
+        project_name="osagent",
+    )
+
+
+@pytest.mark.asyncio
+async def test_index_repo_changes_uses_explicit_project_name_override():
+    mcp_srv._producer = _mock_producer("5011-0")
+    with patch(
+        "backend.tools.server._collect_git_changed_paths",
+        return_value={"changed_paths": ["src/a.py"], "destructive_paths": []},
+    ):
+        result = await mcp_srv.index_repo_changes(repo_path="/repo", project_name="osagent")
+    assert result["mode"] == "incremental"
+    mcp_srv._producer.submit_incremental_index.assert_awaited_once_with(
+        "/repo",
+        ["src/a.py"],
+        project_name="osagent",
+    )
 
 
 def test_collect_git_changed_paths_parses_modified_and_untracked():
@@ -287,7 +330,7 @@ async def test_index_repo_changes_uses_incremental_for_destructive_git_changes_b
     mcp_srv._producer.submit_incremental_index.assert_awaited_once_with(
         "/repo",
         ["src/old.py", "src/new.py"],
-        project_key="contextgraph",
+        project_name="contextgraph",
     )
     mcp_srv._producer.submit_full_index.assert_not_called()
 
@@ -320,7 +363,7 @@ async def test_index_repo_changes_falls_back_to_full_when_git_binary_missing():
     assert result["reason"] == "git_unavailable"
     mcp_srv._producer.submit_full_index.assert_awaited_once_with(
         "/repo",
-        project_key="contextgraph",
+        project_name="contextgraph",
     )
     mcp_srv._producer.submit_incremental_index.assert_not_called()
 
@@ -338,7 +381,7 @@ async def test_index_repo_changes_falls_back_to_full_when_git_status_fails():
     assert result["reason"] == "git_status_failed"
     mcp_srv._producer.submit_full_index.assert_awaited_once_with(
         "/repo",
-        project_key="contextgraph",
+        project_name="contextgraph",
     )
     mcp_srv._producer.submit_incremental_index.assert_not_called()
 

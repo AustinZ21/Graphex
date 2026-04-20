@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS projects (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    project_key  TEXT    UNIQUE NOT NULL,
+    project_name TEXT    UNIQUE NOT NULL,
     project_id   TEXT    UNIQUE NOT NULL,
     upstream_url TEXT    NOT NULL DEFAULT '',
     description  TEXT    NOT NULL DEFAULT '',
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     actor_id        INTEGER,
     actor_name      TEXT,
     project_id      INTEGER,
-    project_key     TEXT,
+    project_name    TEXT,
     token_id        INTEGER,
     client_ip       TEXT,
     user_agent      TEXT,
@@ -117,6 +117,16 @@ async def init_db() -> None:
             await db.commit()
         except Exception:
             pass  # index creation best-effort
+        try:
+            await db.execute("ALTER TABLE projects RENAME COLUMN project_key TO project_name")
+            await db.commit()
+        except Exception:
+            pass  # column already renamed or missing
+        try:
+            await db.execute("ALTER TABLE audit_logs RENAME COLUMN project_key TO project_name")
+            await db.commit()
+        except Exception:
+            pass  # column already renamed or missing
         # role rename: viewer -> developer
         try:
             await db.execute("UPDATE users SET role = 'developer' WHERE role = 'viewer'")
@@ -151,7 +161,7 @@ async def insert_audit_log(
     actor_id: int | None = None,
     actor_name: str | None = None,
     project_id: int | None = None,
-    project_key: str | None = None,
+    project_name: str | None = None,
     token_id: int | None = None,
     client_ip: str | None = None,
     user_agent: str | None = None,
@@ -171,7 +181,7 @@ async def insert_audit_log(
             INSERT INTO audit_logs(
                 created_at, scope, method, path, status_code, duration_ms,
                 actor_type, actor_id, actor_name,
-                project_id, project_key, token_id,
+                project_id, project_name, token_id,
                 client_ip, user_agent, query_string, request_body, response_error, details_json, token_usage_total
             ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,
@@ -186,7 +196,7 @@ async def insert_audit_log(
                 actor_id,
                 _truncate_text(actor_name, 128),
                 project_id,
-                _truncate_text(project_key, 128),
+                _truncate_text(project_name, 128),
                 token_id,
                 _truncate_text(client_ip, 128),
                 _truncate_text(user_agent, 512),

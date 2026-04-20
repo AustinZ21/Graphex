@@ -257,7 +257,7 @@ async def audit_request_middleware(request: Request, call_next):
     actor_id = None
     actor_name = None
     project_id = None
-    project_key = None
+    project_name = None
     token_id = None
 
     raw_auth = request.headers.get("authorization", "")
@@ -291,7 +291,7 @@ async def audit_request_middleware(request: Request, call_next):
                     db.row_factory = aiosqlite.Row
                     async with db.execute(
                         """
-                        SELECT pt.id AS token_id, pt.project_id, p.project_key
+                        SELECT pt.id AS token_id, pt.project_id, p.project_name
                         FROM project_tokens pt
                         JOIN projects p ON p.id = pt.project_id
                         WHERE pt.token_hash = ?
@@ -303,7 +303,7 @@ async def audit_request_middleware(request: Request, call_next):
                             actor_type = "project_token"
                             token_id = token_row["token_id"]
                             project_id = token_row["project_id"]
-                            project_key = token_row["project_key"]
+                            project_name = token_row["project_name"]
                             actor_name = f"token:{token_id}"
             except Exception:
                 pass
@@ -369,8 +369,8 @@ async def audit_request_middleware(request: Request, call_next):
         duration_ms = int((time.perf_counter() - start) * 1000)
         if not project_id:
             project_id = request.scope.get("state", {}).get("project_db_id")
-        if not project_key:
-            project_key = request.scope.get("state", {}).get("project_key")
+        if not project_name:
+            project_name = request.scope.get("state", {}).get("project_name")
         if not token_id:
             token_id = request.scope.get("state", {}).get("project_token_id")
         scope_name = "mcp" if path.startswith("/mcp") else "api"
@@ -391,7 +391,7 @@ async def audit_request_middleware(request: Request, call_next):
                 actor_id=actor_id,
                 actor_name=actor_name,
                 project_id=project_id,
-                project_key=project_key,
+                project_name=project_name,
                 token_id=token_id,
                 client_ip=_truncate(client_ip, 128),
                 user_agent=_truncate(user_agent, 512),

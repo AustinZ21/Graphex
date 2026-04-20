@@ -16,7 +16,7 @@ async def _make_db(tmp_path: Path) -> aiosqlite.Connection:
         """
         CREATE TABLE projects (
             id INTEGER PRIMARY KEY,
-            project_key TEXT NOT NULL,
+            project_name TEXT NOT NULL,
             project_id TEXT NOT NULL,
             upstream_url TEXT DEFAULT '',
             description TEXT DEFAULT '',
@@ -42,7 +42,7 @@ def test_candidate_repo_paths_prefers_case_insensitive_local_repo_match(tmp_path
 async def test_trigger_project_index_calls_mcp_server_with_resolved_repo_path(tmp_path: Path) -> None:
     db = await _make_db(tmp_path)
     await db.execute(
-        "INSERT INTO projects(id, project_key, project_id, is_active) VALUES (1, 'osagent', 'OESIJQWHXY', 1)"
+        "INSERT INTO projects(id, project_name, project_id, is_active) VALUES (1, 'osagent', 'OESIJQWHXY', 1)"
     )
     await db.commit()
 
@@ -61,10 +61,10 @@ async def test_trigger_project_index_calls_mcp_server_with_resolved_repo_path(tm
         ) as index_repo_changes:
             result = await auth_router.trigger_project_index(1, _={"role": "admin"}, db=db)
 
-        assert result.project_key == "osagent"
+        assert result.project_name == "osagent"
         assert result.repo_path == "D:/Repos/OSAgent"
         assert result.job_id == "job-123"
-        index_repo_changes.assert_awaited_once_with(repo_path="D:/Repos/OSAgent")
+        index_repo_changes.assert_awaited_once_with(repo_path="D:/Repos/OSAgent", project_name="osagent")
     finally:
         await db.close()
 
@@ -73,7 +73,7 @@ async def test_trigger_project_index_calls_mcp_server_with_resolved_repo_path(tm
 async def test_trigger_project_index_errors_when_repo_path_missing(tmp_path: Path) -> None:
     db = await _make_db(tmp_path)
     await db.execute(
-        "INSERT INTO projects(id, project_key, project_id, is_active) VALUES (1, 'missing', 'MISS123456', 1)"
+        "INSERT INTO projects(id, project_name, project_id, is_active) VALUES (1, 'missing', 'MISS123456', 1)"
     )
     await db.commit()
 
@@ -90,7 +90,7 @@ async def test_trigger_project_index_errors_when_repo_path_missing(tmp_path: Pat
 async def test_list_projects_index_status_includes_queue_position_and_eta(tmp_path: Path) -> None:
     db = await _make_db(tmp_path)
     await db.execute(
-        "INSERT INTO projects(id, project_key, project_id, is_active) VALUES (1, 'osagent', 'OESIJQWHXY', 1)"
+        "INSERT INTO projects(id, project_name, project_id, is_active) VALUES (1, 'osagent', 'OESIJQWHXY', 1)"
     )
     await db.commit()
 
@@ -146,7 +146,7 @@ async def test_list_projects_index_status_includes_queue_position_and_eta(tmp_pa
 async def test_list_projects_index_status_uses_latest_job_across_repo_path_variants(tmp_path: Path) -> None:
     db = await _make_db(tmp_path)
     await db.execute(
-        "INSERT INTO projects(id, project_key, project_id, is_active) VALUES (1, 'browseragent', '20YYYTOHV8', 1)"
+        "INSERT INTO projects(id, project_name, project_id, is_active) VALUES (1, 'browseragent', '20YYYTOHV8', 1)"
     )
     await db.commit()
 

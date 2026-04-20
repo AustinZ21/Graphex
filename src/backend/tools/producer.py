@@ -24,24 +24,24 @@ class MCPProducer:
         await self._producer.close()
 
     async def submit_full_index(
-        self, repo_path: str, project_key: str | None = None
+        self, repo_path: str, project_name: str | None = None
     ) -> dict[str, str]:
         job = IndexJob(
             job_type=JobType.INDEX_FULL,
             repo_path=repo_path,
-            project_key=project_key,
+            project_name=project_name,
         )
         stream_id = await self._producer.publish(job)
         return {"job_id": job.job_id, "stream_id": stream_id}
 
     async def submit_incremental_index(
-        self, repo_path: str, changed_paths: list[str], project_key: str | None = None
+        self, repo_path: str, changed_paths: list[str], project_name: str | None = None
     ) -> dict[str, str]:
         job = IndexJob(
             job_type=JobType.INDEX_INCREMENTAL,
             repo_path=repo_path,
             changed_paths=changed_paths,
-            project_key=project_key,
+            project_name=project_name,
         )
         stream_id = await self._producer.publish(job)
         return {"job_id": job.job_id, "stream_id": stream_id}

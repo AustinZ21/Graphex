@@ -55,7 +55,7 @@ class _GraphProxy:
 
     All existing ``_graph.query(...)`` calls and ``if not _graph:`` guards work
     unchanged – the proxy dispatches to the correct per-project graph at call time
-    using the ``_current_project_key`` ContextVar set by ProjectTokenMiddleware.
+    using the ``_current_project_name`` ContextVar set by ProjectTokenMiddleware.
     """
 
     def query(self, cypher: str, params: dict | None = None):
@@ -68,6 +68,12 @@ class _GraphProxy:
 
 
 _graph = _GraphProxy()
+def _resolve_project_name(project_name: str | None = None) -> str:
+    from backend.graph.registry import _current_project_name
+
+    if project_name:
+        return project_name
+    return _current_project_name.get()
 
 
 def _collect_git_changed_paths(repo_path: str, include_untracked: bool = True) -> dict[str, list[str]]:
@@ -285,13 +291,12 @@ def _fetch_relation_summary(qualified_name: str, limit: int = 3) -> dict:
 # ---------------------------------------------------------------------------
 
 @mcp.tool()
-async def index_full(repo_path: str) -> dict:
+async def index_full(repo_path: str, project_name: str | None = None) -> dict:
     """Enqueue a full index job for the given repository path."""
     if not _producer:
         raise RuntimeError("MCP server not initialized")
-    from backend.graph.registry import _current_project_key
-    project_key = _current_project_key.get()
-    submitted = await _producer.submit_full_index(repo_path, project_key=project_key)
+    resolved_project_name = _resolve_project_name(project_name)
+    submitted = await _producer.submit_full_index(repo_path, project_name=resolved_project_name)
     # Invalidate cache so stale reads are avoided after re-index
     if _cache:
         _cache.invalidate_all()
@@ -306,14 +311,13 @@ async def index_full(repo_path: str) -> dict:
 
 
 @mcp.tool()
-async def index_incremental(repo_path: str, changed_paths: list[str]) -> dict:
+async def index_incremental(repo_path: str, changed_paths: list[str], project_name: str | None = None) -> dict:
     """Enqueue an incremental index job for a list of changed files."""
     if not _producer:
         raise RuntimeError("MCP server not initialized")
-    from backend.graph.registry import _current_project_key
-    project_key = _current_project_key.get()
+    resolved_project_name = _resolve_project_name(project_name)
     submitted = await _producer.submit_incremental_index(
-        repo_path, changed_paths, project_key=project_key
+        repo_path, changed_paths, project_name=resolved_project_name
     )
     if _cache:
         _cache.invalidate_all()
@@ -332,6 +336,7 @@ async def index_repo_changes(
     repo_path: str,
     include_untracked: bool = True,
     auto_full_on_destructive: bool = False,
+    project_name: str | None = None,
 ) -> dict:
     """Index current git worktree changes for a repository.
 
@@ -345,8 +350,7 @@ async def index_repo_changes(
     """
     if not _producer:
         raise RuntimeError("MCP server not initialized")
-    from backend.graph.registry import _current_project_key
-    project_key = _current_project_key.get()
+    resolved_project_name = _resolve_project_name(project_name)
 
     try:
         discovered = _collect_git_changed_paths(repo_path, include_untracked=include_untracked)
@@ -356,7 +360,7 @@ async def index_repo_changes(
             repo_path=repo_path,
             fallback_mode="full",
         )
-        submitted = await _producer.submit_full_index(repo_path, project_key=project_key)
+        submitted = await _producer.submit_full_index(repo_path, project_name=resolved_project_name)
         if _cache:
             _cache.invalidate_all()
         base_response = {
@@ -378,7 +382,7 @@ async def index_repo_changes(
             error=str(exc),
             fallback_mode="full",
         )
-        submitted = await _producer.submit_full_index(repo_path, project_key=project_key)
+        submitted = await _producer.submit_full_index(repo_path, project_name=resolved_project_name)
         if _cache:
             _cache.invalidate_all()
         base_response = {
@@ -412,7 +416,7 @@ async def index_repo_changes(
         }
 
     if destructive_paths and auto_full_on_destructive:
-        submitted = await _producer.submit_full_index(repo_path, project_key=project_key)
+        submitted = await _producer.submit_full_index(repo_path, project_name=resolved_project_name)
         if _cache:
             _cache.invalidate_all()
         base_response = {
@@ -431,7 +435,7 @@ async def index_repo_changes(
     submitted = await _producer.submit_incremental_index(
         repo_path,
         incremental_paths,
-        project_key=project_key,
+        project_name=resolved_project_name,
     )
     if _cache:
         _cache.invalidate_all()

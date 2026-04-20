@@ -1,10 +1,10 @@
 """Per-project GraphClient registry with ContextVar-based routing.
 
-Each project gets its own FalkorDB graph named after the project_key
+Each project gets its own FalkorDB graph named after the project_name
 (e.g. 'osagent', 'browseragent').  The registry lazily connects and
-caches one GraphClient per project_key.
+caches one GraphClient per project_name.
 
-The ContextVar ``_current_project_key`` is set by ProjectTokenMiddleware
+The ContextVar ``_current_project_name`` is set by ProjectTokenMiddleware
 on each /mcp request, allowing tool functions to obtain the right graph
 for the authenticated project without thread-locals or explicit passing.
 """
@@ -20,36 +20,36 @@ from backend.graph.client import GraphClient
 log = structlog.get_logger()
 
 # Default matches the legacy graph name so old data is not lost
-_current_project_key: ContextVar[str] = ContextVar(
-    "current_project_key", default="contextgraph"
+_current_project_name: ContextVar[str] = ContextVar(
+    "current_project_name", default="contextgraph"
 )
 
 
 class GraphRegistry:
-    """Maintains one FalkorDB GraphClient per project_key."""
+    """Maintains one FalkorDB GraphClient per project_name."""
 
     def __init__(self, host: str, port: int) -> None:
         self._host = host
         self._port = port
         self._graphs: dict[str, GraphClient] = {}
 
-    def get(self, project_key: str) -> GraphClient:
-        """Return (and lazily connect) the GraphClient for *project_key*."""
-        if project_key not in self._graphs:
+    def get(self, project_name: str) -> GraphClient:
+        """Return (and lazily connect) the GraphClient for *project_name*."""
+        if project_name not in self._graphs:
             g = GraphClient(
                 host=self._host,
                 port=self._port,
-                graph_name=project_key,
+                graph_name=project_name,
             )
             g.connect()
             g.ensure_indexes()
-            log.info("graph.registry.connected", project_key=project_key)
-            self._graphs[project_key] = g
-        return self._graphs[project_key]
+            log.info("graph.registry.connected", project_name=project_name)
+            self._graphs[project_name] = g
+        return self._graphs[project_name]
 
     def current(self) -> GraphClient:
         """Return the GraphClient for the project active in the current context."""
-        return self.get(_current_project_key.get())
+        return self.get(_current_project_name.get())
 
     def close_all(self) -> None:
         for g in self._graphs.values():

@@ -81,6 +81,19 @@ def test_write_cross_scope_variable_flows_writes_argument_and_return_edges() -> 
 
 def test_index_full_clears_repo_subgraph_before_rebuild(tmp_path: Path) -> None:
     graph = MagicMock()
+    query_result = MagicMock()
+
+    def side_effect(cypher: str, params: dict | None = None):
+        result = MagicMock()
+        if cypher == S.QUERY_REPO_EXISTS:
+            result.result_set = [[1]]
+        elif cypher == S.QUERY_REPO_FILE_PATHS:
+            result.result_set = [[str(repo_root / "service.py")]]
+        else:
+            result.result_set = []
+        return result
+
+    graph.query.side_effect = side_effect
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     (repo_root / "service.py").write_text("def render(x):\n    return x\n", encoding="utf-8")
@@ -100,9 +113,45 @@ def test_index_full_clears_repo_subgraph_before_rebuild(tmp_path: Path) -> None:
     pipeline.index_full(str(repo_root))
 
     calls = graph.query.call_args_list
-    delete_idx = next(i for i, call in enumerate(calls) if call.args[0] == S.DELETE_REPO_SUBGRAPH)
+    delete_idx = next(i for i, call in enumerate(calls) if call.args[0] == S.DELETE_REPO)
     merge_idx = next(i for i, call in enumerate(calls) if call.args[0] == S.MERGE_REPO)
     assert delete_idx < merge_idx
+
+
+def test_index_full_skips_repo_delete_when_repo_not_yet_indexed(tmp_path: Path) -> None:
+    graph = MagicMock()
+
+    def side_effect(cypher: str, params: dict | None = None):
+        result = MagicMock()
+        if cypher == S.QUERY_REPO_EXISTS:
+            result.result_set = [[0]]
+        else:
+            result.result_set = []
+        return result
+
+    graph.query.side_effect = side_effect
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    (repo_root / "service.py").write_text("def render(x):\n    return x\n", encoding="utf-8")
+    pipeline = IndexPipeline(graph)
+    pipeline._index_file = MagicMock(return_value={
+        "files": 1,
+        "skipped": 0,
+        "symbols": 0,
+        "calls": 0,
+        "imports": 0,
+        "variables": 0,
+        "variable_flows": 0,
+        "errors": 0,
+    })
+    pipeline._count_symbols = MagicMock(return_value=0)
+
+    pipeline.index_full(str(repo_root))
+
+    calls = graph.query.call_args_list
+    assert any(call.args[0] == S.QUERY_REPO_EXISTS for call in calls)
+    assert not any(call.args[0] == S.DELETE_REPO for call in calls)
+    assert any(call.args[0] == S.MERGE_REPO for call in calls)
 
 
 def test_index_file_clears_existing_file_subgraph_before_rewrite(tmp_path: Path) -> None:
@@ -124,7 +173,7 @@ def test_index_file_clears_existing_file_subgraph_before_rewrite(tmp_path: Path)
     pipeline._index_file(str(repo_root), str(file_path), {}, force=False)
 
     calls = graph.query.call_args_list
-    delete_idx = next(i for i, call in enumerate(calls) if call.args[0] == S.DELETE_FILE_SUBGRAPH)
+    delete_idx = next(i for i, call in enumerate(calls) if call.args[0] == S.DELETE_FILE_VARIABLES)
     merge_idx = next(i for i, call in enumerate(calls) if call.args[0] == S.MERGE_FILE)
     assert delete_idx < merge_idx
 
@@ -142,7 +191,7 @@ def test_index_incremental_deletes_missing_file_subgraph_without_error(tmp_path:
 
     assert stats["errors"] == 0
     assert any(
-        call.args[0] == S.DELETE_FILE_SUBGRAPH and call.args[1]["file_path"] == str(missing_file)
+        call.args[0] == S.DELETE_FILE and call.args[1]["file_path"] == str(missing_file)
         for call in graph.query.call_args_list
         if len(call.args) > 1
     )

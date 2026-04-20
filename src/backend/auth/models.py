@@ -72,15 +72,15 @@ class AdminUserUpdate(BaseModel):
 
 
 class ProjectCreate(BaseModel):
-    project_key: str = Field(min_length=3, max_length=64)
+    project_name: str = Field(min_length=3, max_length=64)
     upstream_url: str = Field(default="", max_length=512)
     description: str = Field(default="", max_length=1000)
 
-    @field_validator("project_key")
+    @field_validator("project_name")
     @classmethod
-    def validate_project_key(cls, v: str) -> str:
+    def validate_project_name(cls, v: str) -> str:
         if not _IDENT_RE.fullmatch(v):
-            raise ValueError("project_key may only contain letters, digits, dot, underscore, and hyphen")
+            raise ValueError("project_name may only contain letters, digits, dot, underscore, and hyphen")
         return v
 
     @field_validator("upstream_url")
@@ -94,17 +94,17 @@ class ProjectCreate(BaseModel):
 
 
 class ProjectUpdate(BaseModel):
-    project_key: str | None = Field(default=None, min_length=3, max_length=64)
+    project_name: str | None = Field(default=None, min_length=3, max_length=64)
     upstream_url: str | None = Field(default=None, max_length=512)
     description: str | None = Field(default=None, max_length=1000)
 
-    @field_validator("project_key")
+    @field_validator("project_name")
     @classmethod
-    def validate_optional_project_key(cls, v: str | None) -> str | None:
+    def validate_optional_project_name(cls, v: str | None) -> str | None:
         if v is None:
             return v
         if not _IDENT_RE.fullmatch(v):
-            raise ValueError("project_key may only contain letters, digits, dot, underscore, and hyphen")
+            raise ValueError("project_name may only contain letters, digits, dot, underscore, and hyphen")
         return v
 
     @field_validator("upstream_url")
@@ -119,7 +119,7 @@ class ProjectUpdate(BaseModel):
 
 class ProjectOut(BaseModel):
     id: int
-    project_key: str
+    project_name: str
     project_id: str
     upstream_url: str
     description: str
@@ -163,7 +163,7 @@ class IndexJobStatus(BaseModel):
 class ProjectIndexStatus(BaseModel):
     """Index status for a project."""
     project_id: int
-    project_key: str
+    project_name: str
     latest_job: IndexJobStatus | None = None
     recent_jobs: list[IndexJobStatus] = Field(default_factory=list)
 
@@ -171,7 +171,7 @@ class ProjectIndexStatus(BaseModel):
 class ProjectIndexTriggerOut(BaseModel):
     """Result of triggering an index job for a specific project from the admin API."""
     project_id: int
-    project_key: str
+    project_name: str
     repo_path: str
     status: str
     mode: str
@@ -194,7 +194,7 @@ class AuditLogOut(BaseModel):
     actor_id: int | None = None
     actor_name: str | None = None
     project_id: int | None = None
-    project_key: str | None = None
+    project_name: str | None = None
     token_id: int | None = None
     client_ip: str | None = None
     user_agent: str | None = None

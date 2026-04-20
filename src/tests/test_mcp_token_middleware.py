@@ -15,7 +15,7 @@ def _setup_db(path: str) -> None:
         """
         CREATE TABLE projects (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            project_key TEXT UNIQUE NOT NULL,
+            project_name TEXT UNIQUE NOT NULL,
             project_id TEXT UNIQUE NOT NULL,
             upstream_url TEXT NOT NULL DEFAULT '',
             description TEXT NOT NULL DEFAULT '',
@@ -37,10 +37,10 @@ def _setup_db(path: str) -> None:
     )
 
     cur.execute(
-        "INSERT INTO projects(id, project_key, project_id, is_active) VALUES(1, 'p1', 'P1', 1)"
+        "INSERT INTO projects(id, project_name, project_id, is_active) VALUES(1, 'p1', 'P1', 1)"
     )
     cur.execute(
-        "INSERT INTO projects(id, project_key, project_id, is_active) VALUES(2, 'p2', 'P2', 1)"
+        "INSERT INTO projects(id, project_name, project_id, is_active) VALUES(2, 'p2', 'P2', 1)"
     )
     cur.execute(
         "INSERT INTO project_tokens(project_id, token_type, token_hash, token_hint, is_active) VALUES(1, 'mcp', ?, 'goodtok...', 1)",

@@ -846,7 +846,7 @@
           <thead><tr>
             <th></th>
             <th class="sortable center-col-header" onclick="setProjectsSort('project_id')">Project ID <span id="sort-project_id"></span></th>
-            <th class="sortable center-col-header" onclick="setProjectsSort('project_key')">Project Name <span id="sort-project_key"></span></th>
+            <th class="sortable center-col-header" onclick="setProjectsSort('project_name')">Project Name <span id="sort-project_name"></span></th>
             <th class="sortable center-col-header" onclick="setProjectsSort('upstream_url')">Upstream URL <span id="sort-upstream_url"></span></th>
             <th class="sortable center-col-header" onclick="setProjectsSort('is_active')">Status <span id="sort-is_active"></span></th>
             <th class="sortable center-col-header" onclick="setProjectsSort('created_at')">Created <span id="sort-created_at"></span></th>
@@ -1131,7 +1131,7 @@ function _sortIcon(state, key) {
 }
 
 function _renderProjectsSortIcons() {
-  const keys = ['project_key', 'project_id', 'upstream_url', 'is_active', 'created_at'];
+  const keys = ['project_name', 'project_id', 'upstream_url', 'is_active', 'created_at'];
   keys.forEach(k => {
     const el = document.getElementById('sort-' + k);
     if (el) el.innerHTML = _sortIcon(_projectsSort, k);
@@ -1660,7 +1660,7 @@ function filterProjects(q) {
     ? _allProjects.filter(p => {
         const tokens = _tokensCache[p.id] || [];
         const tokenStr = tokens.map(t => `#${t.id} ${t.token_hint} ${t.token_type} ${t.created_at}`).join(' ');
-        return [p.project_key, p.project_id, p.upstream_url, p.description, p.created_at, tokenStr]
+        return [p.project_name, p.project_id, p.upstream_url, p.description, p.created_at, tokenStr]
           .join(' ').toLowerCase().includes(kw);
       })
     : _allProjects;
@@ -1706,7 +1706,7 @@ function filterProjects(q) {
       <td><button class="expand-btn" onclick="toggleTokens(${p.id},this)">${expanded ? '&#9660;' : '&#9654;'}</button></td>
       <td style="font-family:monospace;font-size:12px;color:var(--muted);text-align:center">${esc(p.project_id)}</td>
       <td>
-        <strong>${esc(p.project_key)}</strong>
+        <strong>${esc(p.project_name)}</strong>
         <div class="index-status-panel">
           <div class="index-tracker">${trackerHtml}</div>
           ${metaHtml}
@@ -1829,7 +1829,7 @@ function openEditProject(id) {
   _editProjectId = id;
   document.getElementById('modal-project-title').textContent = 'Edit Project';
   document.getElementById('modal-project-submit').textContent = 'Save';
-  document.getElementById('np-key').value = p.project_key;
+  document.getElementById('np-key').value = p.project_name;
   document.getElementById('np-url').value = p.upstream_url || '';
   document.getElementById('np-desc').value = p.description || '';
   openModal('modal-project');
@@ -1840,14 +1840,14 @@ async function submitProjectModal() {
   try {
     if (_editProjectId) {
       await api('PATCH',`/auth/projects/${_editProjectId}`,{
-        project_key: key,
+        project_name: key,
         upstream_url: document.getElementById('np-url').value.trim(),
         description: document.getElementById('np-desc').value.trim()
       });
       closeModal('modal-project'); toast('Project updated'); await loadProjects();
     } else {
       await api('POST','/auth/projects',{
-        project_key: key,
+        project_name: key,
         upstream_url: document.getElementById('np-url').value.trim(),
         description: document.getElementById('np-desc').value.trim()
       });
@@ -1960,7 +1960,7 @@ async function loadAudit() {
   _auditLoading = true;
   try {
     const actor = document.getElementById('audit-actor')?.value.trim() || '';
-    const projectKey = document.getElementById('audit-project')?.value.trim() || '';
+    const projectName = document.getElementById('audit-project')?.value.trim() || '';
     const pathLike = document.getElementById('audit-path')?.value.trim() || '';
     const scope = document.getElementById('audit-scope')?.value || '';
 
@@ -1969,7 +1969,7 @@ async function loadAudit() {
       page_size: String(_auditPagination.pageSize),
     });
     if (actor) params.set('actor', actor);
-    if (projectKey) params.set('project_key', projectKey);
+    if (projectName) params.set('project_name', projectName);
     if (pathLike) params.set('path_like', pathLike);
     if (scope) params.set('scope', scope);
 

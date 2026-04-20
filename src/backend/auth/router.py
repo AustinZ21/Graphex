@@ -65,9 +65,9 @@ GITHUB_OAUTH_STATE_TTL_SEC = int(os.getenv("GITHUB_OAUTH_STATE_TTL_SEC", "600"))
 _LOCAL_REPOS_ROOT = Path(__file__).resolve().parents[4]
 
 
-def _candidate_repo_paths(project_key: str) -> list[str]:
+def _candidate_repo_paths(project_name: str) -> list[str]:
     candidates: list[str] = []
-    normalized = project_key.strip()
+    normalized = project_name.strip()
     if not normalized:
         return candidates
 
@@ -95,8 +95,8 @@ def _candidate_repo_paths(project_key: str) -> list[str]:
     return candidates
 
 
-def _resolve_repo_path(project_key: str) -> str | None:
-    for candidate in _candidate_repo_paths(project_key):
+def _resolve_repo_path(project_name: str) -> str | None:
+    for candidate in _candidate_repo_paths(project_name):
         try:
             if Path(candidate).exists():
                 return candidate
@@ -564,7 +564,7 @@ async def list_projects(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     async with db.execute(
-        "SELECT id, project_key, project_id, upstream_url, description, created_at, is_active FROM projects ORDER BY id"
+        "SELECT id, project_name, project_id, upstream_url, description, created_at, is_active FROM projects ORDER BY id"
     ) as cur:
         rows = await cur.fetchall()
     return [ProjectOut(**dict(r)) for r in rows]
@@ -579,15 +579,15 @@ async def create_project(
     pid = _random_project_id()
     try:
         async with db.execute(
-            """INSERT INTO projects(project_key, project_id, upstream_url, description)
+            """INSERT INTO projects(project_name, project_id, upstream_url, description)
                VALUES(?,?,?,?)
-               RETURNING id, project_key, project_id, upstream_url, description, created_at, is_active""",
-            (body.project_key, pid, body.upstream_url, body.description),
+               RETURNING id, project_name, project_id, upstream_url, description, created_at, is_active""",
+            (body.project_name, pid, body.upstream_url, body.description),
         ) as cur:
             row = await cur.fetchone()
         await db.commit()
     except aiosqlite.IntegrityError:
-        raise HTTPException(status_code=409, detail="project_key already exists")
+        raise HTTPException(status_code=409, detail="project_name already exists")
     return ProjectOut(**dict(row))
 
 
@@ -609,25 +609,25 @@ async def update_project(
     _: dict = Depends(require_admin),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    if body.project_key is None and body.upstream_url is None and body.description is None:
+    if body.project_name is None and body.upstream_url is None and body.description is None:
         raise HTTPException(status_code=400, detail="No fields to update")
 
     try:
         await db.execute(
             """
             UPDATE projects
-            SET project_key = COALESCE(?, project_key),
+            SET project_name = COALESCE(?, project_name),
                 upstream_url = COALESCE(?, upstream_url),
                 description = COALESCE(?, description)
             WHERE id = ?
             """,
-            (body.project_key, body.upstream_url, body.description, project_id),
+            (body.project_name, body.upstream_url, body.description, project_id),
         )
         await db.commit()
     except aiosqlite.IntegrityError:
-        raise HTTPException(status_code=409, detail="project_key already exists")
+        raise HTTPException(status_code=409, detail="project_name already exists")
     async with db.execute(
-        "SELECT id, project_key, project_id, upstream_url, description, created_at, is_active FROM projects WHERE id = ?",
+        "SELECT id, project_name, project_id, upstream_url, description, created_at, is_active FROM projects WHERE id = ?",
         (project_id,),
     ) as cur:
         row = await cur.fetchone()
@@ -740,7 +740,7 @@ async def list_projects_index_status(
 
     # Get all projects
     async with db.execute(
-        "SELECT id, project_key, project_id FROM projects WHERE is_active = 1 ORDER BY id"
+        "SELECT id, project_name, project_id FROM projects WHERE is_active = 1 ORDER BY id"
     ) as cur:
         projects = await cur.fetchall()
 
@@ -777,7 +777,7 @@ async def list_projects_index_status(
         # Get latest job status for this project (if consumer available)
         if consumer:
             try:
-                repo_patterns = _candidate_repo_paths(proj_dict["project_key"])
+                repo_patterns = _candidate_repo_paths(proj_dict["project_name"])
 
                 jobs: list[dict] = []
                 seen_job_ids: set[str] = set()
@@ -811,7 +811,7 @@ async def list_projects_index_status(
 
         results.append(ProjectIndexStatus(
             project_id=proj_dict["id"],
-            project_key=proj_dict["project_key"],
+            project_name=proj_dict["project_name"],
             latest_job=latest_job,
             recent_jobs=recent_jobs,
         ))
@@ -826,7 +826,7 @@ async def trigger_project_index(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     async with db.execute(
-        "SELECT id, project_key, project_id, is_active FROM projects WHERE id = ?",
+        "SELECT id, project_name, project_id, is_active FROM projects WHERE id = ?",
         (project_id,),
     ) as cur:
         row = await cur.fetchone()
@@ -837,17 +837,17 @@ async def trigger_project_index(
     if not project.get("is_active"):
         raise HTTPException(status_code=400, detail="Project is inactive")
 
-    repo_path = _resolve_repo_path(project["project_key"])
+    repo_path = _resolve_repo_path(project["project_name"])
     if not repo_path:
         raise HTTPException(
             status_code=404,
-            detail=f"Repository path not found for project_key '{project['project_key']}'",
+            detail=f"Repository path not found for project_name '{project['project_name']}'",
         )
 
-    result = await mcp_server.index_repo_changes(repo_path=repo_path)
+    result = await mcp_server.index_repo_changes(repo_path=repo_path, project_name=project["project_name"])
     return ProjectIndexTriggerOut(
         project_id=project["id"],
-        project_key=project["project_key"],
+        project_name=project["project_name"],
         repo_path=repo_path,
         status=result.get("status", "queued"),
         mode=result.get("mode", "incremental"),
@@ -865,7 +865,7 @@ async def list_audit_logs(
     offset: int = 0,
     scope: str | None = None,
     actor: str | None = None,
-    project_key: str | None = None,
+    project_name: str | None = None,
     path_like: str | None = None,
     _: dict = Depends(require_admin),
     db: aiosqlite.Connection = Depends(get_db),
@@ -883,9 +883,9 @@ async def list_audit_logs(
     if actor:
         clauses.append("LOWER(COALESCE(actor_name, '')) LIKE ?")
         params.append(f"%{actor.strip().lower()}%")
-    if project_key:
-        clauses.append("LOWER(COALESCE(project_key, '')) LIKE ?")
-        params.append(f"%{project_key.strip().lower()}%")
+    if project_name:
+        clauses.append("LOWER(COALESCE(project_name, '')) LIKE ?")
+        params.append(f"%{project_name.strip().lower()}%")
     if path_like:
         clauses.append("LOWER(path) LIKE ?")
         params.append(f"%{path_like.strip().lower()}%")
@@ -894,7 +894,7 @@ async def list_audit_logs(
     sql = f"""
         SELECT id, created_at, scope, method, path, status_code, duration_ms,
                actor_type, actor_id, actor_name,
-               project_id, project_key, token_id,
+                             project_id, project_name, token_id,
              client_ip, user_agent, query_string, request_body, response_error, details_json, token_usage_total
         FROM audit_logs
         {where_sql}
@@ -914,7 +914,7 @@ async def list_audit_logs_paged(
     page_size: int = 25,
     scope: str | None = None,
     actor: str | None = None,
-    project_key: str | None = None,
+    project_name: str | None = None,
     path_like: str | None = None,
     _: dict = Depends(require_admin),
     db: aiosqlite.Connection = Depends(get_db),
@@ -932,9 +932,9 @@ async def list_audit_logs_paged(
     if actor:
         clauses.append("LOWER(COALESCE(actor_name, '')) LIKE ?")
         params.append(f"%{actor.strip().lower()}%")
-    if project_key:
-        clauses.append("LOWER(COALESCE(project_key, '')) LIKE ?")
-        params.append(f"%{project_key.strip().lower()}%")
+    if project_name:
+        clauses.append("LOWER(COALESCE(project_name, '')) LIKE ?")
+        params.append(f"%{project_name.strip().lower()}%")
     if path_like:
         clauses.append("LOWER(path) LIKE ?")
         params.append(f"%{path_like.strip().lower()}%")
@@ -949,7 +949,7 @@ async def list_audit_logs_paged(
     data_sql = f"""
         SELECT id, created_at, scope, method, path, status_code, duration_ms,
                actor_type, actor_id, actor_name,
-               project_id, project_key, token_id,
+               project_id, project_name, token_id,
                client_ip, user_agent, query_string, request_body, response_error, details_json, token_usage_total
         FROM audit_logs
         {where_sql}

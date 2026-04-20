@@ -79,21 +79,21 @@ async def main() -> None:
         print(f"[init_auth_db] Importing {len(projects)} project(s) from registry.")
 
         for proj in projects:
-            project_key = proj["projectKey"]
+            project_name = proj.get("projectName", proj.get("projectKey", ""))
             project_id = proj["projectId"]
             upstream_url = proj.get("upstreamUrl", "")
             description = proj.get("description", "")
 
             # Upsert project (INSERT OR IGNORE keeps existing rows)
             await db.execute(
-                """INSERT OR IGNORE INTO projects(project_key, project_id, upstream_url, description)
+                """INSERT OR IGNORE INTO projects(project_name, project_id, upstream_url, description)
                    VALUES(?,?,?,?)""",
-                (project_key, project_id, upstream_url, description),
+                (project_name, project_id, upstream_url, description),
             )
 
             # Fetch row id
             async with db.execute(
-                "SELECT id FROM projects WHERE project_key = ?", (project_key,)
+                "SELECT id FROM projects WHERE project_name = ?", (project_name,)
             ) as cur:
                 row = await cur.fetchone()
             db_project_id = row["id"]
@@ -106,7 +106,7 @@ async def main() -> None:
                        VALUES(?,?,?,?)""",
                     (db_project_id, "mcp", hash_token(mcp_raw), token_hint(mcp_raw)),
                 )
-                print(f"[init_auth_db]   {project_key}: mcp token imported.")
+                print(f"[init_auth_db]   {project_name}: mcp token imported.")
 
             # Import edge_agent token
             edge_raw = proj.get("edgeAgent", {}).get("token", "")
@@ -116,7 +116,7 @@ async def main() -> None:
                        VALUES(?,?,?,?)""",
                     (db_project_id, "edge_agent", hash_token(edge_raw), token_hint(edge_raw)),
                 )
-                print(f"[init_auth_db]   {project_key}: edge_agent token imported.")
+                print(f"[init_auth_db]   {project_name}: edge_agent token imported.")
 
         await db.commit()
         print("[init_auth_db] Done.")

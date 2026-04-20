@@ -91,7 +91,7 @@ class ProjectTokenMiddleware:
                     """
                     SELECT pt.id, pt.project_id, pt.token_type,
                            p.project_id AS project_external_id,
-                           p.project_key
+                           p.project_name
                     FROM project_tokens pt
                     JOIN projects p ON p.id = pt.project_id
                     WHERE pt.token_hash = ? AND pt.is_active = 1 AND p.is_active = 1
@@ -123,15 +123,15 @@ class ProjectTokenMiddleware:
             scope["state"] = {}
         scope["state"]["project_id"] = row["project_external_id"]
         scope["state"]["project_db_id"] = row["project_id"]
-        scope["state"]["project_key"] = row["project_key"]
+        scope["state"]["project_name"] = row["project_name"]
         scope["state"]["project_token_id"] = row["id"]
 
         # Set ContextVar so MCP tool functions pick up the right project graph.
         # Pure ASGI middleware propagates ContextVars correctly (unlike BaseHTTPMiddleware).
-        from backend.graph.registry import _current_project_key
+        from backend.graph.registry import _current_project_name
 
-        token_var = _current_project_key.set(row["project_key"])
+        token_var = _current_project_name.set(row["project_name"])
         try:
             await self.app(scope, receive, send)
         finally:
-            _current_project_key.reset(token_var)
+            _current_project_name.reset(token_var)

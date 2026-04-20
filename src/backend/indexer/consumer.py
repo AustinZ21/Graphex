@@ -66,8 +66,8 @@ class IndexerConsumer:
         try:
             await self._consumer.set_job_processing(job)
             # Route to the per-project graph; fall back to contextvar default if unset
-            project_key = job.project_key or "contextgraph"
-            graph = self._registry.get(project_key)
+            project_name = job.project_name or "contextgraph"
+            graph = self._registry.get(project_name)
             pipeline = IndexPipeline(graph=graph)
             if job.job_type == JobType.INDEX_FULL:
                 stats = await asyncio.to_thread(

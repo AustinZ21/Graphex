@@ -15,19 +15,19 @@ MERGE (r:Repository {path: $path})
 SET r.name = $name
 """
 
-DELETE_REPO_SUBGRAPH = """
+QUERY_REPO_EXISTS = """
 MATCH (r:Repository {path: $repo_path})
-OPTIONAL MATCH (r)-[:CONTAINS]->(f:File)
-WITH r, collect(DISTINCT f.path) AS file_paths, collect(DISTINCT f) AS files
-OPTIONAL MATCH (s:Symbol)
-WHERE s.file_path IN file_paths
-WITH r, files, file_paths, collect(DISTINCT s) AS symbols
-OPTIONAL MATCH (v:Variable)
-WHERE v.file_path IN file_paths
-WITH collect(DISTINCT r) + files + symbols + collect(DISTINCT v) AS nodes
-UNWIND nodes AS node
-WITH DISTINCT node WHERE node IS NOT NULL
-DETACH DELETE node
+RETURN count(r) AS cnt
+"""
+
+QUERY_REPO_FILE_PATHS = """
+MATCH (:Repository {path: $repo_path})-[:CONTAINS]->(f:File)
+RETURN DISTINCT f.path
+"""
+
+DELETE_REPO = """
+MATCH (r:Repository {path: $repo_path})
+DETACH DELETE r
 """
 
 MERGE_FILE = """
@@ -40,18 +40,19 @@ SET f.language = $language,
   f.variables_hash = $variables_hash
 """
 
-DELETE_FILE_SUBGRAPH = """
-OPTIONAL MATCH (f:File {path: $file_path})
-WITH collect(DISTINCT f) AS files
-OPTIONAL MATCH (s:Symbol)
-WHERE s.file_path = $file_path
-WITH files, collect(DISTINCT s) AS symbols
-OPTIONAL MATCH (v:Variable)
-WHERE v.file_path = $file_path
-WITH files + symbols + collect(DISTINCT v) AS nodes
-UNWIND nodes AS node
-WITH DISTINCT node WHERE node IS NOT NULL
-DETACH DELETE node
+DELETE_FILE_VARIABLES = """
+MATCH (v:Variable {file_path: $file_path})
+DETACH DELETE v
+"""
+
+DELETE_FILE_SYMBOLS = """
+MATCH (s:Symbol {file_path: $file_path})
+DETACH DELETE s
+"""
+
+DELETE_FILE = """
+MATCH (f:File {path: $file_path})
+DETACH DELETE f
 """
 
 MERGE_SYMBOL = """

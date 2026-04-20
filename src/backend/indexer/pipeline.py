@@ -200,10 +200,23 @@ class IndexPipeline:
         self._graph.query(S.MERGE_REPO, {"path": repo_path, "name": name})
 
     def _delete_repo_subgraph(self, repo_path: str) -> None:
-        self._locked_query(S.DELETE_REPO_SUBGRAPH, {"repo_path": repo_path})
+        if not self._repo_exists(repo_path):
+            return
+        result = self._locked_query(S.QUERY_REPO_FILE_PATHS, {"repo_path": repo_path})
+        for row in result.result_set:
+            if row and row[0]:
+                self._delete_file_subgraph(row[0])
+        self._locked_query(S.DELETE_REPO, {"repo_path": repo_path})
 
     def _delete_file_subgraph(self, file_path: str) -> None:
-        self._locked_query(S.DELETE_FILE_SUBGRAPH, {"file_path": file_path})
+        self._locked_query(S.DELETE_FILE_VARIABLES, {"file_path": file_path})
+        self._locked_query(S.DELETE_FILE_SYMBOLS, {"file_path": file_path})
+        self._locked_query(S.DELETE_FILE, {"file_path": file_path})
+
+    def _repo_exists(self, repo_path: str) -> bool:
+        result = self._locked_query(S.QUERY_REPO_EXISTS, {"repo_path": repo_path})
+        rows = result.result_set
+        return bool(rows and rows[0] and rows[0][0])
 
     def _index_file(
         self,
