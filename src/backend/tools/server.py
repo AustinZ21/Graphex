@@ -72,7 +72,7 @@ def _resolve_project_name(project_name: str | None = None) -> str:
     from backend.graph.registry import _current_project_name
 
     if project_name:
-        return project_name
+        return project_name.strip().lower()
     return _current_project_name.get()
 
 

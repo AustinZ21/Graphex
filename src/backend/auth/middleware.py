@@ -130,7 +130,7 @@ class ProjectTokenMiddleware:
         # Pure ASGI middleware propagates ContextVars correctly (unlike BaseHTTPMiddleware).
         from backend.graph.registry import _current_project_name
 
-        token_var = _current_project_name.set(row["project_name"])
+        token_var = _current_project_name.set(row["project_name"].strip().lower())
         try:
             await self.app(scope, receive, send)
         finally:

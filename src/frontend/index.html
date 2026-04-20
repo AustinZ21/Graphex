@@ -1592,18 +1592,25 @@ function renderIndexTracker(job) {
   }).join('');
 }
 
-function renderIndexStatusMeta(job, statusText, queueText, etaText) {
+function renderIndexStatusMeta(job, statusText, queueText, etaText, recentJobs) {
   const repoText = job?.repo_path || 'No active job yet';
-  const metricsText = job && job.files !== null
-    ? `${job.files} Files / ${job.symbols || 0} Symbols`
-    : 'Metrics pending';
   const isPending = job && (job.status === 'pending' || job.status === 'processing');
+  const jobs = recentJobs || [];
+  const latestFull = jobs.find(j => j.job_type === 'index_full' && j.files !== null);
+  const latestIncr = jobs.find(j => j.job_type === 'index_incremental' && j.files !== null);
+  const fullText = latestFull
+    ? `${latestFull.files} Files / ${latestFull.symbols || 0} Symbols`
+    : 'N/A';
+  const incrText = latestIncr
+    ? `${latestIncr.files} Files / ${latestIncr.symbols || 0} Symbols`
+    : 'N/A';
   return `
     <div class="index-status-meta">
       <span class="index-status-chip"><strong>Status</strong> ${esc(statusText)}</span>
       ${isPending ? `<span class="index-status-chip"><strong>Queue</strong> ${esc(queueText)}</span>` : ''}
       ${isPending ? `<span class="index-status-chip"><strong>ETA</strong> ${esc(etaText)}</span>` : ''}
-      <span class="index-status-chip metrics"><strong>Scope</strong> ${esc(metricsText)}</span>
+      <span class="index-status-chip metrics"><strong>Full Index</strong> ${esc(fullText)}</span>
+      <span class="index-status-chip metrics"><strong>Reindex</strong> ${esc(incrText)}</span>
       <span class="index-status-chip" title="${esc(repoText)}"><strong>Source</strong> ${esc(repoText)}</span>
     </div>
   `;
@@ -1709,7 +1716,8 @@ function filterProjects(q) {
       ? formatStatusLabel(job)
       : 'idle';
     const trackerHtml = renderIndexTracker(job);
-    const metaHtml = renderIndexStatusMeta(job, statusText, queueText, etaText);
+    const recentJobs = status?.recent_jobs || [];
+    const metaHtml = renderIndexStatusMeta(job, statusText, queueText, etaText, recentJobs);
     const expanded = _expandedProjectIds.has(p.id);
     return `
     <tr>

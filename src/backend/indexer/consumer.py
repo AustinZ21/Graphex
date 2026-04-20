@@ -66,7 +66,7 @@ class IndexerConsumer:
         try:
             await self._consumer.set_job_processing(job)
             # Route to the per-project graph; fall back to contextvar default if unset
-            project_name = job.project_name or "contextgraph"
+            project_name = (job.project_name or "contextgraph").strip().lower()
             graph = self._registry.get(project_name)
             pipeline = IndexPipeline(graph=graph)
             if job.job_type == JobType.INDEX_FULL:

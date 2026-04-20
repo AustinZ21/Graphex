@@ -35,6 +35,7 @@ class GraphRegistry:
 
     def get(self, project_name: str) -> GraphClient:
         """Return (and lazily connect) the GraphClient for *project_name*."""
+        project_name = project_name.strip().lower()
         if project_name not in self._graphs:
             g = GraphClient(
                 host=self._host,
