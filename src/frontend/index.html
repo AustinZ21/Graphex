@@ -372,27 +372,333 @@
     .empty-state { text-align: center; padding: 40px; color: var(--muted); }
     .expand-btn { background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; padding:0 4px; }
 
-    /* ── Index Progress ── */
-    .index-progress-bar {
-      height: 4px; background: rgba(70,80,104,.3); border-radius: 2px;
-      overflow: hidden; margin-top: 6px;
+    /* ── Index Tracker ── */
+    .index-status-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 8px;
+      align-items: flex-start;
     }
-    .index-progress-fill {
-      height: 100%; background: linear-gradient(90deg, #4ae387, #3d9b6d);
-      width: 0%; transition: width .3s ease;
+    .index-tracker {
+      display: inline-grid;
+      grid-template-columns: repeat(4, minmax(72px, max-content));
+      gap: 10px;
+      align-items: start;
+      width: fit-content;
+      max-width: 100%;
     }
-    .index-status {
-      display: flex; align-items: center; gap: 6px;
-      font-size: 11px; color: var(--muted); margin-top: 4px;
+    .index-step {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      text-align: center;
     }
-    .status-dot {
-      width: 6px; height: 6px; border-radius: 50%; display: inline-block;
+    .index-step::before {
+      content: '';
+      position: absolute;
+      top: 12px;
+      left: calc(-50% + 14px);
+      width: calc(100% - 28px);
+      height: 2px;
+      background: rgba(70,80,104,.45);
+      z-index: 0;
     }
-    .status-dot.pending { background: #ffa500; animation: pulse 1.5s ease-in-out infinite; }
-    .status-dot.processing { background: #4ae387; animation: pulse 1s ease-in-out infinite; }
-    .status-dot.done { background: #4ae387; }
-    .status-dot.failed { background: #e35a5a; }
+    .index-step::after {
+      content: '';
+      position: absolute;
+      top: 12px;
+      left: calc(-50% + 14px);
+      width: calc(100% - 28px);
+      height: 2px;
+      background: linear-gradient(90deg, rgba(255,255,255,.95), rgba(74,227,135,.92));
+      transform-origin: left center;
+      transform: scaleX(0);
+      opacity: 0;
+      z-index: 0;
+      transition: transform .35s ease, opacity .25s ease;
+    }
+    .index-step:first-child::before {
+      display: none;
+    }
+    .index-step:first-child::after {
+      display: none;
+    }
+    .index-step.completed::before,
+    .index-step.current::before,
+    .index-step.failed::before {
+      background: linear-gradient(90deg, rgba(74,227,135,.95), rgba(74,227,135,.35));
+    }
+    .index-step.completed::after,
+    .index-step.current::after,
+    .index-step.failed::after {
+      transform: scaleX(1);
+      opacity: 1;
+    }
+    .index-step.failed::before {
+      background: linear-gradient(90deg, rgba(227,90,90,.95), rgba(227,90,90,.35));
+    }
+    .index-step.failed::after {
+      background: linear-gradient(90deg, rgba(255,218,218,.98), rgba(227,90,90,.92));
+    }
+    .index-step-node {
+      position: relative;
+      z-index: 1;
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      border: 2px solid rgba(115,129,156,.45);
+      background: rgba(20,28,44,.92);
+      box-shadow: 0 0 0 3px rgba(7,12,20,.55);
+      transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease;
+    }
+    .index-step.pending .index-step-node {
+      border-color: rgba(255,165,0,.55);
+    }
+    .index-step.completed .index-step-node,
+    .index-step.current .index-step-node {
+      border-color: rgba(74,227,135,.92);
+      background: radial-gradient(circle at 35% 35%, rgba(154,255,203,.95), rgba(74,227,135,.92) 55%, rgba(22,109,67,.96));
+      box-shadow: 0 0 0 3px rgba(74,227,135,.18), 0 0 18px rgba(74,227,135,.42);
+    }
+    .index-step.failed .index-step-node {
+      border-color: rgba(227,90,90,.95);
+      background: radial-gradient(circle at 35% 35%, rgba(255,189,189,.95), rgba(227,90,90,.95) 55%, rgba(111,30,30,.96));
+      box-shadow: 0 0 0 3px rgba(227,90,90,.16), 0 0 18px rgba(227,90,90,.28);
+    }
+    .index-step.current .index-step-node {
+      animation: trackerPulse 1.1s ease-in-out infinite;
+      transform: scale(1.04);
+    }
+    .index-step-label {
+      font-size: 10px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .index-step.completed .index-step-label,
+    .index-step.current .index-step-label {
+      color: var(--text);
+    }
+    .index-step.failed .index-step-label {
+      color: #ffb3b3;
+    }
+    .index-status-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      align-items: center;
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .index-status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(115,129,156,.24);
+      background: rgba(21,28,43,.86);
+    }
+    .index-status-chip strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .index-status-chip.metrics strong {
+      color: var(--accent);
+    }
+    .tracking-history {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      margin-bottom: 14px;
+      border: 1px solid rgba(115,129,156,.18);
+      border-radius: 12px;
+      background: rgba(16,22,34,.72);
+      padding: 14px;
+    }
+    .tracking-history h4,
+    .tokens-panel h4 {
+      margin: 0 0 12px;
+      font-size: 13px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: var(--text);
+    }
+    .tracking-history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: min(100%, 760px);
+      align-items: flex-start;
+    }
+    .tracking-event {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 12px;
+      align-items: start;
+      width: 100%;
+      justify-items: start;
+    }
+    .tracking-event-marker {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      padding-top: 2px;
+    }
+    .tracking-event-marker::after {
+      content: '';
+      position: absolute;
+      top: 26px;
+      bottom: -14px;
+      width: 2px;
+      background: linear-gradient(180deg, rgba(115,129,156,.45), rgba(115,129,156,.08));
+    }
+    .tracking-event:last-child .tracking-event-marker::after {
+      display: none;
+    }
+    .tracking-event-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      background: rgba(115,129,156,.65);
+      border: 2px solid rgba(20,28,44,.92);
+      box-shadow: 0 0 0 2px rgba(115,129,156,.12);
+    }
+    .tracking-event.pending .tracking-event-dot {
+      background: #ffa500;
+      box-shadow: 0 0 0 2px rgba(255,165,0,.16), 0 0 16px rgba(255,165,0,.25);
+    }
+    .tracking-event.processing .tracking-event-dot {
+      background: #4ae387;
+      box-shadow: 0 0 0 2px rgba(74,227,135,.16), 0 0 16px rgba(74,227,135,.32);
+      animation: trackerPulse 1.1s ease-in-out infinite;
+    }
+    .tracking-event.done .tracking-event-dot {
+      background: #4ae387;
+      box-shadow: 0 0 0 2px rgba(74,227,135,.12);
+    }
+    .tracking-event.failed .tracking-event-dot {
+      background: #e35a5a;
+      box-shadow: 0 0 0 2px rgba(227,90,90,.14), 0 0 16px rgba(227,90,90,.24);
+    }
+    .tracking-event-body {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+    .tracking-event-head {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      align-items: center;
+      justify-content: flex-start;
+    }
+    .tracking-event-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .tracking-event-kind {
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(115,129,156,.22);
+      background: rgba(29,39,58,.82);
+      font-size: 10px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .tracking-event-time {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      font-size: 11px;
+      color: var(--muted);
+      justify-content: flex-start;
+    }
+    .tracking-event-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      font-size: 11px;
+      color: var(--muted);
+      justify-content: flex-start;
+    }
+    .tracking-event-meta .label,
+    .tracking-event-time .label {
+      color: var(--text);
+      font-weight: 600;
+      margin-right: 4px;
+    }
+    .tracking-event-error {
+      font-size: 11px;
+      color: #ffb3b3;
+    }
+    .tracking-event-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 2px;
+      justify-content: flex-start;
+    }
+    .tracking-inline-btn {
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(115,129,156,.26);
+      background: rgba(27,35,53,.88);
+      color: var(--text);
+      font-size: 11px;
+      cursor: pointer;
+      transition: background .15s ease, border-color .15s ease;
+    }
+    .tracking-inline-btn:hover {
+      background: rgba(36,46,68,.95);
+      border-color: rgba(74,227,135,.35);
+    }
+    .tracking-inline-btn.retry {
+      border-color: rgba(227,90,90,.35);
+      color: #ffd0d0;
+    }
+    .tracking-inline-btn.retry:hover {
+      background: rgba(74,28,28,.92);
+      border-color: rgba(227,90,90,.6);
+    }
+    .tracking-event details {
+      margin-top: 2px;
+      align-self: flex-start;
+    }
+    .tracking-event summary {
+      list-style: none;
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 11px;
+    }
+    .tracking-event summary::-webkit-details-marker {
+      display: none;
+    }
+    .tracking-error-box {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(227,90,90,.28);
+      background: rgba(63,22,22,.58);
+      color: #ffd0d0;
+      font-family: Consolas, 'Courier New', monospace;
+      font-size: 11px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
     @keyframes pulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }
+    @keyframes trackerPulse {
+      0%, 100% { transform: scale(1.02); box-shadow: 0 0 0 3px rgba(74,227,135,.16), 0 0 12px rgba(74,227,135,.28); }
+      50% { transform: scale(1.1); box-shadow: 0 0 0 5px rgba(74,227,135,.22), 0 0 24px rgba(74,227,135,.52); }
+    }
 
     /* ── Search bar ── */
     .search-wrap { margin-bottom: 14px; position: relative; }
@@ -1197,6 +1503,156 @@ async function triggerProjectIndex(projectId) {
   }
 }
 
+function relativeTimeLabel(value) {
+  if (!value) return 'unknown';
+  try {
+    const deltaSec = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 1000));
+    if (deltaSec < 5) return 'just now';
+    if (deltaSec < 60) return `${deltaSec}s ago`;
+    const deltaMin = Math.floor(deltaSec / 60);
+    if (deltaMin < 60) return `${deltaMin}m ago`;
+    const deltaHr = Math.floor(deltaMin / 60);
+    if (deltaHr < 24) return `${deltaHr}h ago`;
+    const deltaDay = Math.floor(deltaHr / 24);
+    return `${deltaDay}d ago`;
+  } catch {
+    return 'unknown';
+  }
+}
+
+function formatStatusLabel(job) {
+  if (!job) return 'Idle';
+  const base = job.status === 'pending'
+    ? 'Queued'
+    : job.status === 'processing'
+      ? 'Indexing'
+      : job.status === 'done'
+        ? 'Complete'
+        : job.status === 'failed'
+          ? 'Failed'
+          : job.status;
+  return job.error ? `${base}` : base;
+}
+
+function getIndexTrackerState(job) {
+  if (!job) return 'idle';
+  if (job.status === 'failed') return 'failed';
+  if (job.status === 'done') return 'done';
+  if (job.status === 'processing') return 'processing';
+  if (job.status === 'pending') return 'pending';
+  return 'idle';
+}
+
+function renderIndexTracker(job) {
+  const trackerState = getIndexTrackerState(job);
+  const steps = [
+    { key: 'pending', label: 'Queued' },
+    { key: 'processing', label: 'Indexing' },
+    { key: 'done', label: 'Complete' },
+    { key: 'failed', label: 'Failed' },
+  ];
+  const currentIndex = trackerState === 'pending'
+    ? 0
+    : trackerState === 'processing'
+      ? 1
+      : trackerState === 'done'
+        ? 2
+        : trackerState === 'failed'
+          ? 3
+          : -1;
+
+  return steps.map((step, index) => {
+    let cls = 'pending';
+    if (trackerState === 'idle') {
+      cls = 'pending';
+    } else if (trackerState === 'failed') {
+      if (index < 2) cls = 'completed';
+      else if (index === 3) cls = 'failed current';
+    } else if (index < currentIndex) {
+      cls = 'completed';
+    } else if (index === currentIndex) {
+      cls = trackerState === 'done' ? 'completed' : 'current';
+    }
+    return `
+      <div class="index-step ${cls}">
+        <span class="index-step-node"></span>
+        <span class="index-step-label">${step.label}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderIndexStatusMeta(job, statusText, queueText, etaText) {
+  const repoText = job?.repo_path || 'No active job yet';
+  const metricsText = job && job.files !== null
+    ? `${job.files} Files / ${job.symbols || 0} Symbols`
+    : 'Metrics pending';
+  const isPending = job && (job.status === 'pending' || job.status === 'processing');
+  return `
+    <div class="index-status-meta">
+      <span class="index-status-chip"><strong>Status</strong> ${esc(statusText)}</span>
+      ${isPending ? `<span class="index-status-chip"><strong>Queue</strong> ${esc(queueText)}</span>` : ''}
+      ${isPending ? `<span class="index-status-chip"><strong>ETA</strong> ${esc(etaText)}</span>` : ''}
+      <span class="index-status-chip metrics"><strong>Scope</strong> ${esc(metricsText)}</span>
+      <span class="index-status-chip" title="${esc(repoText)}"><strong>Source</strong> ${esc(repoText)}</span>
+    </div>
+  `;
+}
+
+async function retryIndexJob(projectId) {
+  await triggerProjectIndex(projectId);
+  if (_expandedProjectIds.has(projectId)) {
+    const panel = document.getElementById('tokens-panel-' + projectId);
+    if (panel) {
+      renderTokensPanel(panel, _tokensCache[projectId] || [], projectId);
+    }
+  }
+}
+
+function renderTrackingHistory(projectId) {
+  const recentJobs = _indexStatusCache[projectId]?.recent_jobs || [];
+  if (!recentJobs.length) {
+    return `<div class="tracking-history"><h4>Recent Index Events</h4><p style="color:var(--muted);margin:0">No indexing activity recorded yet.</p></div>`;
+  }
+  return `
+    <div class="tracking-history">
+      <h4>Recent Index Events</h4>
+      <div class="tracking-history-list">
+        ${recentJobs.map(job => `
+          <div class="tracking-event ${esc(job.status || 'pending')}">
+            <div class="tracking-event-marker"><span class="tracking-event-dot"></span></div>
+            <div class="tracking-event-body">
+              <div class="tracking-event-head">
+                <span class="tracking-event-title">${esc(formatStatusLabel(job))}</span>
+                <span class="tracking-event-kind">${esc(job.job_type || 'index_job')}</span>
+              </div>
+              <div class="tracking-event-time">
+                <span><span class="label">Queued</span>${esc(relativeTimeLabel(job.created_at))} · ${esc(job.created_at || '-')}</span>
+                <span><span class="label">Updated</span>${esc(relativeTimeLabel(job.updated_at))} · ${esc(job.updated_at || '-')}</span>
+              </div>
+              <div class="tracking-event-meta">
+                ${job.status === 'pending' || job.status === 'processing' ? `<span><span class="label">Queue</span>${esc(Number.isInteger(job.queue_position) ? `q#${job.queue_position}` : '—')}</span>` : ''}
+                ${job.status === 'pending' || job.status === 'processing' ? `<span><span class="label">ETA</span>${esc(Number.isInteger(job.eta_seconds) && job.eta_seconds > 0 ? `~${job.eta_seconds}s` : '—')}</span>` : ''}
+                <span><span class="label">Scope</span>${esc(job.files !== null ? `${job.files} Files / ${job.symbols || 0} Symbols` : 'Metrics pending')}</span>
+                <span title="${esc(job.repo_path || '')}"><span class="label">Source</span>${esc(job.repo_path || '-')}</span>
+              </div>
+              ${job.error ? `
+                <div class="tracking-event-actions">
+                  <button class="tracking-inline-btn retry" onclick="retryIndexJob(${projectId})">Retry</button>
+                </div>
+                <details>
+                  <summary>Show failure details</summary>
+                  <div class="tracking-error-box">${esc(job.error)}</div>
+                </details>
+              ` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+}
+
 function filterProjects(q) {
   const tbody = document.getElementById('projects-body');
   const kw = q.trim().toLowerCase();
@@ -1233,9 +1689,17 @@ function filterProjects(q) {
     const status = _indexStatusCache[p.id];
     const job = status?.latest_job;
     const isProcessing = job && (job.status === 'processing' || job.status === 'pending');
-    const progress = (job?.files || 0) > 0 ? Math.min(100, (job?.symbols || 0) / Math.max(1, job?.files || 1) * 100) : 0;
-    const statusDot = job ? `<span class="status-dot ${job.status}"></span>` : '';
-    const statusText = job ? `${job.status}${job.error ? ': ' + job.error : ''}` : 'idle';
+    const queueText = job
+      ? (Number.isInteger(job.queue_position) ? `q#${job.queue_position}` : '—')
+      : '—';
+    const etaText = job
+      ? (Number.isInteger(job.eta_seconds) && job.eta_seconds > 0 ? `ETA ~${job.eta_seconds}s` : '—')
+      : '—';
+    const statusText = job
+      ? formatStatusLabel(job)
+      : 'idle';
+    const trackerHtml = renderIndexTracker(job);
+    const metaHtml = renderIndexStatusMeta(job, statusText, queueText, etaText);
     const expanded = _expandedProjectIds.has(p.id);
     return `
     <tr>
@@ -1243,16 +1707,10 @@ function filterProjects(q) {
       <td style="font-family:monospace;font-size:12px;color:var(--muted);text-align:center">${esc(p.project_id)}</td>
       <td>
         <strong>${esc(p.project_key)}</strong>
-        ${job ? `
-          <div class="index-progress-bar">
-            <div class="index-progress-fill" style="width:${progress}%"></div>
-          </div>
-          <div class="index-status">
-            ${statusDot}
-            <span title="${esc(job.repo_path)}">${esc(statusText)}</span>
-            ${job.files !== null ? `<span style="color:var(--accent)">${job.files} Files / ${job.symbols || 0} Symbols</span>` : ''}
-          </div>
-        ` : ''}
+        <div class="index-status-panel">
+          <div class="index-tracker">${trackerHtml}</div>
+          ${metaHtml}
+        </div>
       </td>
       <td style="color:var(--muted)">${esc(p.upstream_url||'—')}</td>
       <td style="text-align:center"><span class="${p.is_active?'badge-active':'badge-inactive'}">${p.is_active?'Active':'Inactive'}</span></td>
@@ -1317,11 +1775,13 @@ function renderTokensPanel(panel, tokens, projectId) {
     return 'General access';
   };
 
+  const historyHtml = renderTrackingHistory(projectId);
+
   if (!tokens.length) {
-    panel.innerHTML='<div class="tokens-panel"><p style="color:var(--muted)">No tokens yet. Use "+ Token" to generate one.</p></div>';
+    panel.innerHTML=`${historyHtml}<div class="tokens-panel"><h4>Tokens</h4><p style="color:var(--muted)">No tokens yet. Use "+ Token" to generate one.</p></div>`;
     return;
   }
-  panel.innerHTML = `<div class="tokens-panel">
+  panel.innerHTML = `${historyHtml}<div class="tokens-panel">
     <h4>Tokens (${tokens.filter(t=>t.is_active).length} active)</h4>
     <div class="tokens-grid-header">
       <span>ID</span>

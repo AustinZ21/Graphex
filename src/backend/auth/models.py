@@ -155,6 +155,9 @@ class IndexJobStatus(BaseModel):
     # Stats from pipeline (if done):
     files: int | None = None
     symbols: int | None = None
+    # Queue telemetry (best-effort estimates):
+    queue_position: int | None = None
+    eta_seconds: int | None = None
 
 
 class ProjectIndexStatus(BaseModel):
@@ -162,6 +165,7 @@ class ProjectIndexStatus(BaseModel):
     project_id: int
     project_key: str
     latest_job: IndexJobStatus | None = None
+    recent_jobs: list[IndexJobStatus] = Field(default_factory=list)
 
 
 class ProjectIndexTriggerOut(BaseModel):

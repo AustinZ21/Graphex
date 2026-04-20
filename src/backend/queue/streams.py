@@ -33,6 +33,15 @@ def _status_key(job_id: str) -> str:
     return f"{STATUS_KEY_PREFIX}{job_id}"
 
 
+def _parse_iso_utc(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except Exception:
+        return None
+
+
 async def _set_job_status(
     client: aioredis.Redis,
     job: IndexJob,
@@ -203,6 +212,54 @@ class JobConsumer:
         # Sort by updated_at, most recent first
         jobs.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
         return jobs
+
+    async def get_queue_snapshot(self) -> dict:
+        """Return active queue snapshot and average historical job duration.
+
+        The result is used for best-effort UI telemetry only.
+        """
+        if not self._client:
+            raise RuntimeError("JobConsumer not connected")
+
+        jobs: list[dict] = []
+        cursor = 0
+        while True:
+            cursor, keys = await self._client.scan(
+                cursor,
+                match=f"{STATUS_KEY_PREFIX}*",
+                count=100,
+            )
+            for key in keys:
+                status_data = await self._client.hgetall(key)
+                if status_data:
+                    jobs.append(dict(status_data))
+            if cursor == 0:
+                break
+
+        pending_jobs = [j for j in jobs if j.get("status") == "pending"]
+        processing_jobs = [j for j in jobs if j.get("status") == "processing"]
+        done_jobs = [j for j in jobs if j.get("status") == "done"]
+
+        pending_jobs.sort(key=lambda x: x.get("created_at", ""))
+        processing_jobs.sort(key=lambda x: x.get("created_at", ""))
+
+        durations_sec: list[float] = []
+        for job in done_jobs:
+            created_at = _parse_iso_utc(job.get("created_at"))
+            updated_at = _parse_iso_utc(job.get("updated_at"))
+            if not created_at or not updated_at:
+                continue
+            duration = (updated_at - created_at).total_seconds()
+            if 0 < duration < 7200:
+                durations_sec.append(duration)
+
+        avg_duration_sec = int(sum(durations_sec) / len(durations_sec)) if durations_sec else 30
+
+        return {
+            "pending_jobs": pending_jobs,
+            "processing_jobs": processing_jobs,
+            "avg_duration_sec": avg_duration_sec,
+        }
 
     async def _ensure_group(self) -> None:
         try:

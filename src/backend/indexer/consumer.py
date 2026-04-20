@@ -57,6 +57,10 @@ class IndexerConsumer:
         """Get all job statuses for a given repo path, most recent first."""
         return await self._consumer.get_jobs_by_repo(repo_path)
 
+    async def get_queue_snapshot(self) -> dict:
+        """Get active queue snapshot and historical average job duration."""
+        return await self._consumer.get_queue_snapshot()
+
     async def _process(self, msg_id: str, job: IndexJob) -> None:
         log.info("indexer.job.start", job_id=job.job_id, type=job.job_type)
         try:

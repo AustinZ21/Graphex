@@ -8,6 +8,7 @@ import os
 import secrets
 import string
 import time
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -189,6 +190,57 @@ def _oauth_success_page(token: str) -> HTMLResponse:
         "</script></body></html>"
     )
     return HTMLResponse(content=html, status_code=200)
+
+
+def _parse_iso_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except Exception:
+        return None
+
+
+def _estimate_processing_remaining(job_data: dict, avg_duration_sec: int) -> int:
+    started_at = _parse_iso_datetime(job_data.get("updated_at"))
+    if not started_at:
+        return avg_duration_sec
+    elapsed = max(0, int((datetime.now(started_at.tzinfo) - started_at).total_seconds()))
+    return max(1, avg_duration_sec - elapsed)
+
+
+def _build_index_job_status(
+    job_data: dict,
+    pending_by_id: dict[str, int],
+    avg_duration_sec: int,
+    processing_remaining: int,
+) -> IndexJobStatus:
+    queue_position = None
+    eta_seconds = None
+    job_id = str(job_data.get("job_id", ""))
+    job_status = job_data.get("status", "")
+
+    if job_status == "pending":
+        queue_position = pending_by_id.get(job_id)
+        if queue_position:
+            eta_seconds = int(queue_position * avg_duration_sec + processing_remaining)
+    elif job_status == "processing":
+        queue_position = 0
+        eta_seconds = _estimate_processing_remaining(job_data, avg_duration_sec)
+
+    return IndexJobStatus(
+        job_id=job_id,
+        job_type=job_data.get("job_type", ""),
+        repo_path=job_data.get("repo_path", ""),
+        status=job_status,
+        created_at=job_data.get("created_at", ""),
+        updated_at=job_data.get("updated_at", ""),
+        error=job_data.get("error"),
+        files=int(job_data["files"]) if "files" in job_data and job_data["files"] else None,
+        symbols=int(job_data["symbols"]) if "symbols" in job_data and job_data["symbols"] else None,
+        queue_position=queue_position,
+        eta_seconds=eta_seconds,
+    )
 
 
 # ── Helper ─────────────────────────────────────────────────────────────────
@@ -685,52 +737,85 @@ async def list_projects_index_status(
     consumer = Depends(get_consumer),
 ):
     """Get indexing status for all projects."""
-    
+
     # Get all projects
     async with db.execute(
         "SELECT id, project_key, project_id FROM projects WHERE is_active = 1 ORDER BY id"
     ) as cur:
         projects = await cur.fetchall()
-    
+
+    queue_snapshot = None
+    if consumer:
+        try:
+            queue_snapshot = await consumer.get_queue_snapshot()
+        except Exception:
+            queue_snapshot = None
+
+    pending_jobs = queue_snapshot.get("pending_jobs", []) if queue_snapshot else []
+    processing_jobs = queue_snapshot.get("processing_jobs", []) if queue_snapshot else []
+    avg_duration_sec = int(queue_snapshot.get("avg_duration_sec", 30)) if queue_snapshot else 30
+
+    pending_by_id = {
+        str(job.get("job_id", "")): idx + 1
+        for idx, job in enumerate(pending_jobs)
+        if job.get("job_id")
+    }
+
+    current_processing = processing_jobs[0] if processing_jobs else None
+    processing_remaining = (
+        _estimate_processing_remaining(current_processing, avg_duration_sec)
+        if current_processing
+        else 0
+    )
+
     results = []
     for proj in projects:
         proj_dict = dict(proj)
         latest_job = None
-        
+        recent_jobs: list[IndexJobStatus] = []
+
         # Get latest job status for this project (if consumer available)
         if consumer:
             try:
                 repo_patterns = _candidate_repo_paths(proj_dict["project_key"])
-                
-                jobs = []
+
+                jobs: list[dict] = []
+                seen_job_ids: set[str] = set()
                 for pattern in repo_patterns:
                     matching = await consumer.get_jobs_by_repo(pattern)
-                    if matching:
-                        jobs = matching
-                        break
-                
+                    if not matching:
+                        continue
+                    for item in matching:
+                        job_id = str(item.get("job_id", ""))
+                        if job_id and job_id in seen_job_ids:
+                            continue
+                        jobs.append(item)
+                        if job_id:
+                            seen_job_ids.add(job_id)
+
+                jobs.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
+
                 if jobs:
-                    job_data = jobs[0]  # Most recent
-                    latest_job = IndexJobStatus(
-                        job_id=job_data.get("job_id", ""),
-                        job_type=job_data.get("job_type", ""),
-                        repo_path=job_data.get("repo_path", ""),
-                        status=job_data.get("status", ""),
-                        created_at=job_data.get("created_at", ""),
-                        updated_at=job_data.get("updated_at", ""),
-                        error=job_data.get("error"),
-                        files=int(job_data["files"]) if "files" in job_data and job_data["files"] else None,
-                        symbols=int(job_data["symbols"]) if "symbols" in job_data and job_data["symbols"] else None,
+                    latest_job = _build_index_job_status(
+                        jobs[0],
+                        pending_by_id,
+                        avg_duration_sec,
+                        processing_remaining,
                     )
+                    recent_jobs = [
+                        _build_index_job_status(job_data, pending_by_id, avg_duration_sec, processing_remaining)
+                        for job_data in jobs[:5]
+                    ]
             except Exception:
                 pass  # Silently ignore consumer errors
-        
+
         results.append(ProjectIndexStatus(
             project_id=proj_dict["id"],
             project_key=proj_dict["project_key"],
             latest_job=latest_job,
+            recent_jobs=recent_jobs,
         ))
-    
+
     return results
 
 
