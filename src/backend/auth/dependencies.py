@@ -50,3 +50,8 @@ async def require_admin(user: dict = Depends(get_current_user)) -> dict:
 async def get_consumer(request: Request):
     """Get IndexerConsumer from app state."""
     return getattr(request.app.state, 'consumer', None)
+
+
+async def get_registry(request: Request):
+    """Get GraphRegistry from app state."""
+    return getattr(request.app.state, 'registry', None)

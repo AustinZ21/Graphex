@@ -264,7 +264,7 @@
       color: var(--danger);
     }
     .token-actions { display: flex; align-items: center; gap: 8px; justify-content: center; }
-    .actions-col-header { text-align: center; }
+    .actions-col-header { text-align: center; white-space: nowrap; width: 1%; }
     .center-col-header { text-align: center; }
     .tokens-grid-header .center-col-header {
       display: block;
@@ -272,7 +272,7 @@
       width: 100%;
       text-align: center;
     }
-    .project-actions { display: flex; justify-content: center; align-items: center; gap: 6px; }
+    .project-actions { display: flex; justify-content: center; align-items: center; gap: 6px; white-space: nowrap; }
     .token-type-badge {
       padding: 2px 8px; border-radius: 999px; font-size: 11px;
       background: #1e2a3a; color: #6ab3e3; border: 1px solid rgba(106,179,227,.3);
@@ -378,119 +378,35 @@
       flex-direction: column;
       gap: 8px;
       margin-top: 8px;
-      align-items: flex-start;
+      align-items: center;
     }
     .index-tracker {
-      display: inline-grid;
-      grid-template-columns: repeat(4, minmax(72px, max-content));
-      gap: 10px;
-      align-items: start;
-      width: fit-content;
-      max-width: 100%;
+      display: block;
     }
-    .index-step {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-      min-width: 0;
-      text-align: center;
-    }
-    .index-step::before {
-      content: '';
-      position: absolute;
-      top: 12px;
-      left: calc(-50% + 14px);
-      width: calc(100% - 28px);
-      height: 2px;
-      background: rgba(70,80,104,.45);
-      z-index: 0;
-    }
-    .index-step::after {
-      content: '';
-      position: absolute;
-      top: 12px;
-      left: calc(-50% + 14px);
-      width: calc(100% - 28px);
-      height: 2px;
-      background: linear-gradient(90deg, rgba(255,255,255,.95), rgba(74,227,135,.92));
-      transform-origin: left center;
-      transform: scaleX(0);
-      opacity: 0;
-      z-index: 0;
-      transition: transform .35s ease, opacity .25s ease;
-    }
-    .index-step:first-child::before {
-      display: none;
-    }
-    .index-step:first-child::after {
-      display: none;
-    }
-    .index-step.completed::before,
-    .index-step.current::before,
-    .index-step.failed::before {
-      background: linear-gradient(90deg, rgba(74,227,135,.95), rgba(74,227,135,.35));
-    }
-    .index-step.completed::after,
-    .index-step.current::after,
-    .index-step.failed::after {
-      transform: scaleX(1);
-      opacity: 1;
-    }
-    .index-step.failed::before {
-      background: linear-gradient(90deg, rgba(227,90,90,.95), rgba(227,90,90,.35));
-    }
-    .index-step.failed::after {
-      background: linear-gradient(90deg, rgba(255,218,218,.98), rgba(227,90,90,.92));
-    }
-    .index-step-node {
-      position: relative;
-      z-index: 1;
-      width: 24px;
-      height: 24px;
-      border-radius: 999px;
-      border: 2px solid rgba(115,129,156,.45);
-      background: rgba(20,28,44,.92);
-      box-shadow: 0 0 0 3px rgba(7,12,20,.55);
-      transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease;
-    }
-    .index-step.pending .index-step-node {
-      border-color: rgba(255,165,0,.55);
-    }
-    .index-step.completed .index-step-node,
-    .index-step.current .index-step-node {
-      border-color: rgba(74,227,135,.92);
-      background: radial-gradient(circle at 35% 35%, rgba(154,255,203,.95), rgba(74,227,135,.92) 55%, rgba(22,109,67,.96));
-      box-shadow: 0 0 0 3px rgba(74,227,135,.18), 0 0 18px rgba(74,227,135,.42);
-    }
-    .index-step.failed .index-step-node {
-      border-color: rgba(227,90,90,.95);
-      background: radial-gradient(circle at 35% 35%, rgba(255,189,189,.95), rgba(227,90,90,.95) 55%, rgba(111,30,30,.96));
-      box-shadow: 0 0 0 3px rgba(227,90,90,.16), 0 0 18px rgba(227,90,90,.28);
-    }
-    .index-step.current .index-step-node {
-      animation: trackerPulse 1.1s ease-in-out infinite;
-      transform: scale(1.04);
-    }
-    .index-step-label {
-      font-size: 10px;
+    .tracker-svg text {
+      font-family: inherit;
+      font-size: 9px;
       letter-spacing: .08em;
-      text-transform: uppercase;
-      color: var(--muted);
-      white-space: nowrap;
     }
-    .index-step.completed .index-step-label,
-    .index-step.current .index-step-label {
-      color: var(--text);
-    }
-    .index-step.failed .index-step-label {
-      color: #ffb3b3;
+    .tracker-svg .node-dim { fill: rgba(20,28,44,.92); stroke: rgba(115,129,156,.45); stroke-width: 1.5; }
+    .tracker-svg .node-active { fill: rgba(74,227,135,.85); stroke: rgba(74,227,135,.92); stroke-width: 1.5; }
+    .tracker-svg .node-current { fill: rgba(74,227,135,.85); stroke: rgba(74,227,135,.92); stroke-width: 1.5; transform-box: fill-box; transform-origin: center; animation: svgNodePulse 1.1s ease-in-out infinite; }
+    .tracker-svg .node-failed { fill: rgba(227,90,90,.85); stroke: rgba(227,90,90,.95); stroke-width: 1.5; }
+    .tracker-svg .line-dim { stroke: rgba(70,80,104,.45); }
+    .tracker-svg .line-active { stroke: rgba(74,227,135,.7); }
+    .tracker-svg .line-failed { stroke: rgba(227,90,90,.7); }
+    .tracker-svg .lbl-dim { fill: rgba(115,129,156,.65); }
+    .tracker-svg .lbl-active { fill: rgba(200,210,225,.95); }
+    .tracker-svg .lbl-current { fill: rgba(200,210,225,.95); }
+    .tracker-svg .lbl-failed { fill: rgba(255,179,179,1); }
+    @keyframes svgNodePulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.35); opacity: .8; }
     }
     .index-status-meta {
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px 12px;
+      flex-wrap: nowrap;
+      gap: 6px;
       align-items: center;
       font-size: 11px;
       color: var(--muted);
@@ -504,12 +420,54 @@
       border: 1px solid rgba(115,129,156,.24);
       background: rgba(21,28,43,.86);
     }
-    .index-status-chip strong {
+    .status-icon {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      border: 1px solid rgba(115,129,156,.24);
+      background: rgba(21,28,43,.86);
+      cursor: default;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .status-icon.graph-live {
+      border-color: rgba(79,195,247,.3);
+      background: rgba(79,195,247,.08);
+    }
+    .status-icon.metrics {
+      border-color: rgba(74,227,135,.3);
+      background: rgba(74,227,135,.06);
+    }
+    .status-icon .status-tooltip {
+      display: none;
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: rgba(16,22,34,.96);
+      border: 1px solid rgba(115,129,156,.3);
       color: var(--text);
+      font-size: 11px;
+      white-space: nowrap;
+      z-index: 100;
+      pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,.4);
+    }
+    .status-icon .status-tooltip strong {
+      color: var(--accent);
       font-weight: 600;
     }
-    .index-status-chip.metrics strong {
-      color: var(--accent);
+    .status-icon.graph-live .status-tooltip strong {
+      color: #4fc3f7;
+    }
+    .status-icon:hover .status-tooltip {
+      display: block;
     }
     .tracking-history {
       display: flex;
@@ -847,7 +805,6 @@
             <th></th>
             <th class="sortable center-col-header" onclick="setProjectsSort('project_id')">Project ID <span id="sort-project_id"></span></th>
             <th class="sortable center-col-header" onclick="setProjectsSort('project_name')">Project Name <span id="sort-project_name"></span></th>
-            <th class="sortable center-col-header" onclick="setProjectsSort('upstream_url')">Upstream URL <span id="sort-upstream_url"></span></th>
             <th class="sortable center-col-header" onclick="setProjectsSort('is_active')">Status <span id="sort-is_active"></span></th>
             <th class="sortable center-col-header" onclick="setProjectsSort('created_at')">Created <span id="sort-created_at"></span></th>
             <th class="actions-col-header">Actions</th>
@@ -1537,7 +1494,7 @@ function formatStatusLabel(job) {
     : job.status === 'processing'
       ? 'Indexing'
       : job.status === 'done'
-        ? 'Complete'
+        ? 'Succeed'
         : job.status === 'failed'
           ? 'Failed'
           : job.status;
@@ -1554,45 +1511,41 @@ function getIndexTrackerState(job) {
 }
 
 function renderIndexTracker(job) {
-  const trackerState = getIndexTrackerState(job);
-  const steps = [
-    { key: 'pending', label: 'Queued' },
-    { key: 'processing', label: 'Indexing' },
-    { key: 'done', label: 'Complete' },
-    { key: 'failed', label: 'Failed' },
-  ];
-  const currentIndex = trackerState === 'pending'
-    ? 0
-    : trackerState === 'processing'
-      ? 1
-      : trackerState === 'done'
-        ? 2
-        : trackerState === 'failed'
-          ? 3
-          : -1;
-
-  return steps.map((step, index) => {
-    let cls = 'pending';
-    if (trackerState === 'idle') {
-      cls = 'pending';
-    } else if (trackerState === 'failed') {
-      if (index < 2) cls = 'completed';
-      else if (index === 3) cls = 'failed current';
-    } else if (index < currentIndex) {
-      cls = 'completed';
-    } else if (index === currentIndex) {
-      cls = trackerState === 'done' ? 'completed' : 'current';
-    }
-    return `
-      <div class="index-step ${cls}">
-        <span class="index-step-node"></span>
-        <span class="index-step-label">${step.label}</span>
-      </div>
-    `;
-  }).join('');
+  const st = getIndexTrackerState(job);
+  // Node visual state
+  function ns(key) {
+    if (st === 'idle') return key === 'idle' ? 'active' : 'dim';
+    if (st === 'pending') return key === 'idle' ? 'active' : key === 'pending' ? 'current' : 'dim';
+    if (st === 'processing') return (key === 'idle' || key === 'pending') ? 'active' : key === 'processing' ? 'current' : 'dim';
+    if (st === 'done') return (key === 'idle' || key === 'pending' || key === 'processing' || key === 'done') ? 'active' : 'dim';
+    if (st === 'failed') return (key === 'idle' || key === 'pending' || key === 'processing') ? 'active' : key === 'failed' ? 'failed' : 'dim';
+    return 'dim';
+  }
+  // Line state: inherits from destination node
+  function ls(toKey) {
+    const s = ns(toKey);
+    return s === 'dim' ? 'dim' : s === 'failed' ? 'failed' : 'active';
+  }
+  return `
+    <svg class="tracker-svg" width="260" height="44" viewBox="0 0 260 44">
+      <line x1="19" y1="18" x2="59" y2="18" class="line-${ls('pending')}" stroke-width="1"/>
+      <line x1="73" y1="18" x2="113" y2="18" class="line-${ls('processing')}" stroke-width="1"/>
+      <path d="M123,18 C145,18 162,7 175,7" class="line-${ls('done')}" fill="none" stroke-width="1"/>
+      <path d="M123,18 C145,18 162,29 175,29" class="line-${ls('failed')}" fill="none" stroke-width="1"/>
+      <circle cx="14" cy="18" r="5" class="node-${ns('idle')}"/>
+      <circle cx="66" cy="18" r="5" class="node-${ns('pending')}"/>
+      <circle cx="118" cy="18" r="5" class="node-${ns('processing')}"/>
+      <circle cx="180" cy="7" r="5" class="node-${ns('done')}"/>
+      <circle cx="180" cy="29" r="5" class="node-${ns('failed')}"/>
+      <text x="14" y="34" text-anchor="middle" class="lbl-${ns('idle')}">IDLE</text>
+      <text x="66" y="34" text-anchor="middle" class="lbl-${ns('pending')}">QUEUED</text>
+      <text x="118" y="34" text-anchor="middle" class="lbl-${ns('processing')}">INDEXING</text>
+      <text x="188" y="10" text-anchor="start" class="lbl-${ns('done')}">SUCCEED</text>
+      <text x="188" y="33" text-anchor="start" class="lbl-${ns('failed')}">FAILED</text>
+    </svg>`;
 }
 
-function renderIndexStatusMeta(job, statusText, queueText, etaText, recentJobs) {
+function renderIndexStatusMeta(job, statusText, queueText, etaText, recentJobs, graphStats) {
   const repoText = job?.repo_path || 'No active job yet';
   const isPending = job && (job.status === 'pending' || job.status === 'processing');
   const jobs = recentJobs || [];
@@ -1604,14 +1557,22 @@ function renderIndexStatusMeta(job, statusText, queueText, etaText, recentJobs) 
   const incrText = latestIncr
     ? `${latestIncr.files} Files / ${latestIncr.symbols || 0} Symbols`
     : 'N/A';
+  const gs = graphStats;
+  const graphNodesText = gs
+    ? `${gs.total_nodes.toLocaleString()} (${gs.files} Files · ${gs.symbols} Symbols · ${gs.variables} Vars)`
+    : 'N/A';
+  const graphEdgesText = gs
+    ? `${gs.total_edges.toLocaleString()} (${gs.call_edges} Calls · ${gs.flow_edges} Flows · ${gs.uses_variable_edges} UsesVar · ${gs.defines_edges} Def · ${gs.contains_edges} Cont)`
+    : 'N/A';
   return `
     <div class="index-status-meta">
-      <span class="index-status-chip"><strong>Status</strong> ${esc(statusText)}</span>
-      ${isPending ? `<span class="index-status-chip"><strong>Queue</strong> ${esc(queueText)}</span>` : ''}
-      ${isPending ? `<span class="index-status-chip"><strong>ETA</strong> ${esc(etaText)}</span>` : ''}
-      <span class="index-status-chip metrics"><strong>Full Index</strong> ${esc(fullText)}</span>
-      <span class="index-status-chip metrics"><strong>Reindex</strong> ${esc(incrText)}</span>
-      <span class="index-status-chip" title="${esc(repoText)}"><strong>Source</strong> ${esc(repoText)}</span>
+      ${isPending ? `<span class="status-icon" title=""><span class="status-tooltip"><strong>Queue</strong> ${esc(queueText)}</span>⏳</span>` : ''}
+      ${isPending ? `<span class="status-icon" title=""><span class="status-tooltip"><strong>ETA</strong> ${esc(etaText)}</span>⏱</span>` : ''}
+      <span class="status-icon graph-live"><span class="status-tooltip"><strong>Nodes</strong> ${esc(graphNodesText)}</span>🔵</span>
+      <span class="status-icon graph-live"><span class="status-tooltip"><strong>Edges</strong> ${esc(graphEdgesText)}</span>🔗</span>
+      <span class="status-icon metrics"><span class="status-tooltip"><strong>Last Full</strong> ${esc(fullText)}</span>📦</span>
+      <span class="status-icon metrics"><span class="status-tooltip"><strong>Last Reindex</strong> ${esc(incrText)}</span>🔄</span>
+      <span class="status-icon"><span class="status-tooltip"><strong>Source</strong> ${esc(repoText)}</span>📁</span>
     </div>
   `;
 }
@@ -1699,7 +1660,7 @@ function filterProjects(q) {
   });
 
   if (!displayRows.length) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">${kw ? 'No matching projects' : 'No projects yet'}</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state">${kw ? 'No matching projects' : 'No projects yet'}</div></td></tr>`;
     return;
   }
   tbody.innerHTML = displayRows.map(p => {
@@ -1717,21 +1678,22 @@ function filterProjects(q) {
       : 'idle';
     const trackerHtml = renderIndexTracker(job);
     const recentJobs = status?.recent_jobs || [];
-    const metaHtml = renderIndexStatusMeta(job, statusText, queueText, etaText, recentJobs);
+    const graphStats = status?.graph_stats || null;
+    const metaHtml = renderIndexStatusMeta(job, statusText, queueText, etaText, recentJobs, graphStats);
     const expanded = _expandedProjectIds.has(p.id);
     return `
     <tr>
       <td><button class="expand-btn" onclick="toggleTokens(${p.id},this)">${expanded ? '&#9660;' : '&#9654;'}</button></td>
       <td style="font-family:monospace;font-size:12px;color:var(--muted);text-align:center">${esc(p.project_id)}</td>
       <td>
-        <strong>${esc(p.project_name)}</strong>
+        <strong style="color:${p.is_active ? 'var(--accent)' : 'var(--danger)'}">${esc(p.project_name)}</strong>
+      </td>
+      <td>
         <div class="index-status-panel">
           <div class="index-tracker">${trackerHtml}</div>
           ${metaHtml}
         </div>
       </td>
-      <td style="color:var(--muted)">${esc(p.upstream_url||'—')}</td>
-      <td style="text-align:center"><span class="${p.is_active?'badge-active':'badge-inactive'}">${p.is_active?'Active':'Inactive'}</span></td>
       <td style="color:var(--muted);font-size:12px;font-family:monospace;text-align:center">${esc(p.created_at)}</td>
       <td>
         <div class="project-actions">
@@ -1745,7 +1707,7 @@ function filterProjects(q) {
       </td>
     </tr>
     <tr id="tokens-row-${p.id}" style="display:${expanded ? '' : 'none'}">
-      <td colspan="7" style="padding:0 12px 12px 36px">
+      <td colspan="6" style="padding:0 12px 12px 36px">
         <div id="tokens-panel-${p.id}"></div>
       </td>
     </tr>

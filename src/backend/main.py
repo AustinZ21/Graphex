@@ -109,6 +109,7 @@ async def lifespan(app: FastAPI):
     
     # Make consumer available via app state for API endpoints
     app.state.consumer = _consumer
+    app.state.registry = _registry
     
     log.info("contextgraph.started", falkordb=f"{FALKORDB_HOST}:{FALKORDB_PORT}")
 

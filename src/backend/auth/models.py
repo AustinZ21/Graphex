@@ -160,12 +160,27 @@ class IndexJobStatus(BaseModel):
     eta_seconds: int | None = None
 
 
+class GraphLiveStats(BaseModel):
+    """Live node/edge counts from FalkorDB."""
+    files: int = 0
+    symbols: int = 0
+    variables: int = 0
+    call_edges: int = 0
+    flow_edges: int = 0
+    uses_variable_edges: int = 0
+    defines_edges: int = 0
+    contains_edges: int = 0
+    total_nodes: int = 0
+    total_edges: int = 0
+
+
 class ProjectIndexStatus(BaseModel):
     """Index status for a project."""
     project_id: int
     project_name: str
     latest_job: IndexJobStatus | None = None
     recent_jobs: list[IndexJobStatus] = Field(default_factory=list)
+    graph_stats: GraphLiveStats | None = None
 
 
 class ProjectIndexTriggerOut(BaseModel):

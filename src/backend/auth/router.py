@@ -18,11 +18,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from backend.auth.database import get_db
-from backend.auth.dependencies import get_current_user, require_admin, get_consumer
+from backend.auth.dependencies import get_current_user, require_admin, get_consumer, get_registry
 from backend.auth.models import (
     AuditLogOut,
     AdminUserUpdate,
     GenerateTokenRequest,
+    GraphLiveStats,
     IndexJobStatus,
     LoginRequest,
     ProjectCreate,
@@ -248,6 +249,40 @@ def _build_index_job_status(
 def _random_project_id(length: int = 10) -> str:
     alphabet = string.ascii_uppercase + string.digits
     return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+def _query_graph_live_stats(registry, project_name: str) -> GraphLiveStats | None:
+    """Query FalkorDB for live node/edge counts of a project graph."""
+    if not registry:
+        return None
+    try:
+        graph = registry.get(project_name)
+        _q = lambda cypher: (graph.query(cypher).result_set or [[0]])[0][0]
+        files = _q("MATCH (f:File) RETURN count(f)")
+        symbols = _q("MATCH (s:Symbol) RETURN count(s)")
+        variables = _q("MATCH (v:Variable) RETURN count(v)")
+        repos = _q("MATCH (r:Repository) RETURN count(r)")
+        call_edges = _q("MATCH ()-[c:CALLS]->() RETURN count(c)")
+        flow_edges = _q("MATCH ()-[f:FLOWS_TO]->() RETURN count(f)")
+        uses_var = _q("MATCH ()-[u:USES_VARIABLE]->() RETURN count(u)")
+        defines = _q("MATCH ()-[d:DEFINES]->() RETURN count(d)")
+        contains = _q("MATCH ()-[c:CONTAINS]->() RETURN count(c)")
+        total_nodes = files + symbols + variables + repos
+        total_edges = call_edges + flow_edges + uses_var + defines + contains
+        return GraphLiveStats(
+            files=files,
+            symbols=symbols,
+            variables=variables,
+            call_edges=call_edges,
+            flow_edges=flow_edges,
+            uses_variable_edges=uses_var,
+            defines_edges=defines,
+            contains_edges=contains,
+            total_nodes=total_nodes,
+            total_edges=total_edges,
+        )
+    except Exception:
+        return None
 
 
 # ── Auth ───────────────────────────────────────────────────────────────────
@@ -735,6 +770,7 @@ async def list_projects_index_status(
     _: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
     consumer = Depends(get_consumer),
+    registry = Depends(get_registry),
 ):
     """Get indexing status for all projects."""
 
@@ -814,6 +850,7 @@ async def list_projects_index_status(
             project_name=proj_dict["project_name"],
             latest_job=latest_job,
             recent_jobs=recent_jobs,
+            graph_stats=_query_graph_live_stats(registry, proj_dict["project_name"]),
         ))
 
     return results
