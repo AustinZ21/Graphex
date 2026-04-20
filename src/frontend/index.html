@@ -329,6 +329,7 @@
     .btn:hover { opacity: .88; }
     .btn-primary { background: var(--accent); color: #0e1a14; }
     .btn-danger  { background: var(--danger-soft); color: var(--danger); border: 1px solid rgba(227,90,90,.3); }
+    .btn-accent  { background: rgba(74,227,135,.12); color: var(--accent); border: 1px solid rgba(74,227,135,.3); }
     .btn-ghost   { background: transparent; color: var(--muted); border: 1px solid var(--border); }
     .btn-sm { padding: 5px 10px; font-size: 12px; }
 
@@ -396,7 +397,7 @@
     .tracker-svg .line-active { stroke: rgba(74,227,135,.7); }
     .tracker-svg .line-failed { stroke: rgba(227,90,90,.7); }
     .tracker-svg .lbl-dim { fill: rgba(115,129,156,.65); }
-    .tracker-svg .lbl-active { fill: rgba(200,210,225,.95); }
+    .tracker-svg .lbl-active { fill: rgba(74,227,135,.95); }
     .tracker-svg .lbl-current { fill: rgba(200,210,225,.95); }
     .tracker-svg .lbl-failed { fill: rgba(255,179,179,1); }
     @keyframes svgNodePulse {
@@ -1702,7 +1703,10 @@ function filterProjects(q) {
             <button class="btn btn-sm btn-ghost" onclick="triggerProjectIndex(${p.id})" ${isProcessing ? 'disabled title="Index job already running"' : ''}>Reindex</button>
             <button class="btn btn-sm btn-ghost" onclick="triggerProjectFullIndex(${p.id})" ${isProcessing ? 'disabled title="Index job already running"' : ''}>Full Index</button>
             <button class="btn btn-sm" onclick="openEditProject(${p.id})">Edit</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteProject(${p.id})">Delete</button>`:''}
+            ${p.is_active
+              ? `<button class="btn btn-sm btn-danger" onclick="deleteProject(${p.id})">Delete</button>`
+              : `<button class="btn btn-sm btn-accent" onclick="restoreProject(${p.id})">Restore</button>`
+            }`:''}
         </div>
       </td>
     </tr>
@@ -1839,6 +1843,11 @@ async function submitProjectModal() {
 async function deleteProject(id) {
   if (!confirm('Delete this project and all its tokens?')) return;
   try { await api('DELETE',`/auth/projects/${id}`); toast('Project deleted'); location.reload(); }
+  catch(e) { toast(e.message,'error'); }
+}
+async function restoreProject(id) {
+  if (!confirm('Restore this project?')) return;
+  try { await api('POST',`/auth/projects/${id}/restore`); toast('Project restored'); location.reload(); }
   catch(e) { toast(e.message,'error'); }
 }
 

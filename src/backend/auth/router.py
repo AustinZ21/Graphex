@@ -637,6 +637,16 @@ async def delete_project(
     await db.commit()
 
 
+@router.post("/projects/{project_id}/restore", status_code=204)
+async def restore_project(
+    project_id: int,
+    _: dict = Depends(require_admin),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    await db.execute("UPDATE projects SET is_active = 1 WHERE id = ?", (project_id,))
+    await db.commit()
+
+
 @router.patch("/projects/{project_id}", response_model=ProjectOut)
 async def update_project(
     project_id: int,
