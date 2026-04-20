@@ -164,6 +164,20 @@ class ProjectIndexStatus(BaseModel):
     latest_job: IndexJobStatus | None = None
 
 
+class ProjectIndexTriggerOut(BaseModel):
+    """Result of triggering an index job for a specific project from the admin API."""
+    project_id: int
+    project_key: str
+    repo_path: str
+    status: str
+    mode: str
+    job_id: str | None = None
+    stream_id: str | None = None
+    changed_count: int = 0
+    destructive_count: int = 0
+    reason: str | None = None
+
+
 class AuditLogOut(BaseModel):
     id: int
     created_at: str

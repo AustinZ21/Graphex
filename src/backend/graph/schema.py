@@ -15,6 +15,21 @@ MERGE (r:Repository {path: $path})
 SET r.name = $name
 """
 
+DELETE_REPO_SUBGRAPH = """
+MATCH (r:Repository {path: $repo_path})
+OPTIONAL MATCH (r)-[:CONTAINS]->(f:File)
+WITH r, collect(DISTINCT f.path) AS file_paths, collect(DISTINCT f) AS files
+OPTIONAL MATCH (s:Symbol)
+WHERE s.file_path IN file_paths
+WITH r, files, file_paths, collect(DISTINCT s) AS symbols
+OPTIONAL MATCH (v:Variable)
+WHERE v.file_path IN file_paths
+WITH collect(DISTINCT r) + files + symbols + collect(DISTINCT v) AS nodes
+UNWIND nodes AS node
+WITH DISTINCT node WHERE node IS NOT NULL
+DETACH DELETE node
+"""
+
 MERGE_FILE = """
 MERGE (f:File {path: $path})
 SET f.language = $language,
@@ -23,6 +38,20 @@ SET f.language = $language,
     f.calls_hash = $calls_hash,
   f.imports_hash = $imports_hash,
   f.variables_hash = $variables_hash
+"""
+
+DELETE_FILE_SUBGRAPH = """
+OPTIONAL MATCH (f:File {path: $file_path})
+WITH collect(DISTINCT f) AS files
+OPTIONAL MATCH (s:Symbol)
+WHERE s.file_path = $file_path
+WITH files, collect(DISTINCT s) AS symbols
+OPTIONAL MATCH (v:Variable)
+WHERE v.file_path = $file_path
+WITH files + symbols + collect(DISTINCT v) AS nodes
+UNWIND nodes AS node
+WITH DISTINCT node WHERE node IS NOT NULL
+DETACH DELETE node
 """
 
 MERGE_SYMBOL = """

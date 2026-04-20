@@ -8,6 +8,7 @@ import os
 import secrets
 import string
 import time
+from pathlib import Path
 from urllib.parse import urlencode
 
 import aiosqlite
@@ -24,6 +25,7 @@ from backend.auth.models import (
     IndexJobStatus,
     LoginRequest,
     ProjectCreate,
+    ProjectIndexTriggerOut,
     ProjectIndexStatus,
     ProjectOut,
     ProjectTokenOut,
@@ -34,6 +36,7 @@ from backend.auth.models import (
     UserOut,
     UserProfileUpdate,
 )
+from backend.tools import server as mcp_server
 from backend.auth.security import (
     create_access_token,
     generate_token,
@@ -58,6 +61,47 @@ GITHUB_OAUTH_ALLOWED_ORGS = {
 }
 GITHUB_OAUTH_STATE_SECRET = os.getenv("GITHUB_OAUTH_STATE_SECRET", os.getenv("JWT_SECRET_KEY", "dev-local-state-secret"))
 GITHUB_OAUTH_STATE_TTL_SEC = int(os.getenv("GITHUB_OAUTH_STATE_TTL_SEC", "600"))
+_LOCAL_REPOS_ROOT = Path(__file__).resolve().parents[4]
+
+
+def _candidate_repo_paths(project_key: str) -> list[str]:
+    candidates: list[str] = []
+    normalized = project_key.strip()
+    if not normalized:
+        return candidates
+
+    try:
+        if _LOCAL_REPOS_ROOT.exists():
+            for child in _LOCAL_REPOS_ROOT.iterdir():
+                if child.is_dir() and child.name.lower() == normalized.lower():
+                    candidates.append(str(child))
+    except Exception:
+        pass
+
+    fallbacks = [
+        f"D:/Repos/{normalized}",
+        f"D:/Repos/{normalized.lower()}",
+        f"d:/repos/{normalized}",
+        f"d:/repos/{normalized.lower()}",
+        f"/repos/{normalized}",
+        f"/repos/{normalized.lower()}",
+    ]
+    seen = {c.lower() for c in candidates}
+    for candidate in fallbacks:
+        if candidate.lower() not in seen:
+            candidates.append(candidate)
+            seen.add(candidate.lower())
+    return candidates
+
+
+def _resolve_repo_path(project_key: str) -> str | None:
+    for candidate in _candidate_repo_paths(project_key):
+        try:
+            if Path(candidate).exists():
+                return candidate
+        except Exception:
+            continue
+    return None
 
 
 def _github_oauth_enabled() -> bool:
@@ -656,12 +700,7 @@ async def list_projects_index_status(
         # Get latest job status for this project (if consumer available)
         if consumer:
             try:
-                # Use project_id path pattern from OSAgent/.env and BrowserAgent/.env
-                # Try both common repo path patterns
-                repo_patterns = [
-                    f"D:/Repos/{proj_dict['project_key']}",
-                    f"d:/repos/{proj_dict['project_key'].lower()}",
-                ]
+                repo_patterns = _candidate_repo_paths(proj_dict["project_key"])
                 
                 jobs = []
                 for pattern in repo_patterns:
@@ -693,6 +732,46 @@ async def list_projects_index_status(
         ))
     
     return results
+
+
+@router.post("/projects/{project_id}/index", response_model=ProjectIndexTriggerOut)
+async def trigger_project_index(
+    project_id: int,
+    _: dict = Depends(require_admin),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    async with db.execute(
+        "SELECT id, project_key, project_id, is_active FROM projects WHERE id = ?",
+        (project_id,),
+    ) as cur:
+        row = await cur.fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project = dict(row)
+    if not project.get("is_active"):
+        raise HTTPException(status_code=400, detail="Project is inactive")
+
+    repo_path = _resolve_repo_path(project["project_key"])
+    if not repo_path:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Repository path not found for project_key '{project['project_key']}'",
+        )
+
+    result = await mcp_server.index_repo_changes(repo_path=repo_path)
+    return ProjectIndexTriggerOut(
+        project_id=project["id"],
+        project_key=project["project_key"],
+        repo_path=repo_path,
+        status=result.get("status", "queued"),
+        mode=result.get("mode", "incremental"),
+        job_id=result.get("job_id"),
+        stream_id=result.get("stream_id"),
+        changed_count=int(result.get("changed_count") or 0),
+        destructive_count=int(result.get("destructive_count") or 0),
+        reason=result.get("reason"),
+    )
 
 
 @router.get("/audit", response_model=list[AuditLogOut])

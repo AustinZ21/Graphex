@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from unittest.mock import MagicMock
+from pathlib import Path
 
 from backend.graph import schema as S
 from backend.indexer.call_analyzer import RawCall
@@ -76,3 +77,72 @@ def test_write_cross_scope_variable_flows_writes_argument_and_return_edges() -> 
     all_rows = [row for call in batch_flow_calls for row in call.args[1].get("rows", [])]
     assert any(r["source_qname"] == "pkg.caller:input" and r["target_qname"] == "pkg.callee:param" for r in all_rows)
     assert any(r["source_qname"] == "pkg.callee:__return__" and r["target_qname"] == "pkg.caller:result" for r in all_rows)
+
+
+def test_index_full_clears_repo_subgraph_before_rebuild(tmp_path: Path) -> None:
+    graph = MagicMock()
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    (repo_root / "service.py").write_text("def render(x):\n    return x\n", encoding="utf-8")
+    pipeline = IndexPipeline(graph)
+    pipeline._index_file = MagicMock(return_value={
+        "files": 1,
+        "skipped": 0,
+        "symbols": 0,
+        "calls": 0,
+        "imports": 0,
+        "variables": 0,
+        "variable_flows": 0,
+        "errors": 0,
+    })
+    pipeline._count_symbols = MagicMock(return_value=0)
+
+    pipeline.index_full(str(repo_root))
+
+    calls = graph.query.call_args_list
+    delete_idx = next(i for i, call in enumerate(calls) if call.args[0] == S.DELETE_REPO_SUBGRAPH)
+    merge_idx = next(i for i, call in enumerate(calls) if call.args[0] == S.MERGE_REPO)
+    assert delete_idx < merge_idx
+
+
+def test_index_file_clears_existing_file_subgraph_before_rewrite(tmp_path: Path) -> None:
+    graph = MagicMock()
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    file_path = repo_root / "service.py"
+    file_path.write_text(
+        "def normalize(raw):\n    value = raw.strip()\n    return value\n",
+        encoding="utf-8",
+    )
+    pipeline = IndexPipeline(graph)
+    pipeline._get_stored_hash = MagicMock(return_value="old-hash")
+    pipeline._write_python_call_edges = MagicMock(return_value=0)
+    pipeline._write_import_edges = MagicMock(return_value=0)
+    pipeline._write_variable_flow_edges = MagicMock(return_value={"variables": 0, "variable_flows": 0})
+    pipeline._write_cross_scope_variable_flows = MagicMock(return_value=0)
+
+    pipeline._index_file(str(repo_root), str(file_path), {}, force=False)
+
+    calls = graph.query.call_args_list
+    delete_idx = next(i for i, call in enumerate(calls) if call.args[0] == S.DELETE_FILE_SUBGRAPH)
+    merge_idx = next(i for i, call in enumerate(calls) if call.args[0] == S.MERGE_FILE)
+    assert delete_idx < merge_idx
+
+
+def test_index_incremental_deletes_missing_file_subgraph_without_error(tmp_path: Path) -> None:
+    graph = MagicMock()
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    missing_file = repo_root / "removed.py"
+    pipeline = IndexPipeline(graph)
+    pipeline._load_symbol_map = MagicMock(return_value={})
+    pipeline._count_symbols = MagicMock(return_value=0)
+
+    stats = pipeline.index_incremental(str(repo_root), [str(missing_file)])
+
+    assert stats["errors"] == 0
+    assert any(
+        call.args[0] == S.DELETE_FILE_SUBGRAPH and call.args[1]["file_path"] == str(missing_file)
+        for call in graph.query.call_args_list
+        if len(call.args) > 1
+    )

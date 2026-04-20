@@ -1186,6 +1186,17 @@ async function updateIndexStatus() {
   }
 }
 
+async function triggerProjectIndex(projectId) {
+  try {
+    const result = await api('POST', `/auth/projects/${projectId}/index`);
+    const mode = result.mode || 'incremental';
+    toast(`Reindex queued: ${mode}`);
+    await updateIndexStatus();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
 function filterProjects(q) {
   const tbody = document.getElementById('projects-body');
   const kw = q.trim().toLowerCase();
@@ -1250,6 +1261,7 @@ function filterProjects(q) {
         <div class="project-actions">
           <button class="btn btn-sm btn-ghost" onclick="openGenerateToken(${p.id})">+ Token</button>
           ${_me?.role==='admin'?`
+            <button class="btn btn-sm btn-ghost" onclick="triggerProjectIndex(${p.id})" ${isProcessing ? 'disabled title="Index job already running"' : ''}>Reindex</button>
             <button class="btn btn-sm" onclick="openEditProject(${p.id})">Edit</button>
             <button class="btn btn-sm btn-danger" onclick="deleteProject(${p.id})">Delete</button>`:''}
         </div>

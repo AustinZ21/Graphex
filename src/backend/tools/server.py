@@ -2,7 +2,7 @@
 
 Phase 1 tools
 -------------
-index_full / index_incremental  - enqueue jobs via MQ
+index_full / index_incremental / index_repo_changes  - enqueue jobs via MQ
 find_symbol / find_callers / find_callees / retrieve_context  - graph reads
 
 Phase 2 additions
@@ -22,6 +22,7 @@ All read tool calls are trace-recorded for hallucination-proxy scoring.
 from __future__ import annotations
 
 import os
+import subprocess
 import time
 from pathlib import Path
 
@@ -64,6 +65,66 @@ class _GraphProxy:
 
 
 _graph = _GraphProxy()
+
+
+def _collect_git_changed_paths(repo_path: str, include_untracked: bool = True) -> dict[str, list[str]]:
+    """Discover changed paths from the local git worktree.
+
+    Returns:
+        {
+            "changed_paths": [...],       # files safe for incremental indexing
+            "destructive_paths": [...],   # deleted / renamed-away paths requiring full reindex
+        }
+
+    We classify deletes and renames as destructive because the current incremental
+    pipeline does not remove stale symbols for files that disappeared from disk.
+    """
+    cmd = ["git", "-C", repo_path, "status", "--porcelain=v1"]
+    cmd.append("--untracked-files=all" if include_untracked else "--untracked-files=no")
+    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    if proc.returncode != 0:
+        raise RuntimeError((proc.stderr or proc.stdout or "git status failed").strip())
+
+    changed_paths: list[str] = []
+    destructive_paths: list[str] = []
+    seen_changed: set[str] = set()
+    seen_destructive: set[str] = set()
+
+    for raw_line in proc.stdout.splitlines():
+        line = raw_line.rstrip()
+        if len(line) < 3:
+            continue
+        status = line[:2]
+        payload = line[3:].strip()
+        staged = status[0]
+        unstaged = status[1]
+
+        if "->" in payload:
+            old_path, new_path = [part.strip() for part in payload.split("->", 1)]
+            if old_path not in seen_destructive:
+                destructive_paths.append(old_path)
+                seen_destructive.add(old_path)
+            if new_path not in seen_changed:
+                changed_paths.append(new_path)
+                seen_changed.add(new_path)
+            continue
+
+        path = payload
+        destructive = any(flag == "D" for flag in (staged, unstaged))
+        if destructive:
+            if path not in seen_destructive:
+                destructive_paths.append(path)
+                seen_destructive.add(path)
+            continue
+
+        if path not in seen_changed:
+            changed_paths.append(path)
+            seen_changed.add(path)
+
+    return {
+        "changed_paths": changed_paths,
+        "destructive_paths": destructive_paths,
+    }
 
 
 def init(
@@ -192,6 +253,119 @@ async def index_incremental(repo_path: str, changed_paths: list[str]) -> dict:
         "stream_id": submitted["stream_id"],
         "job_id": submitted["job_id"],
         "changed_count": len(changed_paths),
+    }
+
+
+@mcp.tool()
+async def index_repo_changes(
+    repo_path: str,
+    include_untracked: bool = True,
+    auto_full_on_destructive: bool = False,
+) -> dict:
+    """Index current git worktree changes for a repository.
+
+    This is a convenience wrapper for the common agent workflow of:
+    1) discover changed files from git
+     2) queue incremental indexing for current file additions/modifications
+     3) include deleted/renamed-away paths in the incremental job so the native
+         pipeline can remove stale file-local graph data.
+
+     `auto_full_on_destructive=True` remains available as a conservative fallback.
+    """
+    if not _producer:
+        raise RuntimeError("MCP server not initialized")
+    from backend.graph.registry import _current_project_key
+    project_key = _current_project_key.get()
+
+    try:
+        discovered = _collect_git_changed_paths(repo_path, include_untracked=include_untracked)
+    except FileNotFoundError:
+        log.warning(
+            "index_repo_changes.git_unavailable",
+            repo_path=repo_path,
+            fallback_mode="full",
+        )
+        submitted = await _producer.submit_full_index(repo_path, project_key=project_key)
+        if _cache:
+            _cache.invalidate_all()
+        return {
+            "status": "queued",
+            "mode": "full",
+            "reason": "git_unavailable",
+            "stream_id": submitted["stream_id"],
+            "job_id": submitted["job_id"],
+            "changed_count": 0,
+            "destructive_count": 0,
+            "repo_path": repo_path,
+        }
+    except RuntimeError as exc:
+        log.warning(
+            "index_repo_changes.git_status_failed",
+            repo_path=repo_path,
+            error=str(exc),
+            fallback_mode="full",
+        )
+        submitted = await _producer.submit_full_index(repo_path, project_key=project_key)
+        if _cache:
+            _cache.invalidate_all()
+        return {
+            "status": "queued",
+            "mode": "full",
+            "reason": "git_status_failed",
+            "stream_id": submitted["stream_id"],
+            "job_id": submitted["job_id"],
+            "changed_count": 0,
+            "destructive_count": 0,
+            "repo_path": repo_path,
+        }
+
+    changed_paths = discovered["changed_paths"]
+    destructive_paths = discovered["destructive_paths"]
+    incremental_paths: list[str] = []
+    seen_paths: set[str] = set()
+    for path in destructive_paths + changed_paths:
+        if path not in seen_paths:
+            incremental_paths.append(path)
+            seen_paths.add(path)
+    if not incremental_paths:
+        return {
+            "status": "noop",
+            "mode": "none",
+            "changed_count": 0,
+            "destructive_count": 0,
+            "repo_path": repo_path,
+        }
+
+    if destructive_paths and auto_full_on_destructive:
+        submitted = await _producer.submit_full_index(repo_path, project_key=project_key)
+        if _cache:
+            _cache.invalidate_all()
+        return {
+            "status": "queued",
+            "mode": "full",
+            "reason": "destructive_git_change",
+            "stream_id": submitted["stream_id"],
+            "job_id": submitted["job_id"],
+            "changed_count": len(changed_paths),
+            "destructive_count": len(destructive_paths),
+            "repo_path": repo_path,
+        }
+
+    submitted = await _producer.submit_incremental_index(
+        repo_path,
+        incremental_paths,
+        project_key=project_key,
+    )
+    if _cache:
+        _cache.invalidate_all()
+    return {
+        "status": "queued",
+        "mode": "incremental",
+        "stream_id": submitted["stream_id"],
+        "job_id": submitted["job_id"],
+        "changed_count": len(incremental_paths),
+        "destructive_count": len(destructive_paths),
+        "repo_path": repo_path,
     }
 
 

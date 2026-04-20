@@ -132,6 +132,7 @@ class IndexPipeline:
         files = list(discover_files(resolved_repo_path))
         workers = _adaptive_workers(len(files))
         log.info("pipeline.full.start", repo_path=repo_path, resolved_repo_path=resolved_repo_path, files=len(files), workers=workers)
+        self._delete_repo_subgraph(repo_path)
         self._upsert_repo(repo_path)
         stats: dict = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "imports": 0, "variables": 0, "variable_flows": 0, "errors": 0}
         symbol_map: dict[str, str] = {}
@@ -198,6 +199,12 @@ class IndexPipeline:
         name = Path(repo_path).name
         self._graph.query(S.MERGE_REPO, {"path": repo_path, "name": name})
 
+    def _delete_repo_subgraph(self, repo_path: str) -> None:
+        self._locked_query(S.DELETE_REPO_SUBGRAPH, {"repo_path": repo_path})
+
+    def _delete_file_subgraph(self, file_path: str) -> None:
+        self._locked_query(S.DELETE_FILE_SUBGRAPH, {"file_path": file_path})
+
     def _index_file(
         self,
         repo_path: str,
@@ -209,7 +216,11 @@ class IndexPipeline:
         result = {"files": 0, "skipped": 0, "symbols": 0, "calls": 0, "imports": 0, "variables": 0, "variable_flows": 0, "errors": 0}
         try:
             from backend.indexer.hasher import hash_symbols, hash_calls, hash_imports
-            
+
+            if not Path(file_path).exists():
+                self._delete_file_subgraph(file_path)
+                return result
+
             current_hash = sha256_file(file_path)
             if not force:
                 stored = self._get_stored_hash(file_path)
@@ -225,12 +236,12 @@ class IndexPipeline:
             current_calls_hash = hash_calls(parsed)
             current_imports_hash = hash_imports(parsed)
             current_variables_hash = hash_variable_flows(parsed)
-            
-            stored_hashes = self._get_stored_symbol_hashes(file_path) if not force else {}
-            symbols_changed = stored_hashes.get("symbols_hash") != current_symbols_hash
-            calls_changed = stored_hashes.get("calls_hash") != current_calls_hash
-            imports_changed = stored_hashes.get("imports_hash") != current_imports_hash
-            variables_changed = stored_hashes.get("variables_hash") != current_variables_hash
+
+            # For changed files we rebuild the complete file-local subgraph after clearing
+            # stale nodes/edges first. This preserves correctness for removed symbols,
+            # imports, variables, and call/flow relationships.
+            if not force:
+                self._delete_file_subgraph(file_path)
 
             with self._graph_lock:
                 self._graph.query(
@@ -250,62 +261,54 @@ class IndexPipeline:
                     {"repo_path": repo_path, "file_path": file_path},
                 )
 
-            if symbols_changed:
-                sym_rows = [
-                    {
-                        "qualified_name": sym.qualified_name,
-                        "name": sym.name,
-                        "symbol_type": sym.symbol_type,
-                        "file_path": sym.file_path,
-                        "line_start": sym.line_start,
-                        "line_end": sym.line_end,
-                    }
-                    for sym in parsed.symbols
-                ]
-                def_rows = [
-                    {"file_path": file_path, "qualified_name": sym.qualified_name}
-                    for sym in parsed.symbols
-                ]
-                if sym_rows:
-                    with self._graph_lock:
-                        self._graph.query(S.BATCH_MERGE_SYMBOLS, {"rows": sym_rows})
-                        self._graph.query(S.BATCH_EDGE_FILE_DEFINES_SYMBOL, {"rows": def_rows})
-                new_symbols = {sym.name: sym.qualified_name for sym in parsed.symbols}
-                if symbol_map_lock:
-                    with symbol_map_lock:
-                        symbol_map.update(new_symbols)
-                else:
+            sym_rows = [
+                {
+                    "qualified_name": sym.qualified_name,
+                    "name": sym.name,
+                    "symbol_type": sym.symbol_type,
+                    "file_path": sym.file_path,
+                    "line_start": sym.line_start,
+                    "line_end": sym.line_end,
+                }
+                for sym in parsed.symbols
+            ]
+            def_rows = [
+                {"file_path": file_path, "qualified_name": sym.qualified_name}
+                for sym in parsed.symbols
+            ]
+            if sym_rows:
+                with self._graph_lock:
+                    self._graph.query(S.BATCH_MERGE_SYMBOLS, {"rows": sym_rows})
+                    self._graph.query(S.BATCH_EDGE_FILE_DEFINES_SYMBOL, {"rows": def_rows})
+            new_symbols = {sym.name: sym.qualified_name for sym in parsed.symbols}
+            if symbol_map_lock:
+                with symbol_map_lock:
                     symbol_map.update(new_symbols)
-                result["symbols"] += len(sym_rows)
+            else:
+                symbol_map.update(new_symbols)
+            result["symbols"] += len(sym_rows)
 
             python_raw_calls: list[RawCall] = []
-            if parsed.language == "python" and (calls_changed or variables_changed):
+            if parsed.language == "python":
                 python_raw_calls = self._extract_python_raw_calls(file_path)
 
-            if calls_changed:
-                if parsed.language == "python":
-                    result["calls"] = self._write_python_call_edges(python_raw_calls, symbol_map)
-                elif parsed.language in {"typescript", "javascript"}:
-                    result["calls"] = self._write_ts_js_call_edges(parsed.calls, symbol_map)
+            if parsed.language == "python":
+                result["calls"] = self._write_python_call_edges(python_raw_calls, symbol_map)
+            elif parsed.language in {"typescript", "javascript"}:
+                result["calls"] = self._write_ts_js_call_edges(parsed.calls, symbol_map)
 
-            if imports_changed:
-                result["imports"] = self._write_import_edges(file_path, parsed, repo_path)
+            result["imports"] = self._write_import_edges(file_path, parsed, repo_path)
 
-            if variables_changed:
-                variable_stats = self._write_variable_flow_edges(parsed)
-                result["variables"] = variable_stats["variables"]
-                result["variable_flows"] = variable_stats["variable_flows"]
+            variable_stats = self._write_variable_flow_edges(parsed)
+            result["variables"] = variable_stats["variables"]
+            result["variable_flows"] = variable_stats["variable_flows"]
 
-            if calls_changed or variables_changed:
-                if parsed.language == "python":
-                    result["variable_flows"] += self._write_cross_scope_variable_flows(python_raw_calls, symbol_map)
-                elif parsed.language in {"typescript", "javascript"}:
-                    result["variable_flows"] += self._write_cross_scope_variable_flows(parsed.calls, symbol_map)
+            if parsed.language == "python":
+                result["variable_flows"] += self._write_cross_scope_variable_flows(python_raw_calls, symbol_map)
+            elif parsed.language in {"typescript", "javascript"}:
+                result["variable_flows"] += self._write_cross_scope_variable_flows(parsed.calls, symbol_map)
 
-            if symbols_changed or calls_changed or imports_changed or variables_changed:
-                result["files"] = 1
-            else:
-                result["skipped"] = 1
+            result["files"] = 1
         except Exception as exc:
             log.error("pipeline.file_error", path=file_path, error=str(exc))
             result["errors"] = 1
@@ -474,24 +477,6 @@ class IndexPipeline:
         if rows and rows[0][0]:
             return rows[0][0]
         return None
-
-    def _get_stored_symbol_hashes(self, file_path: str) -> dict[str, str]:
-        """Get stored symbol-level hashes for fine-grained incremental tracking."""
-        try:
-            with self._graph_lock:
-                result = self._graph.query(S.QUERY_FILE_SYMBOL_HASHES, {"path": file_path})
-            if result.result_set and len(result.result_set[0]) >= 5:
-                row = result.result_set[0]
-                return {
-                    "content_hash": row[0],
-                    "symbols_hash": row[1],
-                    "calls_hash": row[2],
-                    "imports_hash": row[3],
-                    "variables_hash": row[4],
-                }
-        except Exception:
-            pass
-        return {}
 
     def _load_symbol_map(self) -> dict[str, str]:
         try:

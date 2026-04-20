@@ -39,10 +39,10 @@ def _mock_producer(stream_id: str = "1234-0") -> AsyncMock:
 
 
 def test_init_sets_singletons():
-    graph = MagicMock()
+    registry = MagicMock()
     producer = MagicMock()
-    mcp_srv.init(graph=graph, producer=producer)
-    assert mcp_srv._graph is graph
+    mcp_srv.init(registry=registry, producer=producer)
+    assert mcp_srv._registry is registry
     assert mcp_srv._producer is producer
 
 
@@ -210,7 +210,10 @@ async def test_index_full_queues_job():
     assert result["status"] == "queued"
     assert result["stream_id"] == "5000-0"
     assert result["job_id"] == "job-1"
-    mcp_srv._producer.submit_full_index.assert_awaited_once_with("/repo/myproject")
+    mcp_srv._producer.submit_full_index.assert_awaited_once_with(
+        "/repo/myproject",
+        project_key="contextgraph",
+    )
 
 
 @pytest.mark.asyncio
@@ -222,6 +225,122 @@ async def test_index_incremental_queues_job():
     assert result["changed_count"] == 2
     assert result["job_id"] == "job-2"
     mcp_srv._producer.submit_incremental_index.assert_awaited_once()
+
+
+def test_collect_git_changed_paths_parses_modified_and_untracked():
+    completed = MagicMock(returncode=0, stdout=" M src/a.py\n?? docs/b.md\n")
+    with patch("backend.tools.server.subprocess.run", return_value=completed):
+        result = mcp_srv._collect_git_changed_paths("/repo", include_untracked=True)
+    assert result["changed_paths"] == ["src/a.py", "docs/b.md"]
+    assert result["destructive_paths"] == []
+
+
+def test_collect_git_changed_paths_marks_delete_and_rename_destructive():
+    completed = MagicMock(returncode=0, stdout=" D src/old.py\nR  src/old2.py -> src/new2.py\n")
+    with patch("backend.tools.server.subprocess.run", return_value=completed):
+        result = mcp_srv._collect_git_changed_paths("/repo", include_untracked=True)
+    assert "src/old.py" in result["destructive_paths"]
+    assert "src/new2.py" in result["changed_paths"]
+    assert "src/old2.py" in result["destructive_paths"]
+
+
+@pytest.mark.asyncio
+async def test_index_repo_changes_returns_noop_when_git_clean():
+    mcp_srv._producer = _mock_producer("5010-0")
+    with patch(
+        "backend.tools.server._collect_git_changed_paths",
+        return_value={"changed_paths": [], "destructive_paths": []},
+    ):
+        result = await mcp_srv.index_repo_changes(repo_path="/repo")
+    assert result["status"] == "noop"
+    assert result["mode"] == "none"
+    mcp_srv._producer.submit_incremental_index.assert_not_called()
+    mcp_srv._producer.submit_full_index.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_index_repo_changes_queues_incremental_for_safe_git_changes():
+    mcp_srv._producer = _mock_producer("5011-0")
+    with patch(
+        "backend.tools.server._collect_git_changed_paths",
+        return_value={"changed_paths": ["src/a.py", "docs/b.md"], "destructive_paths": []},
+    ):
+        result = await mcp_srv.index_repo_changes(repo_path="/repo")
+    assert result["status"] == "queued"
+    assert result["mode"] == "incremental"
+    assert result["changed_count"] == 2
+    mcp_srv._producer.submit_incremental_index.assert_awaited_once()
+    mcp_srv._producer.submit_full_index.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_index_repo_changes_uses_incremental_for_destructive_git_changes_by_default():
+    mcp_srv._producer = _mock_producer("5012-0")
+    with patch(
+        "backend.tools.server._collect_git_changed_paths",
+        return_value={"changed_paths": ["src/new.py"], "destructive_paths": ["src/old.py"]},
+    ):
+        result = await mcp_srv.index_repo_changes(repo_path="/repo")
+    assert result["status"] == "queued"
+    assert result["mode"] == "incremental"
+    assert result["changed_count"] == 2
+    mcp_srv._producer.submit_incremental_index.assert_awaited_once_with(
+        "/repo",
+        ["src/old.py", "src/new.py"],
+        project_key="contextgraph",
+    )
+    mcp_srv._producer.submit_full_index.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_index_repo_changes_can_still_promote_to_full_on_destructive_git_changes():
+    mcp_srv._producer = _mock_producer("5013-0")
+    with patch(
+        "backend.tools.server._collect_git_changed_paths",
+        return_value={"changed_paths": ["src/new.py"], "destructive_paths": ["src/old.py"]},
+    ):
+        result = await mcp_srv.index_repo_changes(repo_path="/repo", auto_full_on_destructive=True)
+    assert result["status"] == "queued"
+    assert result["mode"] == "full"
+    assert result["reason"] == "destructive_git_change"
+    mcp_srv._producer.submit_full_index.assert_awaited_once()
+    mcp_srv._producer.submit_incremental_index.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_index_repo_changes_falls_back_to_full_when_git_binary_missing():
+    mcp_srv._producer = _mock_producer("5014-0")
+    with patch(
+        "backend.tools.server._collect_git_changed_paths",
+        side_effect=FileNotFoundError("git"),
+    ):
+        result = await mcp_srv.index_repo_changes(repo_path="/repo")
+    assert result["status"] == "queued"
+    assert result["mode"] == "full"
+    assert result["reason"] == "git_unavailable"
+    mcp_srv._producer.submit_full_index.assert_awaited_once_with(
+        "/repo",
+        project_key="contextgraph",
+    )
+    mcp_srv._producer.submit_incremental_index.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_index_repo_changes_falls_back_to_full_when_git_status_fails():
+    mcp_srv._producer = _mock_producer("5015-0")
+    with patch(
+        "backend.tools.server._collect_git_changed_paths",
+        side_effect=RuntimeError("git status failed"),
+    ):
+        result = await mcp_srv.index_repo_changes(repo_path="/repo")
+    assert result["status"] == "queued"
+    assert result["mode"] == "full"
+    assert result["reason"] == "git_status_failed"
+    mcp_srv._producer.submit_full_index.assert_awaited_once_with(
+        "/repo",
+        project_key="contextgraph",
+    )
+    mcp_srv._producer.submit_incremental_index.assert_not_called()
 
 
 @pytest.mark.asyncio

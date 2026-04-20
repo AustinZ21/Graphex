@@ -512,6 +512,7 @@ When these inline relations are present, `strategy_query` can often skip a separ
 Indexing tools (queued):
 - `index_full`
 - `index_incremental`
+- `index_repo_changes`
 
 Current language indexing support:
 - Python: symbols, imports, call edges (via AST)
@@ -525,9 +526,16 @@ For TS/JS projects, ContextGraph now indexes:
 This enables repository-wide lookup, relationship discovery, and CG-first agent routing across both Python and TS/JS codebases.
 
 Index status workflow:
-1. Call `index_full` or `index_incremental` and keep returned `job_id`.
+1. Call `index_full`, `index_incremental`, or `index_repo_changes` and keep returned `job_id`.
 2. Call `get_index_job_status(job_id)` for polling status.
 3. Or call `wait_for_index_ready(job_id, timeout_sec, poll_interval_sec)` to block until `done`/`failed`.
+
+Recommended routine workflow:
+- Use `index_repo_changes(repo_path)` for normal day-to-day workspaces backed by git.
+- The MCP server will discover modified files from `git status`.
+- Deleted and renamed-away paths are included in the incremental job so the native index pipeline can remove stale file-local graph data.
+- If you still want a conservative rebuild, call `index_repo_changes(repo_path, auto_full_on_destructive=true)`.
+- Use `index_incremental(repo_path, changed_paths)` only when the caller already has an exact changed-file list and knows no destructive git changes are involved.
 
 ## Troubleshooting
 

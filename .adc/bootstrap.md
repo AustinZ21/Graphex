@@ -33,7 +33,10 @@ Required one-time bootstrap indexing flow
 3) Treat indexing as successful only after the ContextGraph service returns a successful completion status.
 ```
 
-For all later changes, run incremental indexing on changed files only.
+For all later changes, prefer the MCP tool `index_repo_changes(repo_path)` for git-backed repositories.
+It discovers current worktree changes automatically and includes deleted or renamed-away paths in incremental indexing so stale file-local graph data is removed natively.
+Use `index_repo_changes(repo_path, auto_full_on_destructive=true)` only when you explicitly want a conservative full rebuild.
+Use raw `index_incremental(repo_path, changed_paths)` only when the caller already has an exact changed-file list.
 
 ## Auto-Enable CG Edge MCP Server Plugin (ADC Standard)
 
