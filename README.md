@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.39  
+**Version:** 1.29.40  
 **Status:** Published  
 **Author:** Nate Scott  
-**Date:** 2026-04-19 (docs: set CG Admin Solution 1 default + add one-command startup script)
+**Date:** 2026-04-20 (fix: tracker shows INDEXING instead of false QUEUED; dynamic version from backend)
 
 ## 1. Introduction
 

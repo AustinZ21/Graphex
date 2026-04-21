@@ -766,7 +766,7 @@
       </svg>
       ContextGraph Admin
     </a>
-    <span style="font-size:11px;color:var(--muted);padding-left:6px;align-self:center">v0.0.4</span>
+    <span id="app-version" style="font-size:11px;color:var(--muted);padding-left:6px;align-self:center">v…</span>
     <div style="flex:1"></div>
     <div class="topbar-nav">
       <button class="tab-btn active" id="tab-projects-btn" onclick="switchTab('projects',this)">Projects</button>
@@ -1226,6 +1226,10 @@ async function initApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   document.getElementById('topbar-user').textContent = _me.username;
+  // Fetch and display app version from backend
+  fetch('/health').then(r => r.json()).then(d => {
+    if (d.version) document.getElementById('app-version').textContent = 'v' + d.version;
+  }).catch(() => {});
   const roleEl = document.getElementById('topbar-role');
   roleEl.textContent = _me.role;
   roleEl.className = 'role-tag' + (_me.role === 'admin' ? '' : ' developer');
@@ -1491,7 +1495,7 @@ function relativeTimeLabel(value) {
 function formatStatusLabel(job) {
   if (!job) return 'Idle';
   const base = job.status === 'pending'
-    ? 'Queued'
+    ? ((job.queue_position && job.queue_position > 1) ? 'Queued' : 'Indexing')
     : job.status === 'processing'
       ? 'Indexing'
       : job.status === 'done'
@@ -1507,7 +1511,10 @@ function getIndexTrackerState(job) {
   if (job.status === 'failed') return 'failed';
   if (job.status === 'done') return 'done';
   if (job.status === 'processing') return 'processing';
-  if (job.status === 'pending') return 'pending';
+  if (job.status === 'pending') {
+    // Consumer picks up jobs nearly instantly; only show QUEUED when genuinely waiting behind others
+    return (job.queue_position && job.queue_position > 1) ? 'pending' : 'processing';
+  }
   return 'idle';
 }
 

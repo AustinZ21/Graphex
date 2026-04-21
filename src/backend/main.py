@@ -48,6 +48,8 @@ from backend.perf.token_efficiency import benchmark_token_efficiency, TokenBench
 
 log = structlog.get_logger()
 
+APP_VERSION = "0.0.5"
+
 FALKORDB_HOST = os.getenv("FALKORDB_HOST", "localhost")
 FALKORDB_PORT = int(os.getenv("FALKORDB_PORT", "6379"))
 FALKORDB_URL = os.getenv("FALKORDB_URL", f"falkor://{FALKORDB_HOST}:{FALKORDB_PORT}")
@@ -408,7 +410,7 @@ async def audit_request_middleware(request: Request, call_next):
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "service": "contextgraph"}
+    return {"status": "ok", "service": "contextgraph", "version": APP_VERSION}
 
 
 @app.get("/mcp")
