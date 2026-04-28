@@ -1,0 +1,43 @@
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant RA as RA (Coordinator)
+    participant CA as CA (Context)
+    participant EA as EA (Execution)
+    participant IA as IA (Integration)
+    participant MA as MA (Monitoring)
+    participant OA as OA (Optimization)
+    participant VA as VA (Validation)
+
+    U->>RA: Submit task
+    RA->>CA: Build context package
+    CA-->>RA: Context bundle
+
+    RA->>EA: Execute plan with context
+    EA-->>RA: Raw execution result
+
+    RA->>IA: Integrate outputs and dependencies
+    IA-->>RA: Integrated result
+
+    par Runtime visibility
+        RA->>MA: Request runtime telemetry
+        MA-->>RA: Health and signal metrics
+    and Quality gate
+        RA->>VA: Validate integrated result
+        VA-->>RA: Pass/Fail + findings
+    end
+
+    alt Validation failed
+        RA->>OA: Request optimization strategy
+        OA-->>RA: Optimization hints
+        RA->>EA: Re-run with optimized parameters
+        EA-->>RA: New execution result
+        RA->>IA: Re-integrate
+        IA-->>RA: Updated integrated result
+        RA->>VA: Re-validate
+        VA-->>RA: Pass
+    else Validation passed
+        Note over RA,VA: First-pass success
+    end
+
+    RA-->>U: Final verified result

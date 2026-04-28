@@ -1,12 +1,49 @@
-sequenceDiagram
-    participant U as User (Client)
-    participant A as API Gateway
-    participant C as Core Engine
-    participant DB as Database
-    
-    U->>A: POST /orders (Payload)
-    A->>C: Validate & Route Request
-    C->>DB: INSERT INTO orders
-    DB-->>C: Return Order ID
-    C-->>A: Format Response (JSON)
-    A-->>U: 201 Created (Order ID)
+flowchart TD
+    U[User Client] --> G[Gateway API]
+    G --> Auth[Auth Policy]
+
+    Auth -->|Access denied| Denied[403 Forbidden]
+    Denied --> U
+
+    Auth -->|Access granted| RA[RA Coordinator]
+
+    RA --> KV[Redis KV]
+    RA --> SQL[PostgreSQL Metadata]
+
+    RA --> CA[CA Context]
+    CA --> GE[Graph Query Engine]
+    GE --> GS[Graph Store]
+    GE --> VS[Vector Store]
+    GE --> CA
+    CA --> RA
+
+    RA --> EA[EA Execution]
+    EA --> RA
+
+    RA --> IA[IA Integration]
+    IA --> SQL
+    IA --> RA
+
+    RA --> VA[VA Validation]
+    VA -->|Validation passed| PASS[Verified Result]
+    PASS --> G
+    G --> OK[200 OK Result]
+    OK --> U
+
+    VA -->|Validation failed| FAIL[Validation Failed]
+    FAIL --> MA[MA Monitoring]
+    MA --> Obs[Observability]
+
+    FAIL -->|Recoverable| OA[OA Optimization]
+    OA --> EA
+    EA --> VA
+    VA -->|Recovered| REC[Recovered Result]
+    REC --> G
+    G --> OK2[200 OK Recovered]
+    OK2 --> U
+
+    FAIL -->|Non-recoverable| FATAL[Escalated Failure]
+    FATAL --> KV
+    FATAL --> G
+    G --> ERR[500 Error Incident Ref]
+    ERR --> U

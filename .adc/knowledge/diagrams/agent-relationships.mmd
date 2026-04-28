@@ -1,0 +1,56 @@
+flowchart LR
+    %% Coordination hub
+    RA[RA - Runtime Agent Coordinator]
+
+    %% Functional agents
+    CA[CA - Context Agent]
+    EA[EA - Execution Agent]
+    IA[IA - Integration Agent]
+    MA[MA - Monitoring Agent]
+    OA[OA - Optimization Agent]
+    VA[VA - Validation Agent]
+
+    %% Shared platform context
+    Relay[Relay Runtime]
+    Bus[(Event / Task Bus)]
+    KV[(Redis / KV)]
+    SQL[(PostgreSQL Metadata)]
+
+    %% Control and dispatch
+    RA -->|dispatch tasks| CA
+    RA -->|dispatch tasks| EA
+    RA -->|dispatch tasks| IA
+    RA -->|dispatch tasks| MA
+    RA -->|dispatch tasks| OA
+    RA -->|dispatch tasks| VA
+
+    %% Cross-agent collaboration
+    CA -->|context package| EA
+    CA -->|context package| IA
+    EA -->|execution results| IA
+    IA -->|integration status| EA
+    MA -->|runtime telemetry| OA
+    MA -->|health signals| RA
+    OA -->|optimization hints| EA
+    OA -->|optimization hints| IA
+    VA -->|verification report| RA
+    VA -->|quality gates| EA
+    VA -->|quality gates| IA
+
+    %% Runtime and state interactions
+    RA --> Relay
+    CA --> Bus
+    EA --> Bus
+    IA --> Bus
+    MA --> Bus
+    OA --> Bus
+    VA --> Bus
+
+    Bus --> KV
+    Bus --> SQL
+    KV --> CA
+    KV --> EA
+    SQL --> IA
+    SQL --> MA
+    KV --> OA
+    SQL --> VA

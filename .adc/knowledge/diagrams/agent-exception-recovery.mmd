@@ -1,0 +1,46 @@
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant RA as RA (Coordinator)
+    participant CA as CA (Context)
+    participant EA as EA (Execution)
+    participant IA as IA (Integration)
+    participant MA as MA (Monitoring)
+    participant OA as OA (Optimization)
+    participant VA as VA (Validation)
+
+    U->>RA: Submit task
+    RA->>CA: Request context package
+    CA-->>RA: Context package
+    RA->>EA: Execute task
+    EA-->>RA: Execution result
+    RA->>IA: Integrate result
+    IA-->>RA: Integrated output
+
+    RA->>VA: Validate output
+    VA-->>RA: Validation failed (policy/rule)
+    RA->>MA: Check runtime health
+    MA-->>RA: Alert: high error rate
+
+    alt Recoverable issue
+        RA->>OA: Request optimization strategy
+        OA-->>RA: Tuned parameters + fallback action
+        RA->>EA: Retry execution (attempt #2)
+        EA-->>RA: New execution result
+        RA->>IA: Re-integrate
+        IA-->>RA: Updated output
+        RA->>VA: Re-validate
+        VA-->>RA: Validation passed
+        RA-->>U: Return verified result
+    else Non-recoverable issue
+        RA->>MA: Raise incident with trace bundle
+        MA-->>RA: Incident created + severity
+        RA-->>U: Escalated failure (manual intervention required)
+    end
+
+    opt Safety rollback path
+        RA->>IA: Trigger rollback to last known good state
+        IA-->>RA: Rollback completed
+        RA->>MA: Publish rollback event
+        MA-->>RA: Observability updated
+    end
