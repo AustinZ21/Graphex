@@ -1,14 +1,17 @@
 flowchart TD
     U[User Client] --> G[Gateway API]
     G --> Auth[Auth Policy]
+    Auth --> PM[Policy Manager]
 
     Auth -->|Access denied| Denied[403 Forbidden]
     Denied --> U
 
     Auth -->|Access granted| RA[RA Coordinator]
+    PM --> RA
 
     RA --> KV[Redis KV]
     RA --> SQL[PostgreSQL Metadata]
+    RA --> SP[Sandbox Policy Engine]
 
     RA --> CA[CA Context]
     CA --> GE[Graph Query Engine]
@@ -19,10 +22,19 @@ flowchart TD
 
     RA --> EA[EA Execution]
     EA --> RA
+    EA --> SR[Sandbox Runtime]
 
     RA --> IA[IA Integration]
     IA --> SQL
     IA --> RA
+    IA --> SR
+
+    SP --> SR
+    SR --> CTRL[Controlled Read Write Execute Share]
+    SR --> SFS[Sandboxed File System]
+    CTRL --> SFS
+    SFS --> TYPES[Allowed Types PDF JPG TXT XLS HTML EXE]
+    SFS --> ART[Artifacts Logs]
 
     RA --> VA[VA Validation]
     VA -->|Validation passed| PASS[Verified Result]

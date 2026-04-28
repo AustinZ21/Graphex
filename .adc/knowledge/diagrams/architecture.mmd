@@ -16,8 +16,15 @@ flowchart TB
 
         subgraph Control[Control Plane]
             RA[RA - Coordinator]
-            SessionMgr[Session Manager]
+            PolicyMgr[Policy Manager]
             TaskPlanner[Task Planner]
+        end
+
+        subgraph Safety[Sandbox Safety Plane]
+            SandboxPolicy[Sandbox Policy Engine]
+            SandboxRuntime[Sandbox Runtime]
+            SandboxCtrl[Controlled Read Write Execute Share]
+            SandboxFS[Sandboxed File System]
         end
 
         subgraph Query[Query Plane]
@@ -64,13 +71,14 @@ flowchart TB
     %% Access and governance
     Gateway --> Auth
     Gateway --> RateLimit
-    Auth --> SessionMgr
+    Auth --> PolicyMgr
     RateLimit --> RA
 
     %% Control-plane execution
     Gateway --> RA
     RA --> TaskPlanner
-    RA --> SessionMgr
+    RA --> PolicyMgr
+    RA --> SandboxPolicy
     TaskPlanner --> Strategy
 
     %% Query-plane execution
@@ -82,12 +90,19 @@ flowchart TB
     GE --> VectorStore
     CA --> LLM
     EA --> IA
+    EA --> SandboxRuntime
+    IA --> SandboxRuntime
     IA --> VA
     VA --> RA
     MA --> OA
     OA --> EA
     GE --> KV
     IA --> SQL
+    SandboxPolicy --> SandboxRuntime
+    SandboxRuntime --> SandboxCtrl
+    SandboxCtrl --> SandboxFS
+    SandboxRuntime --> SandboxFS
+    SandboxFS --> Artifact
 
     %% Indexing flow
     SCM --> ChangeDetector
@@ -101,7 +116,7 @@ flowchart TB
     Incremental --> SQL
 
     %% Runtime state and telemetry
-    SessionMgr --> KV
+    PolicyMgr --> KV
     RA --> SQL
     RA --> Artifact
     Gateway --> Telemetry
