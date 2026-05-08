@@ -14,6 +14,10 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
 
 TOKEN_LENGTH = 35  # ADC standard: 35 A-Za-z0-9 chars
+TOKEN_PREFIXES = {
+    "mcp": "mcp_",
+    "edge_agent": "edge",
+}
 
 
 def hash_password(plain: str) -> str:
@@ -39,6 +43,15 @@ def generate_token() -> str:
     """Generate a cryptographically random 35-char A-Za-z0-9 token."""
     alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
     return "".join(secrets.choice(alphabet) for _ in range(TOKEN_LENGTH))
+
+
+def generate_project_token(token_type: str) -> str:
+    """Generate a project token with a stable type prefix and random body."""
+    try:
+        prefix = TOKEN_PREFIXES[token_type]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported token_type: {token_type}") from exc
+    return prefix + generate_token()
 
 
 def hash_token(token: str) -> str:

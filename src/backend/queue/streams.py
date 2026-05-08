@@ -42,6 +42,15 @@ def _parse_iso_utc(value: str | None) -> datetime | None:
         return None
 
 
+def _age_seconds(value: str | None) -> int | None:
+    parsed = _parse_iso_utc(value)
+    if not parsed:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return max(0, int((datetime.now(timezone.utc) - parsed).total_seconds()))
+
+
 async def _set_job_status(
     client: aioredis.Redis,
     job: IndexJob,
@@ -212,6 +221,57 @@ class JobConsumer:
         # Sort by updated_at, most recent first
         jobs.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
         return jobs
+
+    async def recover_stale_jobs_by_repo(self, repo_paths: list[str], stale_after_sec: int) -> list[dict]:
+        """Mark stale processing jobs failed and ACK their stream entries.
+
+        This is an admin recovery path for jobs left in PROCESSING after the
+        worker thread has stopped making progress. Only delivered stream entries
+        with a stored stream_id are acknowledged.
+        """
+        if not self._client:
+            raise RuntimeError("JobConsumer not connected")
+
+        repo_path_set = {str(path).lower() for path in repo_paths if path}
+        recovered: list[dict] = []
+        cursor = 0
+        now = datetime.now(timezone.utc).isoformat()
+        while True:
+            cursor, keys = await self._client.scan(
+                cursor,
+                match=f"{STATUS_KEY_PREFIX}*",
+                count=100,
+            )
+            for key in keys:
+                status_data = await self._client.hgetall(key)
+                if not status_data:
+                    continue
+                if status_data.get("status") != "processing":
+                    continue
+                if status_data.get("repo_path", "").lower() not in repo_path_set:
+                    continue
+                age = _age_seconds(status_data.get("updated_at"))
+                if age is None or age < stale_after_sec:
+                    continue
+
+                stream_id = status_data.get("stream_id")
+                error = f"Recovered stale processing job after {age}s without status updates"
+                await self._client.hset(
+                    key,
+                    mapping={
+                        "status": "failed",
+                        "updated_at": now,
+                        "error": error,
+                    },
+                )
+                if stream_id:
+                    await self._client.xack(STREAM_KEY, CONSUMER_GROUP, stream_id)
+                recovered_job = dict(status_data)
+                recovered_job.update({"status": "failed", "updated_at": now, "error": error})
+                recovered.append(recovered_job)
+            if cursor == 0:
+                break
+        return recovered
 
     async def get_queue_snapshot(self) -> dict:
         """Return active queue snapshot and average historical job duration.

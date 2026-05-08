@@ -148,7 +148,7 @@ class IndexJobStatus(BaseModel):
     job_id: str
     job_type: str
     repo_path: str
-    status: str  # pending, processing, done, failed
+    status: str  # pending, processing, done, failed, stale
     created_at: str
     updated_at: str
     error: str | None = None
@@ -158,6 +158,8 @@ class IndexJobStatus(BaseModel):
     # Queue telemetry (best-effort estimates):
     queue_position: int | None = None
     eta_seconds: int | None = None
+    is_stale: bool = False
+    age_seconds: int | None = None
 
 
 class GraphLiveStats(BaseModel):
@@ -195,6 +197,15 @@ class ProjectIndexTriggerOut(BaseModel):
     changed_count: int = 0
     destructive_count: int = 0
     reason: str | None = None
+
+
+class ProjectIndexRecoveryOut(BaseModel):
+    """Result of recovering stale index jobs for a project."""
+    project_id: int
+    project_name: str
+    repo_path: str
+    recovered_count: int
+    recovered_jobs: list[IndexJobStatus] = Field(default_factory=list)
 
 
 class AuditLogOut(BaseModel):

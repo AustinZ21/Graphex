@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.40  
-**Status:** Published  
-**Author:** Nate Scott  
-**Date:** 2026-04-20 (fix: tracker shows INDEXING instead of false QUEUED; dynamic version from backend)
+**Version:** 1.29.42
+**Status:** Published
+**Author:** Nate Scott
+**Date:** 2026-05-07 (admin: project ID copy action and stale index recovery)
 
 ## 1. Introduction
 

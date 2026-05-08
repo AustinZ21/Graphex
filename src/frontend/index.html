@@ -372,6 +372,40 @@
     .copy-note { color: var(--muted); font-size: 12px; margin-top: 6px; }
     .empty-state { text-align: center; padding: 40px; color: var(--muted); }
     .expand-btn { background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; padding:0 4px; }
+    .project-id-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-family: monospace;
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .copy-id-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border: 1px solid rgba(115,129,156,.28);
+      border-radius: 6px;
+      background: rgba(21,28,43,.7);
+      color: var(--muted);
+      cursor: pointer;
+      transition: color .15s, border-color .15s, background .15s;
+    }
+    .copy-id-btn:hover {
+      color: var(--accent);
+      border-color: rgba(74,227,135,.45);
+      background: rgba(74,227,135,.08);
+    }
+    .copy-id-btn svg {
+      width: 13px;
+      height: 13px;
+      stroke: currentColor;
+      fill: none;
+    }
 
     /* ── Index Tracker ── */
     .index-status-panel {
@@ -542,6 +576,10 @@
       box-shadow: 0 0 0 2px rgba(74,227,135,.12);
     }
     .tracking-event.failed .tracking-event-dot {
+      background: #e35a5a;
+      box-shadow: 0 0 0 2px rgba(227,90,90,.14), 0 0 16px rgba(227,90,90,.24);
+    }
+    .tracking-event.stale .tracking-event-dot {
       background: #e35a5a;
       box-shadow: 0 0 0 2px rgba(227,90,90,.14), 0 0 16px rgba(227,90,90,.24);
     }
@@ -1155,6 +1193,36 @@ function toast(msg, type = 'success') {
   setTimeout(() => el.remove(), 3500);
 }
 
+function jsArg(value) {
+  return esc(JSON.stringify(String(value ?? '')));
+}
+
+async function copyText(value, label) {
+  const text = String(value ?? '');
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    toast(`${label} copied`);
+  } catch(e) {
+    toast(`Could not copy ${label.toLowerCase()}`, 'error');
+  }
+}
+
+function copyProjectId(projectId) {
+  copyText(projectId, 'Project ID');
+}
+
 function loginWithGitHub() {
   window.location.href = '/api/auth/github/start';
 }
@@ -1475,6 +1543,16 @@ async function triggerProjectFullIndex(projectId) {
   }
 }
 
+async function recoverStaleIndexJob(projectId) {
+  try {
+    const result = await api('POST', `/auth/projects/${projectId}/index/recover-stale`);
+    toast(result.recovered_count ? `Recovered ${result.recovered_count} stale job` : 'No stale jobs found');
+    await updateIndexStatus();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
 function relativeTimeLabel(value) {
   if (!value) return 'unknown';
   try {
@@ -1498,6 +1576,8 @@ function formatStatusLabel(job) {
     ? ((job.queue_position && job.queue_position > 1) ? 'Queued' : 'Indexing')
     : job.status === 'processing'
       ? 'Indexing'
+      : job.status === 'stale'
+        ? 'Stale'
       : job.status === 'done'
         ? 'Succeed'
         : job.status === 'failed'
@@ -1509,6 +1589,7 @@ function formatStatusLabel(job) {
 function getIndexTrackerState(job) {
   if (!job) return 'idle';
   if (job.status === 'failed') return 'failed';
+  if (job.status === 'stale') return 'failed';
   if (job.status === 'done') return 'done';
   if (job.status === 'processing') return 'processing';
   if (job.status === 'pending') {
@@ -1555,7 +1636,7 @@ function renderIndexTracker(job) {
 
 function renderIndexStatusMeta(job, statusText, queueText, etaText, recentJobs, graphStats) {
   const repoText = job?.repo_path || 'No active job yet';
-  const isPending = job && (job.status === 'pending' || job.status === 'processing');
+  const isPending = job && !job.is_stale && (job.status === 'pending' || job.status === 'processing');
   const jobs = recentJobs || [];
   const latestFull = jobs.find(j => j.job_type === 'index_full' && j.files !== null);
   const latestIncr = jobs.find(j => j.job_type === 'index_incremental' && j.files !== null);
@@ -1622,9 +1703,11 @@ function renderTrackingHistory(projectId) {
                 <span><span class="label">Scope</span>${esc(job.files !== null ? `${job.files} Files / ${job.symbols || 0} Symbols` : 'Metrics pending')}</span>
                 <span title="${esc(job.repo_path || '')}"><span class="label">Source</span>${esc(job.repo_path || '-')}</span>
               </div>
-              ${job.error ? `
+              ${(job.error || job.is_stale) ? `
                 <div class="tracking-event-actions">
-                  <button class="tracking-inline-btn retry" onclick="retryIndexJob(${projectId})">Retry</button>
+                  ${job.is_stale || job.status === 'stale'
+                    ? `<button class="tracking-inline-btn retry" onclick="recoverStaleIndexJob(${projectId})">Recover</button>`
+                    : `<button class="tracking-inline-btn retry" onclick="retryIndexJob(${projectId})">Retry</button>`}
                 </div>
                 <details>
                   <summary>Show failure details</summary>
@@ -1674,7 +1757,8 @@ function filterProjects(q) {
   tbody.innerHTML = displayRows.map(p => {
     const status = _indexStatusCache[p.id];
     const job = status?.latest_job;
-    const isProcessing = job && (job.status === 'processing' || job.status === 'pending');
+    const isStale = job && (job.is_stale || job.status === 'stale');
+    const isProcessing = job && !isStale && (job.status === 'processing' || job.status === 'pending');
     const queueText = job
       ? (Number.isInteger(job.queue_position) ? `q#${job.queue_position}` : '—')
       : '—';
@@ -1692,7 +1776,14 @@ function filterProjects(q) {
     return `
     <tr>
       <td><button class="expand-btn" onclick="toggleTokens(${p.id},this)">${expanded ? '&#9660;' : '&#9654;'}</button></td>
-      <td style="font-family:monospace;font-size:12px;color:var(--muted);text-align:center">${esc(p.project_id)}</td>
+      <td>
+        <div class="project-id-cell">
+          <span>${esc(p.project_id)}</span>
+          <button type="button" class="copy-id-btn" onclick="copyProjectId(${jsArg(p.project_id)})" title="Copy project ID" aria-label="Copy project ID">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="8" height="8" rx="1.5" stroke-width="1.5"></rect><path d="M3 10.5V3.5C3 3 3.5 2.5 4 2.5H10.5" stroke-width="1.5" stroke-linecap="round"></path></svg>
+          </button>
+        </div>
+      </td>
       <td>
         <strong style="color:${p.is_active ? 'var(--accent)' : 'var(--danger)'}">${esc(p.project_name)}</strong>
       </td>
@@ -1707,6 +1798,7 @@ function filterProjects(q) {
         <div class="project-actions">
           <button class="btn btn-sm btn-ghost" onclick="openGenerateToken(${p.id})">+ Token</button>
           ${_me?.role==='admin'?`
+            ${isStale ? `<button class="btn btn-sm btn-danger" onclick="recoverStaleIndexJob(${p.id})" title="Mark stale index job failed and unlock this project">Recover</button>` : ''}
             <button class="btn btn-sm btn-ghost" onclick="triggerProjectIndex(${p.id})" ${isProcessing ? 'disabled title="Index job already running"' : ''}>Reindex</button>
             <button class="btn btn-sm btn-ghost" onclick="triggerProjectFullIndex(${p.id})" ${isProcessing ? 'disabled title="Index job already running"' : ''}>Full Index</button>
             <button class="btn btn-sm" onclick="openEditProject(${p.id})">Edit</button>

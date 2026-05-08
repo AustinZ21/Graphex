@@ -8,7 +8,7 @@ import os
 import secrets
 import string
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -27,6 +27,7 @@ from backend.auth.models import (
     IndexJobStatus,
     LoginRequest,
     ProjectCreate,
+    ProjectIndexRecoveryOut,
     ProjectIndexTriggerOut,
     ProjectIndexStatus,
     ProjectOut,
@@ -41,6 +42,7 @@ from backend.auth.models import (
 from backend.tools import server as mcp_server
 from backend.auth.security import (
     create_access_token,
+    generate_project_token as generate_project_token_value,
     generate_token,
     hash_password,
     hash_token,
@@ -63,6 +65,7 @@ GITHUB_OAUTH_ALLOWED_ORGS = {
 }
 GITHUB_OAUTH_STATE_SECRET = os.getenv("GITHUB_OAUTH_STATE_SECRET", os.getenv("JWT_SECRET_KEY", "dev-local-state-secret"))
 GITHUB_OAUTH_STATE_TTL_SEC = int(os.getenv("GITHUB_OAUTH_STATE_TTL_SEC", "600"))
+INDEX_STALE_AFTER_SEC = int(os.getenv("CONTEXTGRAPH_INDEX_STALE_AFTER_SEC", "900"))
 _LOCAL_REPOS_ROOT = Path(__file__).resolve().parents[4]
 
 
@@ -210,6 +213,15 @@ def _estimate_processing_remaining(job_data: dict, avg_duration_sec: int) -> int
     return max(1, avg_duration_sec - elapsed)
 
 
+def _job_age_seconds(job_data: dict) -> int | None:
+    updated_at = _parse_iso_datetime(job_data.get("updated_at"))
+    if not updated_at:
+        return None
+    if updated_at.tzinfo is None:
+        updated_at = updated_at.replace(tzinfo=timezone.utc)
+    return max(0, int((datetime.now(timezone.utc) - updated_at).total_seconds()))
+
+
 def _build_index_job_status(
     job_data: dict,
     pending_by_id: dict[str, int],
@@ -220,8 +232,16 @@ def _build_index_job_status(
     eta_seconds = None
     job_id = str(job_data.get("job_id", ""))
     job_status = job_data.get("status", "")
+    age_seconds = _job_age_seconds(job_data)
+    is_stale = bool(
+        job_status == "processing"
+        and age_seconds is not None
+        and age_seconds >= INDEX_STALE_AFTER_SEC
+    )
 
-    if job_status == "pending":
+    if is_stale:
+        job_status = "stale"
+    elif job_status == "pending":
         queue_position = pending_by_id.get(job_id)
         if queue_position:
             eta_seconds = int(queue_position * avg_duration_sec + processing_remaining)
@@ -236,12 +256,29 @@ def _build_index_job_status(
         status=job_status,
         created_at=job_data.get("created_at", ""),
         updated_at=job_data.get("updated_at", ""),
-        error=job_data.get("error"),
+        error=job_data.get("error") or ("No status update within stale threshold" if is_stale else None),
         files=int(job_data["files"]) if "files" in job_data and job_data["files"] else None,
         symbols=int(job_data["symbols"]) if "symbols" in job_data and job_data["symbols"] else None,
         queue_position=queue_position,
         eta_seconds=eta_seconds,
+        is_stale=is_stale,
+        age_seconds=age_seconds,
     )
+
+
+async def _get_active_project(project_id: int, db: aiosqlite.Connection) -> dict:
+    async with db.execute(
+        "SELECT id, project_name, project_id, is_active FROM projects WHERE id = ?",
+        (project_id,),
+    ) as cur:
+        row = await cur.fetchone()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project = dict(row)
+    if not project.get("is_active"):
+        raise HTTPException(status_code=400, detail="Project is inactive")
+    return project
 
 
 # ── Helper ─────────────────────────────────────────────────────────────────
@@ -709,7 +746,7 @@ async def generate_project_token(
         if not await cur.fetchone():
             raise HTTPException(status_code=404, detail="Project not found")
 
-    raw = generate_token()
+    raw = generate_project_token_value(body.token_type)
     digest = hash_token(raw)
     hint = token_hint(raw)
 
@@ -743,7 +780,7 @@ async def rotate_token(
         raise HTTPException(status_code=404, detail="Token not found or already revoked")
 
     new_version = old["version"] + 1
-    raw = generate_token()
+    raw = generate_project_token_value(old["token_type"])
     digest = hash_token(raw)
     hint = token_hint(raw)
 
@@ -872,17 +909,7 @@ async def trigger_project_index(
     _: dict = Depends(require_admin),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    async with db.execute(
-        "SELECT id, project_name, project_id, is_active FROM projects WHERE id = ?",
-        (project_id,),
-    ) as cur:
-        row = await cur.fetchone()
-
-    if not row:
-        raise HTTPException(status_code=404, detail="Project not found")
-    project = dict(row)
-    if not project.get("is_active"):
-        raise HTTPException(status_code=400, detail="Project is inactive")
+    project = await _get_active_project(project_id, db)
 
     repo_path = _resolve_repo_path(project["project_name"])
     if not repo_path:
@@ -912,17 +939,7 @@ async def trigger_project_full_index(
     _: dict = Depends(require_admin),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    async with db.execute(
-        "SELECT id, project_name, project_id, is_active FROM projects WHERE id = ?",
-        (project_id,),
-    ) as cur:
-        row = await cur.fetchone()
-
-    if not row:
-        raise HTTPException(status_code=404, detail="Project not found")
-    project = dict(row)
-    if not project.get("is_active"):
-        raise HTTPException(status_code=400, detail="Project is inactive")
+    project = await _get_active_project(project_id, db)
 
     repo_path = _resolve_repo_path(project["project_name"])
     if not repo_path:
@@ -943,6 +960,36 @@ async def trigger_project_full_index(
         changed_count=0,
         destructive_count=0,
         reason="admin_triggered_full",
+    )
+
+
+@router.post("/projects/{project_id}/index/recover-stale", response_model=ProjectIndexRecoveryOut)
+async def recover_project_stale_index_jobs(
+    project_id: int,
+    _: dict = Depends(require_admin),
+    db: aiosqlite.Connection = Depends(get_db),
+    consumer = Depends(get_consumer),
+):
+    if not consumer:
+        raise HTTPException(status_code=503, detail="Indexer consumer is unavailable")
+
+    project = await _get_active_project(project_id, db)
+    repo_path = _resolve_repo_path(project["project_name"])
+    if not repo_path:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Repository path not found for project_name '{project['project_name']}'",
+        )
+
+    repo_paths = _candidate_repo_paths(project["project_name"])
+    recovered = await consumer.recover_stale_jobs_by_repo(repo_paths, INDEX_STALE_AFTER_SEC)
+    recovered_jobs = [_build_index_job_status(job, {}, 30, 0) for job in recovered]
+    return ProjectIndexRecoveryOut(
+        project_id=project["id"],
+        project_name=project["project_name"],
+        repo_path=repo_path,
+        recovered_count=len(recovered_jobs),
+        recovered_jobs=recovered_jobs,
     )
 
 
