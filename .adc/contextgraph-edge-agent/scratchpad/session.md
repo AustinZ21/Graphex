@@ -34,7 +34,7 @@
 Write down exactly what you are currently doing, the last known successful step, and any immediate blockers.
 This ensures the NEXT agent handling this repository knows exactly where you left off.
 
-- **Current Task:** 
-- **Last Action Taken:** 
-- **Failing Tests / Errors:** 
-- **Next Steps:** 
+- **Current Task:** 2026-05-07 ContextGraph HPS context-quality benchmark.
+- **Last Action Taken:** Added deterministic Hallucination Pressure Score scoring, REST/MCP benchmark surfaces, a CodexCLI/ClaudeCLI JSONL manifest, a report runner, generated JSON/Markdown reports, and README/docs updates.
+- **Failing Tests / Errors:** Normal pytest collection still hits local `pytest_asyncio` AttributeError before test execution; new runner initially needed an explicit `src/` import path fix when launched with `python -m src.scripts...`.
+- **Next Steps:** Focused HPS tests passed with plugin autoload disabled and pytest addopts cleared; run full suite after the local pytest plugin mismatch is resolved.

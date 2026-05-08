@@ -55,14 +55,16 @@ def test_mcp_tools_work_on_real_indexed_graph(tmp_path: Path) -> None:
     )
 
     graph = _connect_live_graph()
-    old_state = (mcp_srv._graph, mcp_srv._producer, mcp_srv._cache, mcp_srv._recorder)
+    old_state = (mcp_srv._registry, mcp_srv._graph, mcp_srv._producer, mcp_srv._cache, mcp_srv._recorder)
 
     try:
         pipeline = IndexPipeline(graph)
         stats = pipeline.index_full(str(repo_root))
         assert stats["files"] == 1
 
-        mcp_srv.init(graph=graph, producer=MagicMock(), cache=None, recorder=None)
+        registry = MagicMock()
+        registry.current.return_value = graph
+        mcp_srv.init(registry=registry, producer=MagicMock(), cache=None, recorder=None)
         module_qname = path_to_module(str(file_path))
         render_scope = f"{module_qname}.render"
 
@@ -73,7 +75,8 @@ def test_mcp_tools_work_on_real_indexed_graph(tmp_path: Path) -> None:
         explanation = mcp_srv.explain_data_flow(render_scope, limit=20)
         assert explanation["scope_qname"] == render_scope
         assert "narrative" in explanation and explanation["narrative"]
-        assert "返回值最终受这些输入影响" in explanation["narrative"]
+        assert "Return value is influenced by these inputs" in explanation["narrative"]
+        assert explanation["narrative"].isascii()
 
         influence = mcp_srv.analyze_return_influence(render_scope, limit=10)
         assert any(param.endswith(":input_text") for param in influence["influenced_by_parameters"])
@@ -83,4 +86,4 @@ def test_mcp_tools_work_on_real_indexed_graph(tmp_path: Path) -> None:
         except Exception:
             pass
         graph.close()
-        mcp_srv._graph, mcp_srv._producer, mcp_srv._cache, mcp_srv._recorder = old_state
+        mcp_srv._registry, mcp_srv._graph, mcp_srv._producer, mcp_srv._cache, mcp_srv._recorder = old_state

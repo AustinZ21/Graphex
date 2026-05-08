@@ -12,12 +12,14 @@ import backend.tools.server as mcp_srv
 @pytest.fixture(autouse=True)
 def reset_server_state():
     """Reset module-level singletons between tests."""
-    mcp_srv._graph = None
+    mcp_srv._registry = None
+    mcp_srv._graph = mcp_srv._GraphProxy()
     mcp_srv._producer = None
     mcp_srv._cache = None
     mcp_srv._recorder = None
     yield
-    mcp_srv._graph = None
+    mcp_srv._registry = None
+    mcp_srv._graph = mcp_srv._GraphProxy()
     mcp_srv._producer = None
     mcp_srv._cache = None
     mcp_srv._recorder = None
@@ -178,8 +180,9 @@ def test_explain_data_flow():
     assert result["scope_qname"] == "backend.service.render"
     assert "backend.service.render:suffix" in result["unused_parameters"]
     assert "backend.service.render:label" in result["key_intermediates"]
-    assert any("返回值最终受这些输入影响" in line for line in result["summary"])
-    assert "render 的输入参数包括" in result["narrative"]
+    assert any("Return value is influenced by these inputs" in line for line in result["summary"])
+    assert "render inputs include" in result["narrative"]
+    assert result["narrative"].isascii()
 
 
 def test_retrieve_context():

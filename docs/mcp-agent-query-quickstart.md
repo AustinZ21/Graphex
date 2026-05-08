@@ -482,6 +482,23 @@ Benefit: Small edits (comments, whitespace, method bodies) won't retrigger expen
 
 Example performance gain: editing method body in a 200-function file only re-indexes that one method, not the entire file's symbol table.
 
+## Context quality HPS benchmarking
+
+ContextGraph can also benchmark how much irrelevant context and hallucination pressure a baseline retrieval flow feeds into the LLM compared with CG-reduced context.
+
+```powershell
+python -m src.scripts.run_context_quality_benchmark `
+    --input docs/benchmarks/context-quality.codex-claude.jsonl `
+    --output docs/benchmarks/context-quality-report.json `
+    --markdown docs/benchmarks/context-quality-report.md
+```
+
+HPS means Hallucination Pressure Score. It is deterministic and scores context risk before an LLM answer is generated. Lower is better.
+
+MCP/REST surfaces:
+- MCP tool: `benchmark_context_quality`
+- REST endpoint: `POST /api/benchmark/context-quality`
+
 Read/query tools:
 - `find_symbol`
 - `find_callers`
@@ -492,6 +509,7 @@ Read/query tools:
 - `get_stats`
 - `run_eval`
 - `clear_cache`
+- `benchmark_context_quality`
 - `get_index_job_status`
 - `wait_for_index_ready`
 

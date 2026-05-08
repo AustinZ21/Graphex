@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.42
+**Version:** 1.29.44
 **Status:** Published
 **Author:** Nate Scott
-**Date:** 2026-05-07 (admin: project ID copy action and stale index recovery)
+**Date:** 2026-05-07 (HPS context-quality benchmark)
 
 ## 1. Introduction
 
@@ -339,6 +339,28 @@ API: `POST http://localhost:8001/api/benchmark/token-efficiency` (shared cross-p
 | **Average** | **68.4%** | **3.17x** | — |
 
 Both projects converge near **~68–69% savings / ~3.1–3.2x ratio**, suggesting this is a reliable baseline for ADC-compliant Rust and scripting-language codebases using CG graph retrieval.
+
+### 4.4 Context Quality HPS Benchmark
+
+ContextGraph also includes a deterministic context-quality benchmark for **Hallucination Pressure Score (HPS)**. HPS estimates pre-answer context risk from missing evidence, useless context, duplicated context, and ambiguous symbol hits.
+
+Run the sample CodexCLI and ClaudeCLI benchmark:
+
+```powershell
+python -m src.scripts.run_context_quality_benchmark `
+  --input docs/benchmarks/context-quality.codex-claude.jsonl `
+  --output docs/benchmarks/context-quality-report.json `
+  --markdown docs/benchmarks/context-quality-report.md
+```
+
+Latest sample report: `docs/benchmarks/context-quality-report.md`.
+
+| Project | Baseline HPS | CG HPS | HPS Reduction | Token Reduction |
+|---|---:|---:|---:|---:|
+| ClaudeCLI | 66.08 | 17.50 | 73.52% | 57.51% |
+| CodexCLI | 55.60 | 10.73 | 80.70% | 13.29% |
+| **Average** | **60.84** | **14.12** | **77.11%** | **35.40%** |
+
 **Example constraints to include:**
 - **Amendment Proposals**: "Any change to the `.adc/` directory by an AI Agent MUST be submitted as an independent Pull Request titled prefix `[AMENDMENT]`. AI Agents are strictly forbidden from committing changes directly to the `main` branch if they affect the `.adc/` ruleset."
 - **Human Ratification**: "An AI Agent CANNOT self-approve amendments. All changes to the Constitution require explicit human review and approval."

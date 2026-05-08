@@ -34,6 +34,7 @@ from backend.agent.query_strategy import run_cg_first_strategy
 from backend.graph.client import GraphClient
 from backend.graph.registry import GraphRegistry
 from backend.graph import schema as S
+from backend.perf.context_quality import benchmark_context_quality as run_context_quality_benchmark
 from backend.perf.token_efficiency import benchmark_token_efficiency as run_token_efficiency_benchmark
 from backend.tools.producer import MCPProducer
 from backend.queue.streams import JobConsumer
@@ -735,24 +736,24 @@ def explain_data_flow(scope_qname: str, limit: int = 20) -> dict:
         key_intermediate_names = [_short_variable_name(item) for item in key_intermediates[:limit]]
 
         if parameter_names:
-            summary.append(f"{scope_name} 的输入参数包括: {', '.join(parameter_names)}。")
+            summary.append(f"{scope_name} inputs include: {', '.join(parameter_names)}.")
         if return_paths:
             params = ", ".join(influenced_parameters)
-            summary.append(f"返回值最终受这些输入影响: {params}。")
+            summary.append(f"Return value is influenced by these inputs: {params}.")
         else:
-            summary.append("当前还没有发现从输入参数流向返回值的清晰路径。")
+            summary.append("No clear path from inputs to the return value was found yet.")
         if unused_parameter_names:
-            summary.append("这些参数目前没有参与后续传播: " + ", ".join(unused_parameter_names) + "。")
+            summary.append("Unused parameters: " + ", ".join(unused_parameter_names) + ".")
         if key_intermediate_names:
-            summary.append("承接多步转换的关键中间变量: " + ", ".join(key_intermediate_names) + "。")
+            summary.append("Key intermediary variables: " + ", ".join(key_intermediate_names) + ".")
         if flows:
             preview = "; ".join(
                 f"{_short_variable_name(item['source'])} -> {_short_variable_name(item['target'])} ({item['flow_type']})"
                 for item in flows[: min(5, len(flows))]
             )
-            summary.append("前几条关键传播路径是: " + preview + "。")
+            summary.append("Key flow preview: " + preview + ".")
 
-        narrative = "".join(summary)
+        narrative = " ".join(summary)
 
         return {
             "scope_qname": scope_qname,
@@ -913,6 +914,22 @@ def benchmark_token_efficiency(
         payload["cg"]["filePaths"] = cg_file_paths
 
     return run_token_efficiency_benchmark(payload=payload, repo_root=_repo_root)
+
+
+@mcp.tool()
+def benchmark_context_quality(
+    cases: list[dict] | None = None,
+    weights: dict | None = None,
+) -> dict:
+    """Compute Hallucination Pressure Score (HPS) for baseline-vs-CG contexts.
+
+    Cases should provide goldItems plus baseline/cg chunks with evidence IDs.
+    This is deterministic and scores context risk before an LLM answer is generated.
+    """
+    payload = {"cases": cases or []}
+    if weights:
+        payload["weights"] = weights
+    return run_context_quality_benchmark(payload=payload, repo_root=_repo_root)
 
 
 # ---------------------------------------------------------------------------

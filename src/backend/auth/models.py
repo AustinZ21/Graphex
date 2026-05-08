@@ -75,6 +75,7 @@ class ProjectCreate(BaseModel):
     project_name: str = Field(min_length=3, max_length=64)
     upstream_url: str = Field(default="", max_length=512)
     description: str = Field(default="", max_length=1000)
+    repo_path: str = Field(default="", max_length=512)
 
     @field_validator("project_name")
     @classmethod
@@ -97,6 +98,7 @@ class ProjectUpdate(BaseModel):
     project_name: str | None = Field(default=None, min_length=3, max_length=64)
     upstream_url: str | None = Field(default=None, max_length=512)
     description: str | None = Field(default=None, max_length=1000)
+    repo_path: str | None = Field(default=None, max_length=512)
 
     @field_validator("project_name")
     @classmethod
@@ -123,6 +125,7 @@ class ProjectOut(BaseModel):
     project_id: str
     upstream_url: str
     description: str
+    repo_path: str = ""
     created_at: str
     is_active: bool
 

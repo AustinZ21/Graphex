@@ -1,0 +1,148 @@
+{
+  "ok": true,
+  "metric": "hallucination-pressure-score",
+  "method": "hps-context-quality-v1",
+  "weights": {
+    "missingEvidence": 0.45,
+    "noise": 0.35,
+    "redundancy": 0.1,
+    "ambiguity": 0.1
+  },
+  "cases": [
+    {
+      "id": "claudecli-mcp-timeout",
+      "project": "ClaudeCLI",
+      "category": "symbol-localization",
+      "query": "Where is MCP tool timeout configured and how is the timeout selected?",
+      "goldItems": [
+        "file:src/services/mcp/client.ts#DEFAULT_MCP_TOOL_TIMEOUT_MS",
+        "file:src/services/mcp/client.ts#getMcpToolTimeoutMs"
+      ],
+      "targetSymbols": [
+        "src.services.mcp.client.getMcpToolTimeoutMs"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 193,
+        "usefulTokens": 31,
+        "uselessTokens": 162,
+        "duplicateTokens": 81,
+        "coveredGoldItems": [
+          "file:src/services/mcp/client.ts#DEFAULT_MCP_TOOL_TIMEOUT_MS"
+        ],
+        "missingGoldItems": [
+          "file:src/services/mcp/client.ts#getMcpToolTimeoutMs"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.1606,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.8394,
+        "redundancyRatio": 0.4197,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 1.0,
+        "hallucinationPressureScore": 66.08
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 82,
+        "usefulTokens": 41,
+        "uselessTokens": 41,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:src/services/mcp/client.ts#DEFAULT_MCP_TOOL_TIMEOUT_MS",
+          "file:src/services/mcp/client.ts#getMcpToolTimeoutMs"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.5,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.5,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 1,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 17.5
+      },
+      "comparison": {
+        "tokenReductionPercent": 57.51,
+        "uselessTokenReductionPercent": 74.69,
+        "hpsReductionPercent": 73.52,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.3394
+      }
+    },
+    {
+      "id": "codexcli-mcp-mutation-owner",
+      "project": "CodexCLI",
+      "category": "cross-module-ownership",
+      "query": "Where should MCP tool call mutation logic live and why?",
+      "goldItems": [
+        "file:AGENTS.md#mcp-tool-call-mutation",
+        "file:codex-rs/codex-mcp/src/mcp_connection_manager.rs#tool-call-mutation"
+      ],
+      "targetSymbols": [
+        "codex_mcp.mcp_connection_manager"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 143,
+        "usefulTokens": 35,
+        "uselessTokens": 108,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:AGENTS.md#mcp-tool-call-mutation"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/codex-mcp/src/mcp_connection_manager.rs#tool-call-mutation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.2448,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.7552,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 55.6
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 124,
+        "usefulTokens": 86,
+        "uselessTokens": 38,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:AGENTS.md#mcp-tool-call-mutation",
+          "file:codex-rs/codex-mcp/src/mcp_connection_manager.rs#tool-call-mutation"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.6935,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.3065,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 10.73
+      },
+      "comparison": {
+        "tokenReductionPercent": 13.29,
+        "uselessTokenReductionPercent": 64.81,
+        "hpsReductionPercent": 80.7,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.4487
+      }
+    }
+  ],
+  "summary": {
+    "caseCount": 2,
+    "avgBaselineHps": 60.84,
+    "avgCgHps": 14.12,
+    "avgHpsReductionPercent": 77.11,
+    "avgBaselineTokens": 168.0,
+    "avgCgTokens": 103.0,
+    "avgTokenReductionPercent": 35.4
+  }
+}

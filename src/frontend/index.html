@@ -110,6 +110,8 @@
       border-color: rgba(74,227,135,.3);
     }
     .topbar-nav .tab-btn:hover:not(.active) { color: var(--text); background: rgba(255,255,255,.05); }
+    .fdb-info-tip.show { display:inline-flex !important; align-items:center; }
+    .fdb-info-icon:hover { color: var(--text); }
     .topbar .user-badge { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
     .role-tag {
       padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
@@ -172,7 +174,7 @@
     tbody td { padding: 10px 12px; }
     .table-wrap {
       background: var(--panel); border: 1px solid var(--border);
-      border-radius: var(--radius); overflow: hidden;
+      border-radius: var(--radius); overflow-x: auto;
     }
     .pagination-wrap {
       margin-top: 10px;
@@ -264,7 +266,7 @@
       color: var(--danger);
     }
     .token-actions { display: flex; align-items: center; gap: 8px; justify-content: center; }
-    .actions-col-header { text-align: center; white-space: nowrap; width: 1%; }
+    .actions-col-header { text-align: center; }
     .center-col-header { text-align: center; }
     .tokens-grid-header .center-col-header {
       display: block;
@@ -272,7 +274,7 @@
       width: 100%;
       text-align: center;
     }
-    .project-actions { display: flex; justify-content: center; align-items: center; gap: 6px; white-space: nowrap; }
+    .project-actions { display: flex; justify-content: center; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
     .token-type-badge {
       padding: 2px 8px; border-radius: 999px; font-size: 11px;
       background: #1e2a3a; color: #6ab3e3; border: 1px solid rgba(106,179,227,.3);
@@ -417,6 +419,12 @@
     }
     .index-tracker {
       display: block;
+      max-width: 100%;
+      overflow: hidden;
+    }
+    .tracker-svg {
+      max-width: 100%;
+      height: auto;
     }
     .tracker-svg text {
       font-family: inherit;
@@ -440,7 +448,7 @@
     }
     .index-status-meta {
       display: flex;
-      flex-wrap: nowrap;
+      flex-wrap: wrap;
       gap: 6px;
       align-items: center;
       font-size: 11px;
@@ -477,6 +485,10 @@
       border-color: rgba(74,227,135,.3);
       background: rgba(74,227,135,.06);
     }
+    .status-icon.source {
+      border-color: rgba(255,183,77,.3);
+      background: rgba(255,183,77,.06);
+    }
     .status-icon .status-tooltip {
       display: none;
       position: absolute;
@@ -500,6 +512,9 @@
     }
     .status-icon.graph-live .status-tooltip strong {
       color: #4fc3f7;
+    }
+    .status-icon.source .status-tooltip strong {
+      color: #ffb74d;
     }
     .status-icon:hover .status-tooltip {
       display: block;
@@ -811,6 +826,13 @@
       <button class="tab-btn" id="tab-users-btn" onclick="switchTab('users',this)">Users</button>
       <button class="tab-btn" id="tab-audit-btn" onclick="switchTab('audit',this)">Audit</button>
       <button class="tab-btn" id="tab-fdb-btn" style="display:none" onclick="openFdbBrowser()">FDB-Browser</button>
+      <span class="fdb-info-wrap" id="fdb-info-wrap" style="display:none;position:relative;align-self:center;margin-left:2px">
+        <span class="fdb-info-icon" title="FalkorDB connection" onclick="document.getElementById('fdb-info-tip').classList.toggle('show')" style="cursor:pointer;font-size:14px;color:var(--muted);user-select:none">&#9432;</span>
+        <span class="fdb-info-tip" id="fdb-info-tip" style="display:none;position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--panel-elevated);border:1px solid var(--border);border-radius:8px;padding:6px 10px;white-space:nowrap;z-index:20;font-size:12px;color:var(--text);box-shadow:0 4px 12px rgba(0,0,0,.35)">
+          <code style="margin-right:6px">falkor://localhost:6379</code>
+          <span class="fdb-copy-btn" onclick="navigator.clipboard.writeText('falkor://localhost:6379');this.textContent='✓';setTimeout(()=>this.textContent='⧉',1200)" style="cursor:pointer;color:var(--accent);font-size:13px" title="Copy">⧉</span>
+        </span>
+      </span>
     </div>
     <div class="user-badge">
       <div class="user-menu-wrap" id="user-menu-wrap">
@@ -1307,6 +1329,7 @@ async function initApp() {
       if (cfg?.falkordb_url) _falkordbUrl = cfg.falkordb_url;
     } catch {}
     document.getElementById('tab-fdb-btn').style.display = '';
+    document.getElementById('fdb-info-wrap').style.display = '';
   }
   if (_me.role !== 'admin') {
     document.getElementById('new-project-btn').style.display = 'none';
@@ -1315,6 +1338,12 @@ async function initApp() {
   }
   await loadProjects();
 }
+
+document.addEventListener('click', e => {
+  const tip = document.getElementById('fdb-info-tip');
+  const wrap = document.getElementById('fdb-info-wrap');
+  if (tip && wrap && !wrap.contains(e.target)) tip.classList.remove('show');
+});
 
 async function openFdbBrowser() {
   try {
@@ -1423,6 +1452,22 @@ let _projectExternalIdByDbId = {};
 let _auditPollInterval = null;
 let _auditLoading = false;
 
+function mergeIndexStatusCache(statuses) {
+  const nextCache = {};
+  statuses.forEach(status => {
+    const previous = _indexStatusCache[status.project_id];
+    const hasJobData = status.latest_job
+      || (Array.isArray(status.recent_jobs) && status.recent_jobs.length > 0);
+    if (!hasJobData && previous) {
+      nextCache[status.project_id] = { ...previous, project_name: status.project_name };
+      if (status.graph_stats) nextCache[status.project_id].graph_stats = status.graph_stats;
+    } else {
+      nextCache[status.project_id] = status;
+    }
+  });
+  _indexStatusCache = nextCache;
+}
+
 function _renderAuditSortIcons() {
   const keys = [
     'created_at',
@@ -1509,10 +1554,7 @@ async function loadProjects() {
 async function updateIndexStatus() {
   try {
     const statuses = await api('GET', '/auth/projects/index-status');
-    _indexStatusCache = {};
-    statuses.forEach(status => {
-      _indexStatusCache[status.project_id] = status;
-    });
+    mergeIndexStatusCache(statuses);
     // Re-render if projects are visible
     if (document.getElementById('pane-projects')?.classList.contains('active')) {
       filterProjects(document.getElementById('project-search')?.value || '');
@@ -1661,7 +1703,7 @@ function renderIndexStatusMeta(job, statusText, queueText, etaText, recentJobs, 
       <span class="status-icon graph-live"><span class="status-tooltip"><strong>Edges</strong> ${esc(graphEdgesText)}</span>🔗</span>
       <span class="status-icon metrics"><span class="status-tooltip"><strong>Last Full</strong> ${esc(fullText)}</span>📦</span>
       <span class="status-icon metrics"><span class="status-tooltip"><strong>Last Reindex</strong> ${esc(incrText)}</span>🔄</span>
-      <span class="status-icon"><span class="status-tooltip"><strong>Source</strong> ${esc(repoText)}</span>📁</span>
+      <span class="status-icon source"><span class="status-tooltip"><strong>Source</strong> ${esc(repoText)}</span>📁</span>
     </div>
   `;
 }

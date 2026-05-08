@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS projects (
     project_id   TEXT    UNIQUE NOT NULL,
     upstream_url TEXT    NOT NULL DEFAULT '',
     description  TEXT    NOT NULL DEFAULT '',
+    repo_path    TEXT    NOT NULL DEFAULT '',
     created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
     is_active    INTEGER NOT NULL DEFAULT 1
 );
@@ -122,6 +123,12 @@ async def init_db() -> None:
             await db.commit()
         except Exception:
             pass  # column already renamed or missing
+        # repo_path column for explicit repository path (decouples indexing from project_name)
+        try:
+            await db.execute("ALTER TABLE projects ADD COLUMN repo_path TEXT NOT NULL DEFAULT ''")
+            await db.commit()
+        except Exception:
+            pass  # column already exists
         try:
             await db.execute("ALTER TABLE audit_logs RENAME COLUMN project_key TO project_name")
             await db.commit()

@@ -44,6 +44,7 @@ from backend.graph.registry import GraphRegistry
 from backend.indexer.consumer import IndexerConsumer
 from backend.tools.producer import MCPProducer
 from backend.tools import server as mcp_server
+from backend.perf.context_quality import benchmark_context_quality, ContextQualityInputError
 from backend.perf.token_efficiency import benchmark_token_efficiency, TokenBenchmarkInputError
 
 log = structlog.get_logger()
@@ -264,7 +265,10 @@ async def audit_request_middleware(request: Request, call_next):
     token_id = None
 
     raw_auth = request.headers.get("authorization", "")
-    token_usage_eligible = path.startswith("/mcp/messages") or path == "/api/benchmark/token-efficiency"
+    token_usage_eligible = path.startswith("/mcp/messages") or path in {
+        "/api/benchmark/token-efficiency",
+        "/api/benchmark/context-quality",
+    }
     if raw_auth.startswith("Bearer "):
         bearer_token = raw_auth[len("Bearer ") :]
         if path.startswith("/api"):
@@ -436,6 +440,15 @@ async def api_benchmark_token_efficiency(payload: dict) -> dict:
     try:
         return benchmark_token_efficiency(payload=payload, repo_root=REPO_ROOT)
     except TokenBenchmarkInputError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/benchmark/context-quality")
+async def api_benchmark_context_quality(payload: dict) -> dict:
+    """Benchmark context quality and HPS for baseline-vs-CG context bundles."""
+    try:
+        return benchmark_context_quality(payload=payload, repo_root=REPO_ROOT)
+    except ContextQualityInputError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 

@@ -57,6 +57,18 @@ def test_candidate_repo_paths_prefers_case_insensitive_local_repo_match(tmp_path
     assert candidates[0] == str(tmp_path / "OSAgent")
 
 
+def test_candidate_repo_paths_matches_punctuation_insensitive_local_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(auth_router, "_LOCAL_REPOS_ROOT", tmp_path)
+    (tmp_path / "ClaudeCLI").mkdir()
+    (tmp_path / "HermesAgent").mkdir()
+
+    claude_candidates = auth_router._candidate_repo_paths("claude-cli")
+    hermes_candidates = auth_router._candidate_repo_paths("hermes-agent")
+
+    assert claude_candidates[0] == str(tmp_path / "ClaudeCLI")
+    assert hermes_candidates[0] == str(tmp_path / "HermesAgent")
+
+
 def test_build_index_job_status_marks_stale_processing(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(auth_router, "INDEX_STALE_AFTER_SEC", 60)
     old_update = (datetime.now(timezone.utc) - timedelta(seconds=120)).isoformat()
@@ -109,9 +121,9 @@ async def test_generate_project_token_uses_type_prefixes(tmp_path: Path) -> None
         assert mcp.token_type == "mcp"
         assert mcp.token_hint.startswith("mcp_")
         assert edge.token is not None
-        assert edge.token.startswith("edge")
+        assert edge.token.startswith("edge_")
         assert edge.token_type == "edge_agent"
-        assert edge.token_hint.startswith("edge")
+        assert edge.token_hint.startswith("edge_")
     finally:
         await db.close()
 
@@ -137,8 +149,8 @@ async def test_rotate_token_preserves_type_and_prefixes_new_token(tmp_path: Path
         assert rotated.token_type == "edge_agent"
         assert rotated.version == 5
         assert rotated.token is not None
-        assert rotated.token.startswith("edge")
-        assert rotated.token_hint.startswith("edge")
+        assert rotated.token.startswith("edge_")
+        assert rotated.token_hint.startswith("edge_")
 
         async with db.execute("SELECT is_active FROM project_tokens WHERE id = 13") as cur:
             old = await cur.fetchone()

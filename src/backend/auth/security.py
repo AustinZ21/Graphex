@@ -16,7 +16,7 @@ JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "24"))
 TOKEN_LENGTH = 35  # ADC standard: 35 A-Za-z0-9 chars
 TOKEN_PREFIXES = {
     "mcp": "mcp_",
-    "edge_agent": "edge",
+    "edge_agent": "edge_",
 }
 
 

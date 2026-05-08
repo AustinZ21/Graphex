@@ -69,19 +69,35 @@ INDEX_STALE_AFTER_SEC = int(os.getenv("CONTEXTGRAPH_INDEX_STALE_AFTER_SEC", "900
 _LOCAL_REPOS_ROOT = Path(__file__).resolve().parents[4]
 
 
+def _repo_name_key(value: str) -> str:
+    return "".join(ch for ch in value.lower() if ch.isalnum())
+
+
+def _repo_search_roots() -> list[Path]:
+    return [
+        _LOCAL_REPOS_ROOT,
+        Path("/repos"),
+        Path("D:/Repos"),
+        Path("d:/repos"),
+    ]
+
+
 def _candidate_repo_paths(project_name: str) -> list[str]:
     candidates: list[str] = []
     normalized = project_name.strip()
     if not normalized:
         return candidates
 
-    try:
-        if _LOCAL_REPOS_ROOT.exists():
-            for child in _LOCAL_REPOS_ROOT.iterdir():
-                if child.is_dir() and child.name.lower() == normalized.lower():
-                    candidates.append(str(child))
-    except Exception:
-        pass
+    normalized_key = _repo_name_key(normalized)
+
+    for root in _repo_search_roots():
+        try:
+            if root.exists():
+                for child in root.iterdir():
+                    if child.is_dir() and _repo_name_key(child.name) == normalized_key:
+                        candidates.append(str(child))
+        except Exception:
+            pass
 
     fallbacks = [
         f"D:/Repos/{normalized}",
@@ -107,6 +123,22 @@ def _resolve_repo_path(project_name: str) -> str | None:
         except Exception:
             continue
     return None
+
+
+def _resolve_project_repo_path(project: dict) -> str | None:
+    """Resolve repo path for a project, preferring the stored repo_path column.
+
+    Falls back to name-based directory scanning for backward compatibility
+    with projects created before the repo_path column was added.
+    """
+    stored = (project.get("repo_path") or "").strip()
+    if stored:
+        try:
+            if Path(stored).exists():
+                return stored
+        except Exception:
+            pass
+    return _resolve_repo_path(project["project_name"])
 
 
 def _github_oauth_enabled() -> bool:
@@ -268,7 +300,7 @@ def _build_index_job_status(
 
 async def _get_active_project(project_id: int, db: aiosqlite.Connection) -> dict:
     async with db.execute(
-        "SELECT id, project_name, project_id, is_active FROM projects WHERE id = ?",
+        "SELECT id, project_name, project_id, repo_path, is_active FROM projects WHERE id = ?",
         (project_id,),
     ) as cur:
         row = await cur.fetchone()
@@ -636,7 +668,7 @@ async def list_projects(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     async with db.execute(
-        "SELECT id, project_name, project_id, upstream_url, description, created_at, is_active FROM projects ORDER BY id"
+        "SELECT id, project_name, project_id, upstream_url, description, repo_path, created_at, is_active FROM projects ORDER BY id"
     ) as cur:
         rows = await cur.fetchall()
     return [ProjectOut(**dict(r)) for r in rows]
@@ -651,10 +683,10 @@ async def create_project(
     pid = _random_project_id()
     try:
         async with db.execute(
-            """INSERT INTO projects(project_name, project_id, upstream_url, description)
-               VALUES(?,?,?,?)
-               RETURNING id, project_name, project_id, upstream_url, description, created_at, is_active""",
-            (body.project_name, pid, body.upstream_url, body.description),
+            """INSERT INTO projects(project_name, project_id, upstream_url, description, repo_path)
+               VALUES(?,?,?,?,?)
+               RETURNING id, project_name, project_id, upstream_url, description, repo_path, created_at, is_active""",
+            (body.project_name, pid, body.upstream_url, body.description, body.repo_path),
         ) as cur:
             row = await cur.fetchone()
         await db.commit()
@@ -691,7 +723,7 @@ async def update_project(
     _: dict = Depends(require_admin),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    if body.project_name is None and body.upstream_url is None and body.description is None:
+    if body.project_name is None and body.upstream_url is None and body.description is None and body.repo_path is None:
         raise HTTPException(status_code=400, detail="No fields to update")
 
     try:
@@ -700,16 +732,17 @@ async def update_project(
             UPDATE projects
             SET project_name = COALESCE(?, project_name),
                 upstream_url = COALESCE(?, upstream_url),
-                description = COALESCE(?, description)
+                description = COALESCE(?, description),
+                repo_path = COALESCE(?, repo_path)
             WHERE id = ?
             """,
-            (body.project_name, body.upstream_url, body.description, project_id),
+            (body.project_name, body.upstream_url, body.description, body.repo_path, project_id),
         )
         await db.commit()
     except aiosqlite.IntegrityError:
         raise HTTPException(status_code=409, detail="project_name already exists")
     async with db.execute(
-        "SELECT id, project_name, project_id, upstream_url, description, created_at, is_active FROM projects WHERE id = ?",
+        "SELECT id, project_name, project_id, upstream_url, description, repo_path, created_at, is_active FROM projects WHERE id = ?",
         (project_id,),
     ) as cur:
         row = await cur.fetchone()
@@ -911,7 +944,7 @@ async def trigger_project_index(
 ):
     project = await _get_active_project(project_id, db)
 
-    repo_path = _resolve_repo_path(project["project_name"])
+    repo_path = _resolve_project_repo_path(project)
     if not repo_path:
         raise HTTPException(
             status_code=404,
@@ -941,7 +974,7 @@ async def trigger_project_full_index(
 ):
     project = await _get_active_project(project_id, db)
 
-    repo_path = _resolve_repo_path(project["project_name"])
+    repo_path = _resolve_project_repo_path(project)
     if not repo_path:
         raise HTTPException(
             status_code=404,
@@ -974,7 +1007,7 @@ async def recover_project_stale_index_jobs(
         raise HTTPException(status_code=503, detail="Indexer consumer is unavailable")
 
     project = await _get_active_project(project_id, db)
-    repo_path = _resolve_repo_path(project["project_name"])
+    repo_path = _resolve_project_repo_path(project)
     if not repo_path:
         raise HTTPException(
             status_code=404,
