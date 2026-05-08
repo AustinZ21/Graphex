@@ -827,7 +827,7 @@
       <button class="tab-btn" id="tab-audit-btn" onclick="switchTab('audit',this)">Audit</button>
       <button class="tab-btn" id="tab-fdb-btn" style="display:none" onclick="openFdbBrowser()">FDB-Browser</button>
       <span class="fdb-info-wrap" id="fdb-info-wrap" style="display:none;position:relative;align-self:center;margin-left:2px">
-        <span class="fdb-info-icon" title="FalkorDB connection" onclick="document.getElementById('fdb-info-tip').classList.toggle('show')" style="cursor:pointer;font-size:14px;color:var(--muted);user-select:none">&#9432;</span>
+        <span class="fdb-info-icon" title="FalkorDB connection" onclick="event.stopPropagation();document.getElementById('fdb-info-tip').classList.toggle('show')" style="cursor:pointer;font-size:14px;color:var(--muted);user-select:none">&#9432;</span>
         <span class="fdb-info-tip" id="fdb-info-tip" style="display:none;position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--panel-elevated);border:1px solid var(--border);border-radius:8px;padding:6px 10px;white-space:nowrap;z-index:20;font-size:12px;color:var(--text);box-shadow:0 4px 12px rgba(0,0,0,.35)">
           <code style="margin-right:6px">falkor://localhost:6379</code>
           <span class="fdb-copy-btn" onclick="navigator.clipboard.writeText('falkor://localhost:6379');this.textContent='✓';setTimeout(()=>this.textContent='⧉',1200)" style="cursor:pointer;color:var(--accent);font-size:13px" title="Copy">⧉</span>
@@ -952,6 +952,11 @@
     <div class="form-group">
       <label>Description</label>
       <textarea id="np-desc" placeholder="Optional" rows="3" style="resize:vertical"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Repository Path</label>
+      <input id="np-repo-path" placeholder="e.g. /repos/MyProject or D:/Repos/MyProject" />
+      <small style="color:var(--text-dim);font-size:0.78em">Stored path used for indexing. Decouples indexing from project name.</small>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
       <button class="btn btn-ghost" onclick="closeModal('modal-project')">Cancel</button>
@@ -1946,7 +1951,7 @@ function openNewProject() {
   _editProjectId = null;
   document.getElementById('modal-project-title').textContent = 'New Project';
   document.getElementById('modal-project-submit').textContent = 'Create';
-  ['np-key','np-url','np-desc'].forEach(id=>document.getElementById(id).value='');
+  ['np-key','np-url','np-desc','np-repo-path'].forEach(id=>document.getElementById(id).value='');
   openModal('modal-project');
 }
 function openEditProject(id) {
@@ -1958,6 +1963,7 @@ function openEditProject(id) {
   document.getElementById('np-key').value = p.project_name;
   document.getElementById('np-url').value = p.upstream_url || '';
   document.getElementById('np-desc').value = p.description || '';
+  document.getElementById('np-repo-path').value = p.repo_path || '';
   openModal('modal-project');
 }
 async function submitProjectModal() {
@@ -1968,14 +1974,16 @@ async function submitProjectModal() {
       await api('PATCH',`/auth/projects/${_editProjectId}`,{
         project_name: key,
         upstream_url: document.getElementById('np-url').value.trim(),
-        description: document.getElementById('np-desc').value.trim()
+        description: document.getElementById('np-desc').value.trim(),
+        repo_path: document.getElementById('np-repo-path').value.trim()
       });
       closeModal('modal-project'); toast('Project updated'); await loadProjects();
     } else {
       await api('POST','/auth/projects',{
         project_name: key,
         upstream_url: document.getElementById('np-url').value.trim(),
-        description: document.getElementById('np-desc').value.trim()
+        description: document.getElementById('np-desc').value.trim(),
+        repo_path: document.getElementById('np-repo-path').value.trim()
       });
       closeModal('modal-project'); toast('Project created'); await loadProjects();
     }
