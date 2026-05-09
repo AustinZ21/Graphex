@@ -139,6 +139,15 @@
     .pane { display: none; }
     .pane.active { display: block; }
 
+    .viewer-frame {
+      display: block;
+      width: 100%;
+      height: calc(100vh - 176px);
+      min-height: 660px;
+      border: 0;
+      background: #151922;
+    }
+
     /* ── Tables ── */
     .section-header {
       display: flex; align-items: center; justify-content: space-between;
@@ -825,14 +834,7 @@
       <button class="tab-btn active" id="tab-projects-btn" onclick="switchTab('projects',this)">Projects</button>
       <button class="tab-btn" id="tab-users-btn" onclick="switchTab('users',this)">Users</button>
       <button class="tab-btn" id="tab-audit-btn" onclick="switchTab('audit',this)">Audit</button>
-      <button class="tab-btn" id="tab-fdb-btn" style="display:none" onclick="openFdbBrowser()">FDB-Browser</button>
-      <span class="fdb-info-wrap" id="fdb-info-wrap" style="display:none;position:relative;align-self:center;margin-left:2px">
-        <span class="fdb-info-icon" title="FalkorDB connection" onclick="event.stopPropagation();document.getElementById('fdb-info-tip').classList.toggle('show')" style="cursor:pointer;font-size:14px;color:var(--muted);user-select:none">&#9432;</span>
-        <span class="fdb-info-tip" id="fdb-info-tip" style="display:none;position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--panel-elevated);border:1px solid var(--border);border-radius:8px;padding:6px 10px;white-space:nowrap;z-index:20;font-size:12px;color:var(--text);box-shadow:0 4px 12px rgba(0,0,0,.35)">
-          <code style="margin-right:6px">falkor://localhost:6379</code>
-          <span class="fdb-copy-btn" onclick="navigator.clipboard.writeText('falkor://localhost:6379');this.textContent='✓';setTimeout(()=>this.textContent='⧉',1200)" style="cursor:pointer;color:var(--accent);font-size:13px" title="Copy">⧉</span>
-        </span>
-      </span>
+      <button class="tab-btn" id="tab-viewer-btn" style="display:none" onclick="switchTab('viewer',this)">Graph</button>
     </div>
     <div class="user-badge">
       <div class="user-menu-wrap" id="user-menu-wrap">
@@ -903,7 +905,7 @@
       <div class="section-header">
         <h2>Audit</h2>
         <div class="audit-filters">
-          <input id="audit-actor" placeholder="Actor" style="width:130px" oninput="onAuditFiltersChanged()" />
+          <input id="audit-actor" placeholder="User" style="width:130px" oninput="onAuditFiltersChanged()" />
           <input id="audit-project" placeholder="Project" style="width:130px" oninput="onAuditFiltersChanged()" />
           <input id="audit-path" placeholder="Path contains" style="width:180px" oninput="onAuditFiltersChanged()" />
           <select id="audit-scope" style="width:120px" onchange="onAuditFiltersChanged()">
@@ -923,7 +925,7 @@
             <th class="sortable center-col-header" onclick="setAuditSort('path')">Path <span id="sort-audit-path"></span></th>
             <th class="sortable center-col-header" onclick="setAuditSort('status_code')">Status <span id="sort-audit-status_code"></span></th>
             <th class="sortable center-col-header" onclick="setAuditSort('duration_ms')">Duration <span id="sort-audit-duration_ms"></span></th>
-            <th class="sortable center-col-header" onclick="setAuditSort('actor_display')">Actor <span id="sort-audit-actor_display"></span></th>
+            <th class="sortable center-col-header" onclick="setAuditSort('actor_display')">User <span id="sort-audit-actor_display"></span></th>
             <th class="sortable center-col-header" onclick="setAuditSort('token_count_sort')">Token Usage <span id="sort-audit-token_count_sort"></span></th>
             <th class="sortable center-col-header" onclick="setAuditSort('details_display')">Details <span id="sort-audit-details_display"></span></th>
           </tr></thead>
@@ -931,6 +933,11 @@
         </table>
       </div>
       <div class="pagination-wrap" id="audit-pagination"></div>
+    </div>
+
+    <!-- GRAPH VIEWER -->
+    <div class="pane" id="pane-viewer">
+      <iframe id="graph-viewer-frame" class="viewer-frame" title="ContextGraph graph viewer" data-src="/viewer/"></iframe>
     </div>
   </div>
 
@@ -1333,8 +1340,7 @@ async function initApp() {
       const cfg = await api('GET', '/admin/runtime-config');
       if (cfg?.falkordb_url) _falkordbUrl = cfg.falkordb_url;
     } catch {}
-    document.getElementById('tab-fdb-btn').style.display = '';
-    document.getElementById('fdb-info-wrap').style.display = '';
+    document.getElementById('tab-viewer-btn').style.display = '';
   }
   if (_me.role !== 'admin') {
     document.getElementById('new-project-btn').style.display = 'none';
@@ -1371,6 +1377,18 @@ async function openFdbBrowser() {
 function goHome() {
   const btn = document.querySelector('.tab-btn');
   if (btn) switchTab('projects', btn);
+}
+
+function loadGraphViewerFrame() {
+  const frame = document.getElementById('graph-viewer-frame');
+  if (frame && !frame.src) frame.src = frame.dataset.src || '/viewer/';
+}
+
+function refreshGraphViewer() {
+  const frame = document.getElementById('graph-viewer-frame');
+  if (!frame) return;
+  frame.src = frame.src || frame.dataset.src || '/viewer/';
+  frame.contentWindow?.location.reload();
 }
 
 function logout() {
@@ -1433,6 +1451,7 @@ function switchTab(name, btn) {
     const projectsTabBtn = document.getElementById('tab-projects-btn');
     if (projectsTabBtn) projectsTabBtn.classList.add('active');
   }
+  if (name === 'viewer') loadGraphViewerFrame();
   if (name === 'users') loadUsers();
   if (name === 'audit') {
     loadAudit();
@@ -1552,16 +1571,18 @@ async function loadProjects() {
   await updateIndexStatus();
   // Start polling for index status updates
   if (_indexStatusPollInterval) clearInterval(_indexStatusPollInterval);
-  _indexStatusPollInterval = setInterval(updateIndexStatus, 2000);  // Poll every 2 seconds
+  _indexStatusPollInterval = setInterval(updateIndexStatus, 5000);  // Poll every 5 seconds
   filterProjects(document.getElementById('project-search')?.value || '');
 }
 
 async function updateIndexStatus() {
   try {
     const statuses = await api('GET', '/auth/projects/index-status');
+    const prevSnapshot = JSON.stringify(_indexStatusCache);
     mergeIndexStatusCache(statuses);
-    // Re-render if projects are visible
-    if (document.getElementById('pane-projects')?.classList.contains('active')) {
+    const nextSnapshot = JSON.stringify(_indexStatusCache);
+    // Only re-render when status data actually changed
+    if (prevSnapshot !== nextSnapshot && document.getElementById('pane-projects')?.classList.contains('active')) {
       filterProjects(document.getElementById('project-search')?.value || '');
     }
   } catch(e) {
@@ -1569,7 +1590,8 @@ async function updateIndexStatus() {
   }
 }
 
-async function triggerProjectIndex(projectId) {
+async function triggerProjectIndex(projectId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting\u2026'; }
   try {
     const result = await api('POST', `/auth/projects/${projectId}/index`);
     const mode = result.mode || 'incremental';
@@ -1577,16 +1599,21 @@ async function triggerProjectIndex(projectId) {
     await updateIndexStatus();
   } catch (e) {
     toast(e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Reindex'; }
   }
 }
 
-async function triggerProjectFullIndex(projectId) {
+async function triggerProjectFullIndex(projectId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting\u2026'; }
   try {
     const result = await api('POST', `/auth/projects/${projectId}/index-full`);
     toast('Full index queued');
     await updateIndexStatus();
   } catch (e) {
     toast(e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Full Index'; }
   }
 }
 
@@ -1846,8 +1873,8 @@ function filterProjects(q) {
           <button class="btn btn-sm btn-ghost" onclick="openGenerateToken(${p.id})">+ Token</button>
           ${_me?.role==='admin'?`
             ${isStale ? `<button class="btn btn-sm btn-danger" onclick="recoverStaleIndexJob(${p.id})" title="Mark stale index job failed and unlock this project">Recover</button>` : ''}
-            <button class="btn btn-sm btn-ghost" onclick="triggerProjectIndex(${p.id})" ${isProcessing ? 'disabled title="Index job already running"' : ''}>Reindex</button>
-            <button class="btn btn-sm btn-ghost" onclick="triggerProjectFullIndex(${p.id})" ${isProcessing ? 'disabled title="Index job already running"' : ''}>Full Index</button>
+            <button class="btn btn-sm btn-ghost" onclick="triggerProjectIndex(${p.id},this)" ${isProcessing ? 'disabled title="Index job already running"' : ''}>Reindex</button>
+            <button class="btn btn-sm btn-ghost" onclick="triggerProjectFullIndex(${p.id},this)" ${isProcessing ? 'disabled title="Index job already running"' : ''}>Full Index</button>
             <button class="btn btn-sm" onclick="openEditProject(${p.id})">Edit</button>
             ${p.is_active
               ? `<button class="btn btn-sm btn-danger" onclick="deleteProject(${p.id})">Delete</button>`

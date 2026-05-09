@@ -27,6 +27,7 @@ yarn-error.log
 yarn.log
 .pnpm-debug.log
 src/dist/
+src/viewer/dist/
 build/
 coverage/
 .nyc_output/

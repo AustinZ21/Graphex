@@ -1,0 +1,17 @@
+{
+  "name": "contextgraph-viewer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5178",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 5179"
+  },
+  "dependencies": {
+    "@cosmos.gl/graph": "^3.0.0-beta.8"
+  },
+  "devDependencies": {
+    "vite": "^6.3.0"
+  }
+}

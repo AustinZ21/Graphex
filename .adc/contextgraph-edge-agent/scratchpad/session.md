@@ -38,3 +38,8 @@ This ensures the NEXT agent handling this repository knows exactly where you lef
 - **Last Action Taken:** Added deterministic Hallucination Pressure Score scoring, REST/MCP benchmark surfaces, a CodexCLI/ClaudeCLI JSONL manifest, a report runner, generated JSON/Markdown reports, and README/docs updates.
 - **Failing Tests / Errors:** Normal pytest collection still hits local `pytest_asyncio` AttributeError before test execution; new runner initially needed an explicit `src/` import path fix when launched with `python -m src.scripts...`.
 - **Next Steps:** Focused HPS tests passed with plugin autoload disabled and pytest addopts cleared; run full suite after the local pytest plugin mismatch is resolved.
+- 2026-05-08 update: Added a standalone large graph viewer under `src/viewer` and a protected `/api/viewer/graphs/{project_name}` API for stats plus chunked graph loading.
+- 2026-05-08 update: Merged the graph viewer into the Admin SPA as an admin-only `Graph Viewer` tab backed by the same `/viewer/` static app and shared `cg_jwt` session.
+- 2026-05-08 update: Added relationship-type colors to the viewer: CALLS, IMPORTS, DEFINES, CONTAINS, USES_VARIABLE, and FLOWS_TO now use distinct node/link colors with a legend.
+- Library decision: selected MIT-licensed `@cosmos.gl/graph` for GPU/WebGL large network rendering; the API defaults to 50k-edge chunks and caps chunks at 100k edges so million-scale graphs are loaded progressively instead of as one JSON payload.
+- Integration note: FastAPI now serves the viewer at `/viewer`; it reuses the Admin UI `cg_jwt` token or accepts a pasted admin JWT.

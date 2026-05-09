@@ -32,6 +32,7 @@ from fastapi import HTTPException
 from fastapi import Request
 from jose import JWTError
 from fastapi.responses import FileResponse
+from fastapi.responses import RedirectResponse
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 
@@ -46,10 +47,11 @@ from backend.tools.producer import MCPProducer
 from backend.tools import server as mcp_server
 from backend.perf.context_quality import benchmark_context_quality, ContextQualityInputError
 from backend.perf.token_efficiency import benchmark_token_efficiency, TokenBenchmarkInputError
+from backend.viewer.router import router as viewer_router
 
 log = structlog.get_logger()
 
-APP_VERSION = "0.0.5"
+APP_VERSION = "0.0.20"
 
 FALKORDB_HOST = os.getenv("FALKORDB_HOST", "localhost")
 FALKORDB_PORT = int(os.getenv("FALKORDB_PORT", "6379"))
@@ -145,6 +147,7 @@ app.add_middleware(ProjectTokenMiddleware)
 
 # ── Auth API ───────────────────────────────────────────────────────────────
 app.include_router(auth_router, prefix="/api")
+app.include_router(viewer_router, prefix="/api")
 
 
 def _truncate(value: str | None, limit: int) -> str | None:
@@ -519,6 +522,7 @@ app.mount("/mcp", mcp_server.mcp.sse_app())
 
 # ── Admin SPA (served last so API routes take precedence) ─────────────────
 _FRONTEND = Path(__file__).resolve().parents[1] / "frontend"
+_VIEWER = Path(__file__).resolve().parents[1] / "viewer"
 
 
 @app.get("/admin", include_in_schema=False)
@@ -531,6 +535,15 @@ async def admin_ui():
             "Expires": "0",
         },
     )
+
+
+@app.get("/viewer", include_in_schema=False)
+async def graph_viewer_ui():
+    return RedirectResponse(url="/viewer/", status_code=307)
+
+
+if _VIEWER.is_dir():
+    app.mount("/viewer", StaticFiles(directory=str(_VIEWER), html=True), name="viewer")
 
 
 if _FRONTEND.is_dir():

@@ -21,8 +21,8 @@ All read tool calls are trace-recorded for hallucination-proxy scoring.
 
 from __future__ import annotations
 
+import asyncio
 import os
-import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
@@ -77,7 +77,7 @@ def _resolve_project_name(project_name: str | None = None) -> str:
     return _current_project_name.get()
 
 
-def _collect_git_changed_paths(repo_path: str, include_untracked: bool = True) -> dict[str, list[str]]:
+async def _collect_git_changed_paths(repo_path: str, include_untracked: bool = True) -> dict[str, list[str]]:
     """Discover changed paths from the local git worktree.
 
     Returns:
@@ -89,18 +89,23 @@ def _collect_git_changed_paths(repo_path: str, include_untracked: bool = True) -
     We classify deletes and renames as destructive because the current incremental
     pipeline does not remove stale symbols for files that disappeared from disk.
     """
-    cmd = ["git", "-C", repo_path, "status", "--porcelain=v1"]
-    cmd.append("--untracked-files=all" if include_untracked else "--untracked-files=no")
-    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    untracked_flag = "--untracked-files=all" if include_untracked else "--untracked-files=no"
+    proc = await asyncio.create_subprocess_exec(
+        "git", "-C", repo_path, "status", "--porcelain=v1", untracked_flag,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout_bytes, stderr_bytes = await proc.communicate()
     if proc.returncode != 0:
-        raise RuntimeError((proc.stderr or proc.stdout or "git status failed").strip())
+        msg = (stderr_bytes or stdout_bytes or b"git status failed").decode().strip()
+        raise RuntimeError(msg)
 
     changed_paths: list[str] = []
     destructive_paths: list[str] = []
     seen_changed: set[str] = set()
     seen_destructive: set[str] = set()
 
-    for raw_line in proc.stdout.splitlines():
+    for raw_line in stdout_bytes.decode().splitlines():
         line = raw_line.rstrip()
         if len(line) < 3:
             continue
@@ -354,7 +359,7 @@ async def index_repo_changes(
     resolved_project_name = _resolve_project_name(project_name)
 
     try:
-        discovered = _collect_git_changed_paths(repo_path, include_untracked=include_untracked)
+        discovered = await _collect_git_changed_paths(repo_path, include_untracked=include_untracked)
     except FileNotFoundError:
         log.warning(
             "index_repo_changes.git_unavailable",

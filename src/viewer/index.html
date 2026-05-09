@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Viewer</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "@cosmos.gl/graph": "https://esm.sh/@cosmos.gl/graph@3.0.0-beta.8"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="/admin" title="Back to admin">
+        <span>Viewer</span>
+      </a>
+      <div class="topbar-actions">
+        <a class="link-button" href="http://localhost:13000/graph" target="_blank" rel="noreferrer">FalkorDB Graph</a>
+      </div>
+    </header>
+
+    <main id="workspace" class="workspace">
+      <button id="toggle-panel" class="panel-toggle" type="button" aria-label="Collapse controls" title="Collapse controls"></button>
+      <aside class="control-panel" aria-label="Graph controls">
+        <section>
+          <div class="section-title">Project</div>
+          <label for="project-select">Graph</label>
+          <select id="project-select"></select>
+          <div class="field-row">
+            <button id="refresh-projects" class="btn secondary" type="button">Refresh</button>
+            <button id="load-first" class="btn primary" type="button">Load</button>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-title">Window</div>
+          <label for="search-input">Search</label>
+          <input id="search-input" placeholder="symbol, path, or name" />
+
+          <label for="chunk-limit">Chunk size</label>
+          <input id="chunk-limit" type="number" min="1000" max="100000" step="1000" value="50000" />
+
+          <div class="edge-grid" aria-label="Edge types">
+            <label style="--edge-color:#ff5c63"><input type="checkbox" name="edge-type" value="CALLS" checked /><i class="edge-dot"></i><span>Calls</span></label>
+            <label style="--edge-color:#5badff"><input type="checkbox" name="edge-type" value="IMPORTS" checked /><i class="edge-dot"></i><span>Imports</span></label>
+            <label style="--edge-color:#ffd642"><input type="checkbox" name="edge-type" value="DEFINES" checked /><i class="edge-dot"></i><span>Defines</span></label>
+            <label style="--edge-color:#ad80ff"><input type="checkbox" name="edge-type" value="CONTAINS" checked /><i class="edge-dot"></i><span>Contains</span></label>
+            <label style="--edge-color:#42e694"><input type="checkbox" name="edge-type" value="USES_VARIABLE" checked /><i class="edge-dot"></i><span>Uses variable</span></label>
+            <label style="--edge-color:#ff8c40"><input type="checkbox" name="edge-type" value="FLOWS_TO" checked /><i class="edge-dot"></i><span>Flows to</span></label>
+          </div>
+
+          <div class="field-row">
+            <button id="load-next" class="btn secondary" type="button" disabled>Next Chunk</button>
+            <button id="clear-graph" class="btn secondary" type="button">Clear</button>
+          </div>
+        </section>
+
+        <section>
+          <div class="section-title">View</div>
+          <div class="field-row">
+            <button id="fit-view" class="btn secondary" type="button">Fit</button>
+            <button id="toggle-sim" class="btn secondary" type="button">Run</button>
+            <button id="toggle-edges" class="btn secondary" type="button" aria-pressed="true">Hide Edges</button>
+          </div>
+        </section>
+
+        <section class="stats-panel">
+          <div class="section-title">Stats</div>
+          <dl>
+            <div><dt>Database nodes</dt><dd id="db-nodes">-</dd></div>
+            <div><dt>Database edges</dt><dd id="db-edges">-</dd></div>
+            <div><dt>Loaded nodes</dt><dd id="loaded-nodes">0</dd></div>
+            <div><dt>Loaded edges</dt><dd id="loaded-edges">0</dd></div>
+            <div><dt>Cursor</dt><dd id="cursor-value">0</dd></div>
+          </dl>
+        </section>
+
+        <section>
+          <div class="section-title">Session Token</div>
+          <input id="token-input" type="password" autocomplete="off" placeholder="Uses cg_jwt from Admin" />
+          <div class="field-row">
+            <button id="save-token" class="btn secondary" type="button">Save</button>
+            <button id="forget-token" class="btn secondary" type="button">Forget</button>
+          </div>
+        </section>
+      </aside>
+
+      <section class="graph-stage" aria-label="Graph canvas">
+        <div id="graph-root"></div>
+        <div id="status-line" class="status-line">Loading viewer...</div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
