@@ -534,8 +534,7 @@ _FRONTEND = Path(__file__).resolve().parents[1] / "frontend"
 _VIEWER = Path(__file__).resolve().parents[1] / "viewer"
 
 
-@app.get("/admin", include_in_schema=False)
-async def admin_ui():
+def _admin_ui_response() -> FileResponse:
     return FileResponse(
         _FRONTEND / "index.html",
         headers={
@@ -544,6 +543,16 @@ async def admin_ui():
             "Expires": "0",
         },
     )
+
+
+@app.get("/admin", include_in_schema=False)
+async def admin_ui():
+    return _admin_ui_response()
+
+
+@app.get("/admin/{admin_path:path}", include_in_schema=False)
+async def admin_deep_link_ui(admin_path: str):
+    return _admin_ui_response()
 
 
 @app.get("/viewer", include_in_schema=False)

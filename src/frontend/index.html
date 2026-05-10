@@ -805,7 +805,7 @@
 <!-- APP -->
 <div id="app">
   <div class="topbar">
-    <a class="logo" onclick="goHome()" href="#">
+    <a class="logo" onclick="goHome(event)" href="/admin/projects">
       <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
         <!-- outer ring -->
         <circle cx="14" cy="14" r="13" stroke="#4ae387" stroke-width="1.5" opacity="0.35"/>
@@ -1082,6 +1082,48 @@ let _allUsers = [];
 let _auditTotal = 0;
 let _falkordbUrl = 'falkor://localhost:6379';
 
+const ADMIN_TAB_ROUTES = Object.freeze({
+  projects: '/admin/projects',
+  users: '/admin/users',
+  audit: '/admin/audit',
+  viewer: '/admin/graph',
+});
+const ADMIN_PATH_TABS = Object.freeze({
+  '/admin': 'projects',
+  '/admin/projects': 'projects',
+  '/admin/project': 'projects',
+  '/admin/users': 'users',
+  '/admin/user': 'users',
+  '/admin/audit': 'audit',
+  '/admin/graph': 'viewer',
+  '/admin/viewer': 'viewer',
+});
+
+function normalizedAdminPath(pathname) {
+  const normalized = String(pathname || '/admin').replace(/\/+$/, '');
+  return normalized || '/admin';
+}
+
+function adminTabFromLocation() {
+  return ADMIN_PATH_TABS[normalizedAdminPath(window.location.pathname).toLowerCase()] || 'projects';
+}
+
+function adminRouteForTab(name) {
+  return ADMIN_TAB_ROUTES[name] || ADMIN_TAB_ROUTES.projects;
+}
+
+function canOpenAdminTab(name) {
+  return name === 'projects' || _me?.role === 'admin';
+}
+
+function setAdminRoute(name, { replace = false } = {}) {
+  const route = adminRouteForTab(name);
+  if (window.location.pathname === route) return;
+  const next = new URL(window.location.href);
+  next.pathname = route;
+  window.history[replace ? 'replaceState' : 'pushState']({ adminTab: name }, '', next.pathname + next.search + next.hash);
+}
+
 function _ensurePageBounds(state, totalRows) {
   const totalPages = Math.max(1, Math.ceil(totalRows / state.pageSize));
   if (state.page > totalPages) state.page = totalPages;
@@ -1348,7 +1390,12 @@ async function initApp() {
     document.getElementById('tab-audit-btn').style.display = 'none';
   }
   await loadProjects();
+  switchTab(adminTabFromLocation(), null, { replace: true });
 }
+
+window.addEventListener('popstate', () => {
+  if (_jwt && _me) switchTab(adminTabFromLocation(), null, { updateUrl: false });
+});
 
 document.addEventListener('click', e => {
   const tip = document.getElementById('fdb-info-tip');
@@ -1374,9 +1421,9 @@ async function openFdbBrowser() {
   }
 }
 
-function goHome() {
-  const btn = document.querySelector('.tab-btn');
-  if (btn) switchTab('projects', btn);
+function goHome(event) {
+  event?.preventDefault();
+  switchTab('projects');
 }
 
 function loadGraphViewerFrame() {
@@ -1438,22 +1485,26 @@ async function submitProfile() {
   } catch(e) { toast(e.message, 'error'); }
 }
 
-function switchTab(name, btn) {
+function switchTab(name, btn, options = {}) {
+  const requestedName = ADMIN_TAB_ROUTES[name] ? name : 'projects';
+  const nextName = canOpenAdminTab(requestedName) ? requestedName : 'projects';
+  const pane = document.getElementById('pane-' + nextName);
+  if (!pane) return;
   document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('pane-' + name).classList.add('active');
-  if (btn) btn.classList.add('active');
+  pane.classList.add('active');
+  const activeBtn = nextName === requestedName && btn ? btn : document.getElementById('tab-' + nextName + '-btn');
+  if (activeBtn) activeBtn.classList.add('active');
+  if (options.updateUrl !== false) {
+    setAdminRoute(nextName, { replace: Boolean(options.replace) || nextName !== requestedName });
+  }
   if (_auditPollInterval) {
     clearInterval(_auditPollInterval);
     _auditPollInterval = null;
   }
-  if (!btn && name === 'projects') {
-    const projectsTabBtn = document.getElementById('tab-projects-btn');
-    if (projectsTabBtn) projectsTabBtn.classList.add('active');
-  }
-  if (name === 'viewer') loadGraphViewerFrame();
-  if (name === 'users') loadUsers();
-  if (name === 'audit') {
+  if (nextName === 'viewer') loadGraphViewerFrame();
+  if (nextName === 'users') loadUsers();
+  if (nextName === 'audit') {
     loadAudit();
     _auditPollInterval = setInterval(() => {
       if (document.getElementById('pane-audit')?.classList.contains('active')) {

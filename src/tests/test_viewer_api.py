@@ -275,6 +275,18 @@ def test_admin_embeds_versioned_graph_viewer() -> None:
 
     assert response.status_code == 200
     assert 'data-src="/viewer/?v=1.29.74"' in response.text
+    assert "const ADMIN_TAB_ROUTES" in response.text
+    assert "viewer: '/admin/graph'" in response.text
+
+
+def test_admin_deep_links_are_served() -> None:
+    client = TestClient(app)
+
+    for path in ["/admin/projects", "/admin/users", "/admin/audit", "/admin/graph"]:
+        response = client.get(path)
+        assert response.status_code == 200
+        assert "<title>ContextGraph Admin</title>" in response.text
+        assert "const ADMIN_TAB_ROUTES" in response.text
 
 
 def test_viewer_stats_advertises_500k_chunk_limit() -> None:
