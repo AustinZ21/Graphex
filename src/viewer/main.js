@@ -13,7 +13,7 @@ const EDGE_STYLES = {
 
 const KIND_ORDER = ['Repository', 'File', 'Symbol', 'Variable', 'Node']
 const KIND_INDEX = new Map(KIND_ORDER.map((kind, index) => [kind, index]))
-const NODE_KIND_COLORS = { Repository: '#4ae387', File: '#5badff', Symbol: '#ffd642', Variable: '#42e694', Node: '#adb8cc' }
+const NODE_KIND_COLORS = { Repository: '#e06c75', File: '#61afef', Symbol: '#c678dd', Variable: '#d19a66', Node: '#7f848e' }
 function kindColor(kind) { return NODE_KIND_COLORS[kind] || NODE_KIND_COLORS.Node }
 const MAX_CLIENT_NODES = 500000
 const MAX_CHUNK_LIMIT = 500000
