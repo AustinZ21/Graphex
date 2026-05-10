@@ -10,6 +10,8 @@ const EDGE_STYLES = {
   CONTAINS: { label: 'Contains', color: '#adb8cc', width: 1.1, priority: 1 },
   UNKNOWN: { label: 'Unclassified', color: '#adb8cc', width: 1, priority: 0 },
 }
+const EDGE_TYPE_ORDER = ['CALLS', 'IMPORTS', 'DEFINES', 'CONTAINS', 'USES_VARIABLE', 'FLOWS_TO']
+const DEFAULT_SELECTED_EDGE_TYPES = new Set(['CALLS', 'IMPORTS', 'DEFINES', 'CONTAINS'])
 
 const KIND_ORDER = ['Repository', 'File', 'Symbol', 'Variable', 'Node']
 const KIND_INDEX = new Map(KIND_ORDER.map((kind, index) => [kind, index]))
@@ -78,6 +80,7 @@ const elements = {
   fitView: document.getElementById('fit-view'),
   toggleSim: document.getElementById('toggle-sim'),
   toggleEdges: document.getElementById('toggle-edges'),
+  edgeGrid: document.getElementById('edge-grid'),
   nodeTypeInputs: [...document.querySelectorAll('input[name="node-type"]')],
   searchInput: document.getElementById('search-input'),
   chunkLimit: document.getElementById('chunk-limit'),
@@ -106,6 +109,31 @@ function formatNumber(value) {
 
 function edgeStyle(edgeType) {
   return EDGE_STYLES[edgeType] || EDGE_STYLES.UNKNOWN
+}
+
+function renderEdgeTypeControls() {
+  elements.edgeGrid.replaceChildren(
+    ...EDGE_TYPE_ORDER.map((edgeType) => {
+      const style = edgeStyle(edgeType)
+      const label = document.createElement('label')
+      label.style.setProperty('--edge-color', style.color)
+
+      const input = document.createElement('input')
+      input.type = 'checkbox'
+      input.name = 'edge-type'
+      input.value = edgeType
+      input.checked = DEFAULT_SELECTED_EDGE_TYPES.has(edgeType)
+
+      const dot = document.createElement('i')
+      dot.className = 'edge-dot'
+
+      const text = document.createElement('span')
+      text.textContent = style.label
+
+      label.append(input, dot, text)
+      return label
+    }),
+  )
 }
 
 function clamp(value, minValue, maxValue) {
@@ -806,6 +834,7 @@ function wireEvents() {
 }
 
 async function boot() {
+  renderEdgeTypeControls()
   elements.chunkLimit.max = String(MAX_CHUNK_LIMIT)
   if (Number(elements.chunkLimit.value) > MAX_CHUNK_LIMIT) elements.chunkLimit.value = String(DEFAULT_CHUNK_LIMIT)
   setControlPanelCollapsed(localStorage.getItem('cg_viewer_controls_collapsed') === '1')

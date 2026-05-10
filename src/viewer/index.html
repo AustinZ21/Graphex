@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Viewer</title>
-  <link rel="stylesheet" href="./styles.css?v=1.29.74" />
+  <link rel="stylesheet" href="./styles.css?v=1.29.75" />
   <script type="importmap">
     {
       "imports": {
@@ -45,14 +45,7 @@
           <label for="chunk-limit">Rendering Node Types</label>
           <input id="chunk-limit" type="number" min="1" max="500000" step="250" value="250" />
 
-          <div class="edge-grid" aria-label="Edge types">
-            <label style="--edge-color:#4ae387"><input type="checkbox" name="edge-type" value="CALLS" checked /><i class="edge-dot"></i><span>Calls</span></label>
-            <label style="--edge-color:#5badff"><input type="checkbox" name="edge-type" value="IMPORTS" checked /><i class="edge-dot"></i><span>Imports</span></label>
-            <label style="--edge-color:#ffd642"><input type="checkbox" name="edge-type" value="DEFINES" checked /><i class="edge-dot"></i><span>Defines</span></label>
-            <label style="--edge-color:#adb8cc"><input type="checkbox" name="edge-type" value="CONTAINS" checked /><i class="edge-dot"></i><span>Contains</span></label>
-            <label style="--edge-color:#42e694"><input type="checkbox" name="edge-type" value="USES_VARIABLE" /><i class="edge-dot"></i><span>Uses variable</span></label>
-            <label style="--edge-color:#4ae387"><input type="checkbox" name="edge-type" value="FLOWS_TO" /><i class="edge-dot"></i><span>Flows to</span></label>
-          </div>
+          <div id="edge-grid" class="edge-grid" aria-label="Edge types"></div>
 
           <div class="field-row">
             <button id="load-first" class="btn primary" type="button">Load</button>
@@ -99,6 +92,6 @@
     </main>
   </div>
 
-  <script type="module" src="./main.js?v=1.29.74"></script>
+  <script type="module" src="./main.js?v=1.29.75"></script>
 </body>
 </html>
