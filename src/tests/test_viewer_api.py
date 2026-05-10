@@ -222,7 +222,7 @@ def test_viewer_entrypoint_is_served() -> None:
     assert "<title>Viewer</title>" in response.text
     assert '"sigma"' in response.text
     assert '"graphology"' in response.text
-    assert 'src="./main.js?v=1.29.75"' in response.text
+    assert 'src="./main.js?v=1.29.76"' in response.text
     assert '<label for="chunk-limit">Rendering Node Types</label>' in response.text
     assert 'value="250"' in response.text
     assert '<div id="edge-grid" class="edge-grid" aria-label="Edge types"></div>' in response.text
@@ -253,7 +253,9 @@ def test_viewer_static_assets_are_not_cached() -> None:
     assert "EDGE_TYPE_ORDER = ['CALLS', 'IMPORTS', 'DEFINES', 'CONTAINS', 'USES_VARIABLE', 'FLOWS_TO']" in response.text
     assert "DEFAULT_SELECTED_EDGE_TYPES = new Set(['CALLS', 'IMPORTS', 'DEFINES', 'CONTAINS'])" in response.text
     assert "function renderEdgeTypeControls" in response.text
-    assert "label.style.setProperty('--edge-color', style.color)" in response.text
+    assert "label.append(input, text)" in response.text
+    assert "--edge-color" not in response.text
+    assert "edge-dot" not in response.text
     assert "color: style.color" in response.text
     assert "function setNodeKindVisibility" in response.text
     assert "function startFpsCounter" in response.text
@@ -277,7 +279,7 @@ def test_admin_embeds_versioned_graph_viewer() -> None:
     response = TestClient(app).get("/admin")
 
     assert response.status_code == 200
-    assert 'data-src="/viewer/?v=1.29.75"' in response.text
+    assert 'data-src="/viewer/?v=1.29.76"' in response.text
     assert "const ADMIN_TAB_ROUTES" in response.text
     assert "viewer: '/admin/graph'" in response.text
 

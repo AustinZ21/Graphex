@@ -246,15 +246,6 @@ select:focus {
   font-weight: 600;
 }
 
-.edge-dot {
-  width: 10px;
-  height: 10px;
-  flex: 0 0 10px;
-  border-radius: 999px;
-  background: var(--edge-color);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--edge-color), transparent 45%);
-}
-
 .node-dot {
   width: 10px;
   height: 10px;

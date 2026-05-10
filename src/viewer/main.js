@@ -116,7 +116,6 @@ function renderEdgeTypeControls() {
     ...EDGE_TYPE_ORDER.map((edgeType) => {
       const style = edgeStyle(edgeType)
       const label = document.createElement('label')
-      label.style.setProperty('--edge-color', style.color)
 
       const input = document.createElement('input')
       input.type = 'checkbox'
@@ -124,13 +123,10 @@ function renderEdgeTypeControls() {
       input.value = edgeType
       input.checked = DEFAULT_SELECTED_EDGE_TYPES.has(edgeType)
 
-      const dot = document.createElement('i')
-      dot.className = 'edge-dot'
-
       const text = document.createElement('span')
       text.textContent = style.label
 
-      label.append(input, dot, text)
+      label.append(input, text)
       return label
     }),
   )
