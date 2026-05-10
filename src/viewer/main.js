@@ -112,37 +112,6 @@ function clamp(value, minValue, maxValue) {
   return Math.max(minValue, Math.min(maxValue, value))
 }
 
-const _parsedHexCache = new Map()
-
-function parseHexColor(color) {
-  let cached = _parsedHexCache.get(color)
-  if (cached) return cached
-  const normalized = color.replace('#', '')
-  cached = {
-    red: parseInt(normalized.slice(0, 2), 16),
-    green: parseInt(normalized.slice(2, 4), 16),
-    blue: parseInt(normalized.slice(4, 6), 16),
-  }
-  _parsedHexCache.set(color, cached)
-  return cached
-}
-
-function toHex(channel) {
-  return clamp(Math.round(channel), 0, 255).toString(16).padStart(2, '0')
-}
-
-function mixColor(sourceColor, targetColor, amount) {
-  const source = parseHexColor(sourceColor)
-  const target = parseHexColor(targetColor)
-  return `#${toHex(source.red + (target.red - source.red) * amount)}${toHex(source.green + (target.green - source.green) * amount)}${toHex(source.blue + (target.blue - source.blue) * amount)}`
-}
-
-function depthColor(baseColor, depth) {
-  const normalizedDepth = clamp((depth + 1) / 2, 0, 1)
-  if (normalizedDepth >= 0.5) return mixColor(baseColor, '#f3f7ff', (normalizedDepth - 0.5) * 0.34)
-  return mixColor(baseColor, '#273044', (0.5 - normalizedDepth) * 0.58)
-}
-
 function hashString(value) {
   let hash = 2166136261
   for (let index = 0; index < value.length; index += 1) {
@@ -310,7 +279,7 @@ function projectedNodeAttributes(attributes) {
     x: projection.x,
     y: projection.y,
     size: clamp(baseSize * (0.72 + projection.scale * 0.28), 1.2, MAX_NODE_SIZE + 4),
-    color: depthColor(attributes.baseColor || NODE_KIND_COLORS.Node, projection.depth),
+    color: attributes.baseColor || NODE_KIND_COLORS.Node,
     zIndex: projection.depth,
   }
 }
@@ -486,7 +455,7 @@ function applyProjectionToAllNodes() {
       attributes.x = projection.x
       attributes.y = projection.y
       attributes.size = clamp(baseSize * (0.72 + projection.scale * 0.28), 1.2, MAX_NODE_SIZE + 4)
-      attributes.color = depthColor(attributes.baseColor || NODE_KIND_COLORS.Node, projection.depth)
+      attributes.color = attributes.baseColor || NODE_KIND_COLORS.Node
       attributes.zIndex = projection.depth
       return attributes
     },
