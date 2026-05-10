@@ -35,7 +35,7 @@ npm run dev
 ## Scale Notes
 
 - The default display window is 250 nodes and the API caps each chunk at 500,000 nodes.
-- The primary Load action sits immediately to the left of Load more in the Window controls.
+- The primary Load action loads the requested visible node window in one step.
 - Each chunk uses an internal node-id cursor and includes edges only when both endpoints are inside the selected node page.
 - The client renders every loaded node and edge instead of hiding lower-detail levels. It enforces a 500,000-node cap so extremely large projects do not grow the browser heap without bound.
 - Labels are hover-only and use a high-contrast dark tooltip so node names remain readable on the dark canvas.

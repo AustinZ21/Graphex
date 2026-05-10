@@ -222,7 +222,9 @@ def test_viewer_entrypoint_is_served() -> None:
     assert "<title>Viewer</title>" in response.text
     assert '"sigma"' in response.text
     assert '"graphology"' in response.text
-    assert 'src="./main.js?v=1.29.77"' in response.text
+    assert 'src="./main.js?v=1.29.79"' in response.text
+    assert 'id="copy-falkor-url"' in response.text
+    assert 'aria-label="Copy FalkorDB connection URL"' in response.text
     assert '<label for="chunk-limit">Display Nodes</label>' in response.text
     assert 'value="250"' in response.text
     assert '<div id="edge-grid" class="edge-grid" aria-label="Edge types"></div>' in response.text
@@ -232,9 +234,9 @@ def test_viewer_entrypoint_is_served() -> None:
     assert 'name="node-type" value="Repository" checked' in response.text
     assert 'name="node-type" value="Variable" checked' in response.text
     assert '<div id="fps-counter" class="fps-counter">FPS --</div>' in response.text
-    assert '>Load more</button>' in response.text
     normalized_html = response.text.replace("\r\n", "\n")
-    assert '<button id="load-first" class="btn primary" type="button">Load</button>\n            <button id="load-next" class="btn secondary" type="button" disabled>Load more</button>\n            <button id="clear-graph" class="btn secondary" type="button">Clear</button>' in normalized_html
+    assert '<button id="load-first" class="btn primary" type="button">Load</button>\n            <button id="clear-graph" class="btn secondary" type="button">Clear</button>' in normalized_html
+    assert 'id="load-next"' not in response.text
     assert "Session Token" not in response.text
     assert 'id="token-input"' not in response.text
     assert response.headers["cache-control"] == "no-store, no-cache, must-revalidate, max-age=0"
@@ -249,6 +251,7 @@ def test_viewer_static_assets_are_not_cached() -> None:
     assert "DEFAULT_CHUNK_LIMIT = 250" in response.text
     assert "MAX_AUTO_CHUNK_FETCHES = 80" in response.text
     assert "DEFAULT_EDGE_VISIBILITY = false" in response.text
+    assert "FALKOR_CONNECTION_URL = 'falkor://contextgraph-falkordb-dev:6379'" in response.text
     assert "EDGE_VISIBILITY_STORAGE_KEY = 'cg_viewer_edges_visible_v4'" in response.text
     assert "NODE_KIND_VISIBILITY_STORAGE_KEY" in response.text
     assert "EDGE_TYPE_ORDER = ['CALLS', 'IMPORTS', 'DEFINES', 'CONTAINS', 'USES_VARIABLE', 'FLOWS_TO']" in response.text
@@ -264,6 +267,8 @@ def test_viewer_static_assets_are_not_cached() -> None:
     assert "Loading up to ${formatNumber(requestedVisibleNodes)} visible nodes" in response.text
     assert "Loaded ${formatNumber(loadedVisibleNodes)} visible nodes" in response.text
     assert "remainingVisibleNodes = Math.max(1, targetVisibleNodes - state.loadedNodes)" in response.text
+    assert "loadNext" not in response.text
+    assert "Load more" not in response.text
     assert "defaultDrawNodeHover: drawNodeHover" in response.text
     assert "HOVER_LABEL_FONT" in response.text
     assert "renderLabels: false" in response.text
@@ -283,7 +288,7 @@ def test_admin_embeds_versioned_graph_viewer() -> None:
     response = TestClient(app).get("/admin")
 
     assert response.status_code == 200
-    assert 'data-src="/viewer/?v=1.29.77"' in response.text
+    assert 'data-src="/viewer/?v=1.29.79"' in response.text
     assert "const ADMIN_TAB_ROUTES" in response.text
     assert "viewer: '/admin/graph'" in response.text
 

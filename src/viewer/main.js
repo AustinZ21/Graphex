@@ -22,6 +22,7 @@ const MAX_CHUNK_LIMIT = 500000
 const MIN_CHUNK_LIMIT = 1
 const DEFAULT_CHUNK_LIMIT = 250
 const DEFAULT_EDGE_VISIBILITY = false
+const FALKOR_CONNECTION_URL = 'falkor://contextgraph-falkordb-dev:6379'
 const EDGE_VISIBILITY_STORAGE_KEY = 'cg_viewer_edges_visible_v4'
 const NODE_KIND_VISIBILITY_STORAGE_KEY = 'cg_viewer_node_kinds_visible_v1'
 const FPS_SAMPLE_MS = 500
@@ -72,11 +73,11 @@ const state = {
 
 const elements = {
   workspace: document.getElementById('workspace'),
+  copyFalkorUrl: document.getElementById('copy-falkor-url'),
   togglePanel: document.getElementById('toggle-panel'),
   projectSelect: document.getElementById('project-select'),
   refreshProjects: document.getElementById('refresh-projects'),
   loadFirst: document.getElementById('load-first'),
-  loadNext: document.getElementById('load-next'),
   clearGraph: document.getElementById('clear-graph'),
   fitView: document.getElementById('fit-view'),
   toggleSim: document.getElementById('toggle-sim'),
@@ -106,6 +107,26 @@ function setStatus(message, tone = 'neutral') {
 
 function formatNumber(value) {
   return new Intl.NumberFormat().format(Number(value || 0))
+}
+
+async function copyTextToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.left = '-9999px'
+  textarea.style.top = '0'
+  document.body.append(textarea)
+  textarea.focus()
+  textarea.select()
+  const copied = document.execCommand('copy')
+  textarea.remove()
+  if (!copied) throw new Error('Clipboard copy is unavailable in this browser.')
 }
 
 function edgeStyle(edgeType) {
@@ -480,7 +501,6 @@ function resetState() {
   state.rotationY = 0.64
   state.rotationZ = 0.08
   stopRotation()
-  elements.loadNext.disabled = true
   updateCounters()
 }
 
@@ -743,7 +763,6 @@ async function appendBatch(batch, reset) {
   const normalized = appendBatchToGraph(batch)
   state.hasNext = batch.next_offset !== null && (state.graph?.order || 0) < MAX_CLIENT_NODES
   state.nextOffset = batch.next_offset ?? (batch.offset + batch.points.length)
-  elements.loadNext.disabled = !state.hasNext
   updateCounters()
   if (reset || normalized.addedNodes) fitGraph()
   return normalized
@@ -781,7 +800,6 @@ async function loadChunk(reset = false) {
   const search = elements.searchInput.value.trim()
 
   elements.loadFirst.disabled = true
-  elements.loadNext.disabled = true
   setStatus(`Loading up to ${formatNumber(requestedVisibleNodes)} visible nodes from ${projectName}...`)
   try {
     if (reset) {
@@ -810,14 +828,13 @@ async function loadChunk(reset = false) {
     const hitScanLimit = state.loadedNodes < targetVisibleNodes && state.hasNext
     const more = state.graph?.order >= MAX_CLIENT_NODES
       ? 'The 500,000-node client cap has been reached.'
-      : hitScanLimit ? 'More matching nodes may exist; use Load more to continue scanning.'
-        : state.hasNext ? 'Ready for the next chunk.' : 'No more chunks for this filter.'
+      : hitScanLimit ? 'More matching nodes may exist; narrow filters and load again.'
+        : state.hasNext ? 'Additional matching nodes remain; increase Display Nodes and load again.' : 'No more chunks for this filter.'
     setStatus(statusWithSkippedSummary(`Loaded ${formatNumber(loadedVisibleNodes)} visible nodes and ${formatNumber(totalAddedEdges)} edges. ${more}`), 'ok')
   } catch (error) {
     setStatus(error.message, 'error')
   } finally {
     elements.loadFirst.disabled = false
-    if (state.hasNext && state.renderer) elements.loadNext.disabled = false
   }
 }
 
@@ -846,10 +863,17 @@ async function loadProjects() {
 }
 
 function wireEvents() {
+  elements.copyFalkorUrl?.addEventListener('click', async () => {
+    try {
+      await copyTextToClipboard(FALKOR_CONNECTION_URL)
+      setStatus(`Copied ${FALKOR_CONNECTION_URL}.`, 'ok')
+    } catch (error) {
+      setStatus(error.message, 'error')
+    }
+  })
   elements.togglePanel.addEventListener('click', () => setControlPanelCollapsed(!state.controlPanelCollapsed))
   elements.refreshProjects.addEventListener('click', loadProjects)
   elements.loadFirst.addEventListener('click', () => loadChunk(true))
-  elements.loadNext.addEventListener('click', () => loadChunk(false))
   elements.clearGraph.addEventListener('click', async () => {
     await destroyGraph()
     resetState()

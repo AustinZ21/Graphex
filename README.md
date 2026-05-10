@@ -1,9 +1,9 @@
 # Autonomous Development Constitution (ADC)
 
-**Version:** 1.29.77
+**Version:** 1.29.79
 **Status:** Published
 **Author:** Nate Scott
-**Date:** 2026-05-09 (viewer visible node loading)
+**Date:** 2026-05-09 (viewer Load more removal)
 
 ## 1. Introduction
 

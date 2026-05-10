@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Viewer</title>
-  <link rel="stylesheet" href="./styles.css?v=1.29.77" />
+  <link rel="stylesheet" href="./styles.css?v=1.29.79" />
   <script type="importmap">
     {
       "imports": {
@@ -22,6 +22,12 @@
       </a>
       <div class="topbar-actions">
         <a class="link-button" href="http://localhost:13000/graph" target="_blank" rel="noreferrer">Browser</a>
+        <button id="copy-falkor-url" class="btn icon-button" type="button" aria-label="Copy FalkorDB connection URL" title="Copy FalkorDB connection URL">
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <rect x="9" y="9" width="11" height="11" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        </button>
       </div>
     </header>
 
@@ -49,7 +55,6 @@
 
           <div class="field-row">
             <button id="load-first" class="btn primary" type="button">Load</button>
-            <button id="load-next" class="btn secondary" type="button" disabled>Load more</button>
             <button id="clear-graph" class="btn secondary" type="button">Clear</button>
           </div>
         </section>
@@ -92,6 +97,6 @@
     </main>
   </div>
 
-  <script type="module" src="./main.js?v=1.29.77"></script>
+  <script type="module" src="./main.js?v=1.29.79"></script>
 </body>
 </html>

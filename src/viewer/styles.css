@@ -189,6 +189,22 @@ select:focus {
   white-space: nowrap;
 }
 
+.icon-button {
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+}
+
+.icon-button svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
 .btn:hover,
 .link-button:hover {
   border-color: #59657c;
