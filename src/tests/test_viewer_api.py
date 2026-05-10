@@ -222,8 +222,8 @@ def test_viewer_entrypoint_is_served() -> None:
     assert "<title>Viewer</title>" in response.text
     assert '"sigma"' in response.text
     assert '"graphology"' in response.text
-    assert 'src="./main.js?v=1.29.76"' in response.text
-    assert '<label for="chunk-limit">Rendering Node Types</label>' in response.text
+    assert 'src="./main.js?v=1.29.77"' in response.text
+    assert '<label for="chunk-limit">Display Nodes</label>' in response.text
     assert 'value="250"' in response.text
     assert '<div id="edge-grid" class="edge-grid" aria-label="Edge types"></div>' in response.text
     assert 'id="toggle-edges" class="btn secondary" type="button" aria-pressed="false">Show Edges</button>' in response.text
@@ -247,6 +247,7 @@ def test_viewer_static_assets_are_not_cached() -> None:
     assert response.headers["cache-control"] == "no-store, no-cache, must-revalidate, max-age=0"
     assert "Sigma" in response.text
     assert "DEFAULT_CHUNK_LIMIT = 250" in response.text
+    assert "MAX_AUTO_CHUNK_FETCHES = 80" in response.text
     assert "DEFAULT_EDGE_VISIBILITY = false" in response.text
     assert "EDGE_VISIBILITY_STORAGE_KEY = 'cg_viewer_edges_visible_v4'" in response.text
     assert "NODE_KIND_VISIBILITY_STORAGE_KEY" in response.text
@@ -258,8 +259,11 @@ def test_viewer_static_assets_are_not_cached() -> None:
     assert "edge-dot" not in response.text
     assert "color: style.color" in response.text
     assert "function setNodeKindVisibility" in response.text
+    assert "function syncLoadedCounts" in response.text
     assert "function startFpsCounter" in response.text
-    assert "Loading ${formatNumber(chunkLimit())} nodes" in response.text
+    assert "Loading up to ${formatNumber(requestedVisibleNodes)} visible nodes" in response.text
+    assert "Loaded ${formatNumber(loadedVisibleNodes)} visible nodes" in response.text
+    assert "remainingVisibleNodes = Math.max(1, targetVisibleNodes - state.loadedNodes)" in response.text
     assert "defaultDrawNodeHover: drawNodeHover" in response.text
     assert "HOVER_LABEL_FONT" in response.text
     assert "renderLabels: false" in response.text
@@ -279,7 +283,7 @@ def test_admin_embeds_versioned_graph_viewer() -> None:
     response = TestClient(app).get("/admin")
 
     assert response.status_code == 200
-    assert 'data-src="/viewer/?v=1.29.76"' in response.text
+    assert 'data-src="/viewer/?v=1.29.77"' in response.text
     assert "const ADMIN_TAB_ROUTES" in response.text
     assert "viewer: '/admin/graph'" in response.text
 

@@ -25,6 +25,7 @@ const DEFAULT_EDGE_VISIBILITY = false
 const EDGE_VISIBILITY_STORAGE_KEY = 'cg_viewer_edges_visible_v4'
 const NODE_KIND_VISIBILITY_STORAGE_KEY = 'cg_viewer_node_kinds_visible_v1'
 const FPS_SAMPLE_MS = 500
+const MAX_AUTO_CHUNK_FETCHES = 80
 const LIVE_ROTATION_NODE_LIMIT = 120000
 
 const ROTATION_FRAME_MS = 72
@@ -209,6 +210,20 @@ function updateCounters() {
   elements.loadedNodes.textContent = formatNumber(state.loadedNodes)
   elements.loadedEdges.textContent = formatNumber(state.loadedEdges)
   elements.cursorValue.textContent = formatNumber(state.nextOffset)
+}
+
+function syncLoadedCounts() {
+  if (!state.graph) {
+    state.loadedNodes = 0
+    state.loadedEdges = 0
+    return
+  }
+  let visibleNodes = 0
+  state.graph.forEachNode((_nodeId, attributes) => {
+    if (attributes.hidden !== true) visibleNodes += 1
+  })
+  state.loadedNodes = visibleNodes
+  state.loadedEdges = state.graph.size
 }
 
 function resizeGraphAfterPanelToggle() {
@@ -534,6 +549,8 @@ function setEdgesVisible(visible, showStatus = false) {
   elements.toggleEdges.setAttribute('aria-pressed', visible ? 'true' : 'false')
   localStorage.setItem(EDGE_VISIBILITY_STORAGE_KEY, visible ? '1' : '0')
   refreshEdgeVisibility(true)
+  syncLoadedCounts()
+  updateCounters()
   if (showStatus) setStatus(statusWithSkippedSummary(`Edges ${visible ? 'shown' : 'hidden'}.`), 'ok')
 }
 
@@ -567,6 +584,8 @@ function setNodeKindVisibility(showStatus = false) {
     )
     refreshEdgeVisibility(false)
   }
+  syncLoadedCounts()
+  updateCounters()
   if (showStatus) {
     const count = state.visibleNodeKinds.size
     setStatus(statusWithSkippedSummary(`${formatNumber(count)} node type${count === 1 ? '' : 's'} visible.`), 'ok')
@@ -663,6 +682,7 @@ function addLink(link, dirtyNodes) {
 }
 
 function appendBatchToGraph(batch) {
+  const visibleNodesBefore = state.loadedNodes
   let addedNodes = 0
   let addedEdges = 0
   const dirtyNodes = new Set()
@@ -683,9 +703,8 @@ function appendBatchToGraph(batch) {
   ensureRenderer()
   tuneRendererForScale()
   state.renderer.refresh({ skipIndexation: false })
-  state.loadedNodes = state.graph.order
-  state.loadedEdges = state.graph.size
-  return { addedNodes, addedEdges }
+  syncLoadedCounts()
+  return { addedNodes, addedEdges, addedVisibleNodes: Math.max(0, state.loadedNodes - visibleNodesBefore) }
 }
 
 function stepRotation(deltaX, deltaY, deltaZ) {
@@ -722,7 +741,7 @@ function startRotationWindow(showStatus = false) {
 async function appendBatch(batch, reset) {
   if (reset) await destroyGraph()
   const normalized = appendBatchToGraph(batch)
-  state.hasNext = batch.next_offset !== null && state.loadedNodes < MAX_CLIENT_NODES
+  state.hasNext = batch.next_offset !== null && (state.graph?.order || 0) < MAX_CLIENT_NODES
   state.nextOffset = batch.next_offset ?? (batch.offset + batch.points.length)
   elements.loadNext.disabled = !state.hasNext
   updateCounters()
@@ -752,28 +771,48 @@ async function loadChunk(reset = false) {
     setStatus('Select at least one edge type.', 'warn')
     return
   }
-  const params = new URLSearchParams({
-    offset: String(offset),
-    limit: String(chunkLimit()),
-    edge_types: edgeTypes,
-  })
+  if (!state.visibleNodeKinds.size) {
+    setStatus('Select at least one node type.', 'warn')
+    return
+  }
+  const requestedVisibleNodes = chunkLimit()
+  const targetVisibleNodes = reset ? requestedVisibleNodes : state.loadedNodes + requestedVisibleNodes
+  const startingVisibleNodes = reset ? 0 : state.loadedNodes
   const search = elements.searchInput.value.trim()
-  if (search) params.set('search', search)
 
   elements.loadFirst.disabled = true
   elements.loadNext.disabled = true
-  setStatus(`Loading ${formatNumber(chunkLimit())} nodes from ${projectName}...`)
+  setStatus(`Loading up to ${formatNumber(requestedVisibleNodes)} visible nodes from ${projectName}...`)
   try {
     if (reset) {
       resetState()
       await loadStats(projectName)
     }
-    const batch = await api(`/api/viewer/graphs/${encodeURIComponent(projectName)}/chunk?${params}`)
-    const normalized = await appendBatch(batch, reset)
-    const more = state.loadedNodes >= MAX_CLIENT_NODES
+    let totalAddedEdges = 0
+    let fetchCount = 0
+    while (state.loadedNodes < targetVisibleNodes && fetchCount < MAX_AUTO_CHUNK_FETCHES) {
+      const remainingVisibleNodes = Math.max(1, targetVisibleNodes - state.loadedNodes)
+      const params = new URLSearchParams({
+        offset: String(fetchCount === 0 ? offset : state.nextOffset),
+        limit: String(remainingVisibleNodes),
+        edge_types: edgeTypes,
+      })
+      if (search) params.set('search', search)
+      const batch = await api(`/api/viewer/graphs/${encodeURIComponent(projectName)}/chunk?${params}`)
+      const normalized = await appendBatch(batch, reset && fetchCount === 0)
+      totalAddedEdges += normalized.addedEdges
+      fetchCount += 1
+      if (state.loadedNodes >= targetVisibleNodes || !state.hasNext) break
+      const loadedVisibleNodes = state.loadedNodes - startingVisibleNodes
+      setStatus(`Loaded ${formatNumber(loadedVisibleNodes)} of ${formatNumber(requestedVisibleNodes)} visible nodes from ${projectName}...`)
+    }
+    const loadedVisibleNodes = Math.max(0, state.loadedNodes - startingVisibleNodes)
+    const hitScanLimit = state.loadedNodes < targetVisibleNodes && state.hasNext
+    const more = state.graph?.order >= MAX_CLIENT_NODES
       ? 'The 500,000-node client cap has been reached.'
-      : batch.next_offset === null ? 'No more chunks for this filter.' : 'Ready for the next chunk.'
-    setStatus(statusWithSkippedSummary(`Loaded ${formatNumber(normalized.addedNodes)} nodes and ${formatNumber(normalized.addedEdges)} edges. ${more}`), 'ok')
+      : hitScanLimit ? 'More matching nodes may exist; use Load more to continue scanning.'
+        : state.hasNext ? 'Ready for the next chunk.' : 'No more chunks for this filter.'
+    setStatus(statusWithSkippedSummary(`Loaded ${formatNumber(loadedVisibleNodes)} visible nodes and ${formatNumber(totalAddedEdges)} edges. ${more}`), 'ok')
   } catch (error) {
     setStatus(error.message, 'error')
   } finally {
