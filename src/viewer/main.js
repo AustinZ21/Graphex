@@ -646,9 +646,8 @@ function addLink(link, dirtyNodes) {
   }
 
   const style = edgeStyle(link.type)
-  const sourceColor = graph.getNodeAttribute(link.source, 'baseColor') || kindColor('Node')
   const edgeAttributes = {
-    color: sourceColor,
+    color: style.color,
     edgeType: link.type,
     label: style.label,
     size: style.width,
