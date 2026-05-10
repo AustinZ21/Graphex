@@ -129,6 +129,16 @@ def _chunk_from_node_and_edge_rows(
             }
         )
 
+    # Remove orphan nodes that have no edges in this result set so that
+    # selecting a narrow edge-type filter (e.g. only DEFINES) hides nodes
+    # that are not connected by any of the selected edge types.
+    connected_ids: set[str] = set()
+    for link in links:
+        connected_ids.add(link["source"])
+        connected_ids.add(link["target"])
+    if connected_ids:
+        points_by_id = {pid: p for pid, p in points_by_id.items() if pid in connected_ids}
+
     next_offset = None
     if len(node_rows) > limit:
         next_offset = _coerce_internal_id(node_rows[limit][0], offset + len(visible_node_rows))
