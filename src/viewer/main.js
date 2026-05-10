@@ -1,63 +1,71 @@
-import { Graph } from '@cosmos.gl/graph'
+import Graphology from 'graphology'
+import Sigma from 'sigma'
+
+const EDGE_STYLES = {
+  CALLS: { label: 'Calls', color: '#4ae387', width: 1.7, priority: 6 },
+  IMPORTS: { label: 'Imports', color: '#5badff', width: 1.45, priority: 5 },
+  DEFINES: { label: 'Defines', color: '#ffd642', width: 1.4, priority: 4 },
+  USES_VARIABLE: { label: 'Uses variable', color: '#42e694', width: 1.2, priority: 3 },
+  FLOWS_TO: { label: 'Flows to', color: '#4ae387', width: 1.25, priority: 2 },
+  CONTAINS: { label: 'Contains', color: '#adb8cc', width: 1.1, priority: 1 },
+  UNKNOWN: { label: 'Unclassified', color: '#adb8cc', width: 1, priority: 0 },
+}
+
+const KIND_ORDER = ['Repository', 'File', 'Symbol', 'Variable', 'Node']
+const KIND_INDEX = new Map(KIND_ORDER.map((kind, index) => [kind, index]))
+const NODE_KIND_COLORS = { Repository: '#4ae387', File: '#5badff', Symbol: '#ffd642', Variable: '#42e694', Node: '#adb8cc' }
+function kindColor(kind) { return NODE_KIND_COLORS[kind] || NODE_KIND_COLORS.Node }
+const MAX_CLIENT_NODES = 500000
+const MAX_CHUNK_LIMIT = 500000
+const MIN_CHUNK_LIMIT = 1
+const DEFAULT_CHUNK_LIMIT = 250
+const DEFAULT_EDGE_VISIBILITY = false
+const EDGE_VISIBILITY_STORAGE_KEY = 'cg_viewer_edges_visible_v4'
+const NODE_KIND_VISIBILITY_STORAGE_KEY = 'cg_viewer_node_kinds_visible_v1'
+const FPS_SAMPLE_MS = 500
+const LIVE_ROTATION_NODE_LIMIT = 120000
+
+const ROTATION_FRAME_MS = 72
+const GOLDEN_ANGLE = 2.399963229728653
+const BASE_DEPTH = 900
+const CAMERA_DISTANCE = 3200
+const BASE_NODE_SIZE = 3.6
+const NODE_SIZE_STEP = 1.55
+const MAX_NODE_SIZE = 18
+const HOVER_LABEL_MAX_CHARS = 72
+const HOVER_LABEL_FONT = '600 13px "Segoe UI", "Noto Sans", Arial, sans-serif'
+const HOVER_LABEL_PADDING_X = 10
+const HOVER_LABEL_HEIGHT = 28
+const HOVER_LABEL_RADIUS = 6
 
 const state = {
   graph: null,
+  renderer: null,
   projectName: '',
   nextOffset: 0,
-  pointIndexById: new Map(),
-  pointTypeById: new Map(),
-  pointsByIndex: [],
-  pointDegrees: [],
-  layoutZoneCounts: new Map(),
-  loadedLinkIds: new Set(),
-  pointPositions: [],
-  pointTargetPositions: [],
-  pointColors: [],
-  pointSizes: [],
-  linkPairs: [],
-  linkColors: [],
-  linkTypes: [],
-  linkWidths: [],
-  visibleToFullPointIndex: [],
-  visibleNodes: 0,
-  visibleEdges: 0,
-  lodLevel: 1,
-  zoomLevel: 1,
-  lodFrame: null,
-  radialAnimationFrame: null,
-  pendingRadialPointIndexes: new Set(),
-  controlPanelCollapsed: false,
-  edgesVisible: true,
+  loadedNodeIds: new Set(),
+  loadedEdgeIds: new Set(),
+  nodeTypes: new Map(),
+  nodeDegrees: new Map(),
+  nodesById: new Map(),
   loadedNodes: 0,
   loadedEdges: 0,
+  skippedNodes: 0,
+  skippedEdges: 0,
   hasNext: false,
-  paused: true,
-  simulationTimer: null,
+  edgesVisible: DEFAULT_EDGE_VISIBILITY,
+  visibleNodeKinds: new Set(KIND_ORDER),
+  controlPanelCollapsed: false,
+  rotationX: -0.58,
+  rotationY: 0.64,
+  rotationZ: 0.08,
+  rotating: false,
+  rotationFrame: null,
+  lastRotationAt: 0,
+  fpsFrame: null,
+  fpsLastSampleAt: 0,
+  fpsFrameCount: 0,
 }
-
-const EDGE_STYLES = {
-  CALLS: { label: 'Calls', color: [1, 0.36, 0.39, 1], width: 1.65, priority: 6 },
-  IMPORTS: { label: 'Imports', color: [0.36, 0.67, 1, 1], width: 1.45, priority: 5 },
-  DEFINES: { label: 'Defines', color: [1, 0.84, 0.26, 1], width: 1.4, priority: 4 },
-  USES_VARIABLE: { label: 'Uses variable', color: [0.26, 0.9, 0.58, 1], width: 1.3, priority: 3 },
-  FLOWS_TO: { label: 'Flows to', color: [1, 0.55, 0.25, 1], width: 1.35, priority: 2 },
-  CONTAINS: { label: 'Contains', color: [0.68, 0.5, 1, 1], width: 1.1, priority: 1 },
-  UNKNOWN: { label: 'Unclassified', color: [0.68, 0.72, 0.8, 1], width: 1, priority: 0 },
-}
-
-const POINT_ALPHA = 0.96
-const LINK_ALPHA = 0.78
-const POINT_BASE_SIZE = 4.6
-const POINT_SIZE_STEP = 2.1
-const POINT_MAX_SIZE = 22
-const SIMULATION_RUN_MS = 15000
-const RADIAL_ANIMATION_MS = 4200
-const GOLDEN_ANGLE = 2.399963229728653
-const LOD_HUB_DEGREE_MIN = 4
-const LOD_SYMBOL_DEGREE_MIN = 2
-const LOD_ZOOM_THRESHOLDS = [1.45, 2.75]
-const LAYOUT_ZONE_ORDER = ['CALLS', 'IMPORTS', 'DEFINES', 'CONTAINS', 'USES_VARIABLE', 'FLOWS_TO', 'UNKNOWN']
-const LAYOUT_ZONE_INDEX = new Map(LAYOUT_ZONE_ORDER.map((edgeType, index) => [edgeType, index]))
 
 const elements = {
   workspace: document.getElementById('workspace'),
@@ -70,12 +78,11 @@ const elements = {
   fitView: document.getElementById('fit-view'),
   toggleSim: document.getElementById('toggle-sim'),
   toggleEdges: document.getElementById('toggle-edges'),
+  nodeTypeInputs: [...document.querySelectorAll('input[name="node-type"]')],
   searchInput: document.getElementById('search-input'),
   chunkLimit: document.getElementById('chunk-limit'),
-  tokenInput: document.getElementById('token-input'),
-  saveToken: document.getElementById('save-token'),
-  forgetToken: document.getElementById('forget-token'),
   graphRoot: document.getElementById('graph-root'),
+  fpsCounter: document.getElementById('fps-counter'),
   statusLine: document.getElementById('status-line'),
   dbNodes: document.getElementById('db-nodes'),
   dbEdges: document.getElementById('db-edges'),
@@ -101,73 +108,57 @@ function edgeStyle(edgeType) {
   return EDGE_STYLES[edgeType] || EDGE_STYLES.UNKNOWN
 }
 
-function edgeColor(edgeType, alpha = 1) {
-  const [red, green, blue] = edgeStyle(edgeType).color
-  return [red, green, blue, alpha]
+function clamp(value, minValue, maxValue) {
+  return Math.max(minValue, Math.min(maxValue, value))
 }
 
-function pushColor(target, color) {
-  target.push(color[0], color[1], color[2], color[3])
+const _parsedHexCache = new Map()
+
+function parseHexColor(color) {
+  let cached = _parsedHexCache.get(color)
+  if (cached) return cached
+  const normalized = color.replace('#', '')
+  cached = {
+    red: parseInt(normalized.slice(0, 2), 16),
+    green: parseInt(normalized.slice(2, 4), 16),
+    blue: parseInt(normalized.slice(4, 6), 16),
+  }
+  _parsedHexCache.set(color, cached)
+  return cached
 }
 
-function setPointColor(pointIndex, edgeType) {
-  const color = edgeColor(edgeType, POINT_ALPHA)
-  const offset = pointIndex * 4
-  state.pointColors[offset] = color[0]
-  state.pointColors[offset + 1] = color[1]
-  state.pointColors[offset + 2] = color[2]
-  state.pointColors[offset + 3] = color[3]
+function toHex(channel) {
+  return clamp(Math.round(channel), 0, 255).toString(16).padStart(2, '0')
 }
 
-function pointSizeForDegree(degree) {
-  return Math.min(POINT_MAX_SIZE, POINT_BASE_SIZE + Math.log2(degree + 1) * POINT_SIZE_STEP)
+function mixColor(sourceColor, targetColor, amount) {
+  const source = parseHexColor(sourceColor)
+  const target = parseHexColor(targetColor)
+  return `#${toHex(source.red + (target.red - source.red) * amount)}${toHex(source.green + (target.green - source.green) * amount)}${toHex(source.blue + (target.blue - source.blue) * amount)}`
 }
 
-function incrementPointDegree(pointIndex) {
-  const degree = (state.pointDegrees[pointIndex] || 0) + 1
-  state.pointDegrees[pointIndex] = degree
-  state.pointSizes[pointIndex] = pointSizeForDegree(degree)
+function depthColor(baseColor, depth) {
+  const normalizedDepth = clamp((depth + 1) / 2, 0, 1)
+  if (normalizedDepth >= 0.5) return mixColor(baseColor, '#f3f7ff', (normalizedDepth - 0.5) * 0.34)
+  return mixColor(baseColor, '#273044', (0.5 - normalizedDepth) * 0.58)
 }
 
-function clearSimulationTimer() {
-  if (!state.simulationTimer) return
-  clearTimeout(state.simulationTimer)
-  state.simulationTimer = null
+function hashString(value) {
+  let hash = 2166136261
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index)
+    hash = Math.imul(hash, 16777619)
+  }
+  return hash >>> 0
 }
 
-function cancelRadialAnimation() {
-  if (!state.radialAnimationFrame) return
-  cancelAnimationFrame(state.radialAnimationFrame)
-  state.radialAnimationFrame = null
+function createGraph() {
+  return new Graphology({ type: 'directed', multi: true, allowSelfLoops: true })
 }
 
-function pauseSimulation(auto = false) {
-  clearSimulationTimer()
-  cancelRadialAnimation()
-  state.graph?.pause?.()
-  state.paused = true
-  elements.toggleSim.textContent = 'Run'
-  if (auto) setStatus('Simulation paused after 15 seconds. Press Run to continue.', 'ok')
-}
-
-function startSimulationWindow(showStatus = false) {
-  if (!state.graph) return
-  clearSimulationTimer()
-  cancelRadialAnimation()
-  state.graph.unpause?.()
-  state.paused = false
-  elements.toggleSim.textContent = 'Pause'
-  if (showStatus) setStatus('Simulation running for 15 seconds...', 'ok')
-  state.simulationTimer = setTimeout(() => pauseSimulation(true), SIMULATION_RUN_MS)
-}
-
-function assignPointType(pointId, edgeType) {
-  const pointIndex = state.pointIndexById.get(pointId)
-  if (pointIndex === undefined) return
-  const currentType = state.pointTypeById.get(pointId)
-  if (currentType && edgeStyle(currentType).priority >= edgeStyle(edgeType).priority) return
-  state.pointTypeById.set(pointId, edgeType)
-  setPointColor(pointIndex, edgeType)
+function ensureGraph() {
+  if (!state.graph) state.graph = createGraph()
+  return state.graph
 }
 
 async function api(path) {
@@ -189,42 +180,36 @@ function selectedEdgeTypes() {
     .join(',')
 }
 
-function chunkLimit() {
-  const value = Number(elements.chunkLimit.value || 50000)
-  return Math.max(1000, Math.min(100000, value))
+function normalizeNodeKind(kind) {
+  return KIND_INDEX.has(kind) ? kind : 'Node'
 }
 
-function resetState() {
-  state.nextOffset = 0
-  state.pointIndexById.clear()
-  state.pointTypeById.clear()
-  state.pointsByIndex = []
-  state.pointDegrees = []
-  state.layoutZoneCounts.clear()
-  state.loadedLinkIds.clear()
-  state.pointPositions = []
-  state.pointTargetPositions = []
-  state.pointColors = []
-  state.pointSizes = []
-  state.linkPairs = []
-  state.linkColors = []
-  state.linkTypes = []
-  state.linkWidths = []
-  state.visibleToFullPointIndex = []
-  state.visibleNodes = 0
-  state.visibleEdges = 0
-  state.lodLevel = 1
-  state.zoomLevel = 1
-  if (state.lodFrame) cancelAnimationFrame(state.lodFrame)
-  state.lodFrame = null
-  cancelRadialAnimation()
-  state.pendingRadialPointIndexes.clear()
-  state.loadedNodes = 0
-  state.loadedEdges = 0
-  state.hasNext = false
-  pauseSimulation()
-  elements.loadNext.disabled = true
-  updateCounters()
+function selectedNodeKinds() {
+  return new Set(elements.nodeTypeInputs.filter((input) => input.checked).map((input) => input.value))
+}
+
+function isNodeKindVisible(kind) {
+  return state.visibleNodeKinds.has(normalizeNodeKind(kind))
+}
+
+function restoreNodeKindVisibility() {
+  const storedValue = localStorage.getItem(NODE_KIND_VISIBILITY_STORAGE_KEY)
+  const storedKinds = storedValue === null
+    ? new Set(KIND_ORDER)
+    : new Set(storedValue.split(',').filter((kind) => KIND_INDEX.has(kind)))
+  elements.nodeTypeInputs.forEach((input) => {
+    input.checked = storedKinds.has(input.value)
+  })
+  state.visibleNodeKinds = selectedNodeKinds()
+}
+
+function persistNodeKindVisibility() {
+  localStorage.setItem(NODE_KIND_VISIBILITY_STORAGE_KEY, [...state.visibleNodeKinds].join(','))
+}
+
+function chunkLimit() {
+  const value = Number(elements.chunkLimit.value || DEFAULT_CHUNK_LIMIT)
+  return Math.max(MIN_CHUNK_LIMIT, Math.min(MAX_CHUNK_LIMIT, value))
 }
 
 function updateCounters() {
@@ -234,7 +219,10 @@ function updateCounters() {
 }
 
 function resizeGraphAfterPanelToggle() {
-  window.setTimeout(() => state.graph?.fitView?.(350, 0.12), 220)
+  window.setTimeout(() => {
+    state.renderer?.resize?.()
+    fitGraph()
+  }, 220)
 }
 
 function setControlPanelCollapsed(collapsed) {
@@ -247,443 +235,516 @@ function setControlPanelCollapsed(collapsed) {
   resizeGraphAfterPanelToggle()
 }
 
+function pointSizeForDegree(degree) {
+  return Math.min(MAX_NODE_SIZE, BASE_NODE_SIZE + Math.log2(degree + 1) * NODE_SIZE_STEP)
+}
+
+function nodeKindIndex(kind) {
+  return KIND_INDEX.get(normalizeNodeKind(kind)) ?? KIND_INDEX.get('Node')
+}
+
+function initial3dPosition(point, nodeIndex) {
+  const kindIndex = nodeKindIndex(point.kind)
+  const hash = hashString(point.id)
+  const hashAngle = ((hash & 0xffff) / 0xffff) * Math.PI * 2
+  const angle = nodeIndex * GOLDEN_ANGLE + hashAngle
+  const localStep = nodeIndex > 250000 ? 2.9 : nodeIndex > 100000 ? 3.6 : 5.4
+  const radius = Math.sqrt(nodeIndex + 1) * localStep + kindIndex * 240
+  const layerOffset = (kindIndex - (KIND_ORDER.length - 1) / 2) * 260
+  const depthNoise = (((hash >>> 16) & 0xffff) / 0xffff - 0.5) * BASE_DEPTH
+  return {
+    x3d: Math.cos(angle) * radius,
+    y3d: Math.sin(angle) * radius,
+    z3d: layerOffset + depthNoise,
+  }
+}
+
+let _projCosX = Math.cos(-0.58)
+let _projSinX = Math.sin(-0.58)
+let _projCosY = Math.cos(0.64)
+let _projSinY = Math.sin(0.64)
+let _projCosZ = Math.cos(0.08)
+let _projSinZ = Math.sin(0.08)
+let _projRotX = -0.58
+let _projRotY = 0.64
+let _projRotZ = 0.08
+
+function syncProjectionTrig() {
+  if (state.rotationX !== _projRotX || state.rotationY !== _projRotY || state.rotationZ !== _projRotZ) {
+    _projCosX = Math.cos(state.rotationX)
+    _projSinX = Math.sin(state.rotationX)
+    _projCosY = Math.cos(state.rotationY)
+    _projSinY = Math.sin(state.rotationY)
+    _projCosZ = Math.cos(state.rotationZ)
+    _projSinZ = Math.sin(state.rotationZ)
+    _projRotX = state.rotationX
+    _projRotY = state.rotationY
+    _projRotZ = state.rotationZ
+  }
+}
+
+function project3d(x3d, y3d, z3d) {
+  const yAfterX = y3d * _projCosX - z3d * _projSinX
+  const zAfterX = y3d * _projSinX + z3d * _projCosX
+
+  const xAfterY = x3d * _projCosY + zAfterX * _projSinY
+  const zAfterY = -x3d * _projSinY + zAfterX * _projCosY
+
+  const xAfterZ = xAfterY * _projCosZ - yAfterX * _projSinZ
+  const yAfterZ = xAfterY * _projSinZ + yAfterX * _projCosZ
+
+  const perspective = clamp(CAMERA_DISTANCE / Math.max(900, CAMERA_DISTANCE + zAfterY), 0.32, 2.15)
+  const depth = clamp(zAfterY / BASE_DEPTH, -1, 1)
+  return {
+    x: xAfterZ * perspective,
+    y: yAfterZ * perspective,
+    depth,
+    scale: perspective,
+  }
+}
+
+function projectedNodeAttributes(attributes) {
+  const projection = project3d(attributes.x3d || 0, attributes.y3d || 0, attributes.z3d || 0)
+  const baseSize = attributes.baseSize || BASE_NODE_SIZE
+  return {
+    x: projection.x,
+    y: projection.y,
+    size: clamp(baseSize * (0.72 + projection.scale * 0.28), 1.2, MAX_NODE_SIZE + 4),
+    color: depthColor(attributes.baseColor || NODE_KIND_COLORS.Node, projection.depth),
+    zIndex: projection.depth,
+  }
+}
+
+function truncateHoverLabel(label) {
+  const value = String(label || '')
+  if (value.length <= HOVER_LABEL_MAX_CHARS) return value
+  return `${value.slice(0, HOVER_LABEL_MAX_CHARS - 3)}...`
+}
+
+function drawRoundedRect(context, x, y, width, height, radius) {
+  const nextRadius = Math.min(radius, width / 2, height / 2)
+  context.beginPath()
+  context.moveTo(x + nextRadius, y)
+  context.lineTo(x + width - nextRadius, y)
+  context.quadraticCurveTo(x + width, y, x + width, y + nextRadius)
+  context.lineTo(x + width, y + height - nextRadius)
+  context.quadraticCurveTo(x + width, y + height, x + width - nextRadius, y + height)
+  context.lineTo(x + nextRadius, y + height)
+  context.quadraticCurveTo(x, y + height, x, y + height - nextRadius)
+  context.lineTo(x, y + nextRadius)
+  context.quadraticCurveTo(x, y, x + nextRadius, y)
+  context.closePath()
+}
+
+function drawNodeHover(context, nodeData) {
+  const label = truncateHoverLabel(nodeData.label || nodeData.rawLabel || nodeData.key)
+  const nodeRadius = Math.max(nodeData.size || BASE_NODE_SIZE, BASE_NODE_SIZE)
+
+  context.save()
+  context.lineWidth = 2.25
+  context.strokeStyle = '#f6fbff'
+  context.fillStyle = 'rgba(255, 255, 255, 0.12)'
+  context.beginPath()
+  context.arc(nodeData.x, nodeData.y, nodeRadius + 4, 0, Math.PI * 2)
+  context.fill()
+  context.stroke()
+
+  if (label) {
+    context.font = HOVER_LABEL_FONT
+    context.textBaseline = 'middle'
+    context.textAlign = 'left'
+
+    const textWidth = Math.ceil(context.measureText(label).width)
+    const boxWidth = textWidth + HOVER_LABEL_PADDING_X * 2
+    const boxHeight = HOVER_LABEL_HEIGHT
+    const gap = nodeRadius + 10
+    const canvasWidth = context.canvas.width
+    const canvasHeight = context.canvas.height
+    const boxX = clamp(nodeData.x + gap, 6, canvasWidth - boxWidth - 6)
+    const boxY = clamp(nodeData.y - boxHeight / 2, 6, canvasHeight - boxHeight - 6)
+
+    context.shadowColor = 'rgba(0, 0, 0, 0.45)'
+    context.shadowBlur = 12
+    context.shadowOffsetY = 3
+    drawRoundedRect(context, boxX, boxY, boxWidth, boxHeight, HOVER_LABEL_RADIUS)
+    context.fillStyle = 'rgba(11, 18, 28, 0.96)'
+    context.fill()
+
+    context.shadowColor = 'transparent'
+    context.lineWidth = 1.25
+    context.strokeStyle = '#75d6ff'
+    context.stroke()
+
+    context.fillStyle = '#f8fbff'
+    context.fillText(label, boxX + HOVER_LABEL_PADDING_X, boxY + boxHeight / 2)
+  }
+
+  context.restore()
+}
+
+function rendererSettings() {
+  return {
+    allowInvalidContainer: true,
+    autoCenter: true,
+    autoRescale: true,
+    defaultEdgeType: 'line',
+    defaultNodeColor: NODE_KIND_COLORS.Node,
+    defaultDrawNodeHover: drawNodeHover,
+    defaultEdgeColor: '#4a5368',
+    enableEdgeEvents: false,
+    hideEdgesOnMove: true,
+    hideLabelsOnMove: true,
+    itemSizesReference: 'screen',
+    labelColor: { color: '#edf1f7' },
+    labelDensity: 0,
+    labelFont: 'Segoe UI, Noto Sans, Arial, sans-serif',
+    labelRenderedSizeThreshold: Number.POSITIVE_INFINITY,
+    labelSize: 11,
+    minEdgeThickness: 0.85,
+    renderEdgeLabels: false,
+    renderLabels: false,
+    stagePadding: 28,
+    zIndex: true,
+  }
+}
+
+function tuneRendererForScale() {
+  if (!state.renderer || !state.graph) return
+  const nodeCount = state.graph.order
+  state.renderer.setSettings({
+    hideEdgesOnMove: nodeCount > 70000,
+    hideLabelsOnMove: nodeCount > 12000,
+    labelDensity: 0,
+    labelRenderedSizeThreshold: Number.POSITIVE_INFINITY,
+    renderLabels: false,
+  })
+}
+
+function bindRendererEvents() {
+  state.renderer.on('clickNode', ({ node }) => {
+    const point = state.nodesById.get(node)
+    if (!point) return
+    const location = point.file_path ? ` - ${point.file_path}${point.line_start ? `:${point.line_start}` : ''}` : ''
+    const edgeType = state.nodeTypes.get(node) || 'UNKNOWN'
+    const typeLabel = edgeStyle(edgeType).label
+    const degree = state.nodeDegrees.get(node) || 0
+    setStatus(`${point.kind}: ${point.label}${location} (${typeLabel}, ${formatNumber(degree)} connection${degree === 1 ? '' : 's'})`, 'ok')
+  })
+}
+
+function ensureRenderer() {
+  const graph = ensureGraph()
+  if (state.renderer) return state.renderer
+  state.renderer = new Sigma(graph, elements.graphRoot, rendererSettings())
+  bindRendererEvents()
+  tuneRendererForScale()
+  return state.renderer
+}
+
+function stopRotation() {
+  if (state.rotationFrame) cancelAnimationFrame(state.rotationFrame)
+  state.rotationFrame = null
+  state.rotating = false
+  elements.toggleSim.textContent = '3D Rotate'
+}
+
+async function destroyGraph() {
+  stopRotation()
+  state.renderer?.kill?.()
+  state.renderer = null
+  state.graph = null
+  elements.graphRoot.replaceChildren()
+}
+
+function resetState() {
+  state.nextOffset = 0
+  state.loadedNodeIds.clear()
+  state.loadedEdgeIds.clear()
+  state.nodeTypes.clear()
+  state.nodeDegrees.clear()
+  state.nodesById.clear()
+  state.loadedNodes = 0
+  state.loadedEdges = 0
+  state.skippedNodes = 0
+  state.skippedEdges = 0
+  state.hasNext = false
+  state.rotationX = -0.58
+  state.rotationY = 0.64
+  state.rotationZ = 0.08
+  stopRotation()
+  elements.loadNext.disabled = true
+  updateCounters()
+}
+
+function applyProjectionToAllNodes() {
+  if (!state.graph || !state.graph.order) return
+  syncProjectionTrig()
+  state.graph.updateEachNodeAttributes(
+    (_nodeId, attributes) => {
+      const projection = project3d(attributes.x3d || 0, attributes.y3d || 0, attributes.z3d || 0)
+      const baseSize = attributes.baseSize || BASE_NODE_SIZE
+      attributes.x = projection.x
+      attributes.y = projection.y
+      attributes.size = clamp(baseSize * (0.72 + projection.scale * 0.28), 1.2, MAX_NODE_SIZE + 4)
+      attributes.color = depthColor(attributes.baseColor || NODE_KIND_COLORS.Node, projection.depth)
+      attributes.zIndex = projection.depth
+      return attributes
+    },
+    { attributes: ['x', 'y', 'size', 'color', 'zIndex'] },
+  )
+  state.renderer?.refresh({ skipIndexation: false })
+}
+
+function fitGraph() {
+  if (!state.renderer) return
+  state.renderer.getCamera().animatedReset({ duration: 350 })
+}
+
+function updateFpsCounter(now) {
+  if (!elements.fpsCounter) return
+  if (!state.fpsLastSampleAt) {
+    state.fpsLastSampleAt = now
+    state.fpsFrameCount = 0
+  } else {
+    state.fpsFrameCount += 1
+    const elapsed = now - state.fpsLastSampleAt
+    if (elapsed >= FPS_SAMPLE_MS) {
+      elements.fpsCounter.textContent = `FPS ${Math.round((state.fpsFrameCount * 1000) / elapsed)}`
+      state.fpsLastSampleAt = now
+      state.fpsFrameCount = 0
+    }
+  }
+  state.fpsFrame = requestAnimationFrame(updateFpsCounter)
+}
+
+function startFpsCounter() {
+  if (!elements.fpsCounter || state.fpsFrame) return
+  elements.fpsCounter.textContent = 'FPS --'
+  state.fpsLastSampleAt = 0
+  state.fpsFrameCount = 0
+  state.fpsFrame = requestAnimationFrame(updateFpsCounter)
+}
+
+function skippedSummary() {
+  if (!state.skippedNodes && !state.skippedEdges) return ''
+  return `${formatNumber(state.skippedNodes)} nodes and ${formatNumber(state.skippedEdges)} edges skipped after the 500,000-node cap.`
+}
+
+function statusWithSkippedSummary(message) {
+  const skipped = skippedSummary()
+  return skipped ? `${message} ${skipped}` : message
+}
+
 function setEdgesVisible(visible, showStatus = false) {
   state.edgesVisible = visible
   elements.toggleEdges.textContent = visible ? 'Hide Edges' : 'Show Edges'
   elements.toggleEdges.setAttribute('aria-pressed', visible ? 'true' : 'false')
-  localStorage.setItem('cg_viewer_edges_visible', visible ? '1' : '0')
-  if (state.graph) syncGraphBuffers()
-  if (showStatus) {
-    const visibility = visible ? 'shown' : 'hidden'
-    setStatus(`Edges ${visibility}. ${lodSummary()}`, 'ok')
-  }
+  localStorage.setItem(EDGE_VISIBILITY_STORAGE_KEY, visible ? '1' : '0')
+  refreshEdgeVisibility(true)
+  if (showStatus) setStatus(statusWithSkippedSummary(`Edges ${visible ? 'shown' : 'hidden'}.`), 'ok')
 }
 
-async function destroyGraph() {
-  clearSimulationTimer()
-  cancelRadialAnimation()
-  if (state.graph) {
-    state.graph.destroy?.()
-    state.graph = null
-  }
-  state.paused = true
-  elements.toggleSim.textContent = 'Run'
-  elements.graphRoot.replaceChildren()
+function nodeIsHidden(nodeId) {
+  return state.graph?.getNodeAttribute(nodeId, 'hidden') === true
 }
 
-function graphConfig() {
-  return {
-    spaceSize: 16384,
-    backgroundColor: '#151922',
-    pointDefaultColor: edgeColor('UNKNOWN', POINT_ALPHA),
-    linkDefaultColor: edgeColor('UNKNOWN', LINK_ALPHA),
-    curvedLinks: true,
-    fitViewOnInit: false,
-    fitViewDelay: 0,
-    fitViewPadding: 0.18,
-    rescalePositions: false,
-    enableDrag: true,
-    pointDefaultSize: POINT_BASE_SIZE,
-    linkDefaultWidth: 1.15,
-    linkOpacity: 0.95,
-    renderHoveredPointRing: true,
-    hoveredPointRingColor: '#edf1f7',
-    hoveredLinkColor: '#edf1f7',
-    simulationDecay: 7000,
-    simulationFriction: 0.72,
-    simulationGravity: 0.035,
-    simulationRepulsion: 0.72,
-    simulationLinkSpring: 0.82,
-    simulationLinkDistance: 12,
-    enableSimulationDuringZoom: false,
-    onZoom: (event, userDriven) => {
-      if (!userDriven) return
-      scheduleLodForZoom(event?.transform?.k ?? state.graph?.getZoomLevel?.() ?? state.zoomLevel)
-    },
-    onPointClick: (pointIndex) => {
-      const fullPointIndex = state.visibleToFullPointIndex[pointIndex] ?? pointIndex
-      const point = state.pointsByIndex[fullPointIndex]
-      if (!point) return
-      const location = point.file_path ? ` - ${point.file_path}${point.line_start ? `:${point.line_start}` : ''}` : ''
-      const typeLabel = edgeStyle(state.pointTypeById.get(point.id)).label
-      const degree = state.pointDegrees[fullPointIndex] || 0
-      setStatus(`${point.kind}: ${point.label}${location} (${typeLabel}, ${formatNumber(degree)} connection${degree === 1 ? '' : 's'})`, 'ok')
-    },
-  }
+function shouldHideEdge(attributes) {
+  return !state.edgesVisible || nodeIsHidden(attributes.sourceNodeId) || nodeIsHidden(attributes.targetNodeId)
 }
 
-function lodLevelForZoom(zoomLevel) {
-  if (zoomLevel >= LOD_ZOOM_THRESHOLDS[1]) return 3
-  if (zoomLevel >= LOD_ZOOM_THRESHOLDS[0]) return 2
-  return 1
-}
-
-function lodLabel(level = state.lodLevel) {
-  if (level === 3) return 'Detail LOD'
-  if (level === 2) return 'Symbol LOD'
-  return 'Overview LOD'
-}
-
-function syncVisiblePositionsFromGraph() {
-  if (!state.graph || !state.visibleToFullPointIndex.length) return
-  const positions = state.graph.getPointPositions?.()
-  if (!positions || positions.length < state.visibleToFullPointIndex.length * 2) return
-  for (let visibleIndex = 0; visibleIndex < state.visibleToFullPointIndex.length; visibleIndex += 1) {
-    const fullIndex = state.visibleToFullPointIndex[visibleIndex]
-    const sourceOffset = visibleIndex * 2
-    const targetOffset = fullIndex * 2
-    state.pointPositions[targetOffset] = positions[sourceOffset]
-    state.pointPositions[targetOffset + 1] = positions[sourceOffset + 1]
-  }
-}
-
-function isPrimaryPoint(point) {
-  return point?.kind === 'Repository' || point?.kind === 'File'
-}
-
-function shouldShowPointAtLod(fullIndex, level) {
-  if (level >= 3) return true
-  const point = state.pointsByIndex[fullIndex]
-  const degree = state.pointDegrees[fullIndex] || 0
-  if (isPrimaryPoint(point) || degree >= LOD_HUB_DEGREE_MIN) return true
-  if (level >= 2 && point?.kind === 'Symbol') return degree >= LOD_SYMBOL_DEGREE_MIN
-  return false
-}
-
-function shouldShowLinkAtLod(linkIndex, level) {
-  if (level >= 3) return true
-  const edgeType = state.linkTypes[linkIndex]
-  if (level === 1) return edgeType !== 'USES_VARIABLE' && edgeType !== 'FLOWS_TO'
-  return edgeType !== 'USES_VARIABLE'
-}
-
-function buildVisibleGraphBuffers() {
-  const visiblePointSet = new Set()
-  for (let fullIndex = 0; fullIndex < state.pointsByIndex.length; fullIndex += 1) {
-    if (shouldShowPointAtLod(fullIndex, state.lodLevel)) visiblePointSet.add(fullIndex)
-  }
-
-  if (!visiblePointSet.size && state.pointsByIndex.length) {
-    const ranked = state.pointsByIndex
-      .map((_, fullIndex) => ({ fullIndex, degree: state.pointDegrees[fullIndex] || 0 }))
-      .sort((left, right) => right.degree - left.degree)
-      .slice(0, Math.min(300, state.pointsByIndex.length))
-    for (const item of ranked) visiblePointSet.add(item.fullIndex)
-  }
-
-  const fullToVisiblePointIndex = new Map()
-  const pointPositions = []
-  const pointColors = []
-  const pointSizes = []
-  state.visibleToFullPointIndex = []
-
-  for (const fullIndex of visiblePointSet) {
-    const visibleIndex = state.visibleToFullPointIndex.length
-    fullToVisiblePointIndex.set(fullIndex, visibleIndex)
-    state.visibleToFullPointIndex.push(fullIndex)
-    const positionOffset = fullIndex * 2
-    pointPositions.push(state.pointPositions[positionOffset], state.pointPositions[positionOffset + 1])
-    const colorOffset = fullIndex * 4
-    pointColors.push(state.pointColors[colorOffset], state.pointColors[colorOffset + 1], state.pointColors[colorOffset + 2], state.pointColors[colorOffset + 3])
-    pointSizes.push(state.pointSizes[fullIndex])
-  }
-
-  const linkPairs = []
-  const linkColors = []
-  const linkWidths = []
-  if (state.edgesVisible) {
-    for (let linkIndex = 0; linkIndex < state.linkTypes.length; linkIndex += 1) {
-      if (!shouldShowLinkAtLod(linkIndex, state.lodLevel)) continue
-      const pairOffset = linkIndex * 2
-      const sourceIndex = fullToVisiblePointIndex.get(state.linkPairs[pairOffset])
-      const targetIndex = fullToVisiblePointIndex.get(state.linkPairs[pairOffset + 1])
-      if (sourceIndex === undefined || targetIndex === undefined) continue
-      linkPairs.push(sourceIndex, targetIndex)
-      const colorOffset = linkIndex * 4
-      linkColors.push(state.linkColors[colorOffset], state.linkColors[colorOffset + 1], state.linkColors[colorOffset + 2], state.linkColors[colorOffset + 3])
-      linkWidths.push(state.linkWidths[linkIndex])
-    }
-  }
-
-  state.visibleNodes = state.visibleToFullPointIndex.length
-  state.visibleEdges = linkWidths.length
-  return { pointPositions, pointColors, pointSizes, linkPairs, linkColors, linkWidths }
-}
-
-function lodSummary() {
-  return `${lodLabel()}: showing ${formatNumber(state.visibleNodes)} of ${formatNumber(state.loadedNodes)} nodes and ${formatNumber(state.visibleEdges)} of ${formatNumber(state.loadedEdges)} edges.`
-}
-
-function easeInOutSine(progress) {
-  return -(Math.cos(Math.PI * progress) - 1) / 2
-}
-
-function visibleTargetPositions() {
-  return state.visibleToFullPointIndex.flatMap((fullIndex) => {
-    const offset = fullIndex * 2
-    return [
-      state.pointTargetPositions[offset] ?? state.pointPositions[offset] ?? 0,
-      state.pointTargetPositions[offset + 1] ?? state.pointPositions[offset + 1] ?? 0,
-    ]
-  })
-}
-
-function syncFullPositionsFromVisiblePositions(positions) {
-  for (let visibleIndex = 0; visibleIndex < state.visibleToFullPointIndex.length; visibleIndex += 1) {
-    const fullIndex = state.visibleToFullPointIndex[visibleIndex]
-    const sourceOffset = visibleIndex * 2
-    const targetOffset = fullIndex * 2
-    state.pointPositions[targetOffset] = positions[sourceOffset]
-    state.pointPositions[targetOffset + 1] = positions[sourceOffset + 1]
-  }
-}
-
-function pendingVisiblePoints() {
-  const pending = []
-  for (let visibleIndex = 0; visibleIndex < state.visibleToFullPointIndex.length; visibleIndex += 1) {
-    const fullIndex = state.visibleToFullPointIndex[visibleIndex]
-    if (state.pendingRadialPointIndexes.has(fullIndex)) pending.push({ visibleIndex, fullIndex })
-  }
-  return pending
-}
-
-function frameCenterOutView(targetPositions) {
-  if (!state.graph || !targetPositions.length) return
-  state.graph.fitViewByPointPositions?.(targetPositions, 0, 0.12, false)
-}
-
-function startCenterOutLayoutWindow(showStatus = false) {
-  if (!state.graph) return
-  clearSimulationTimer()
-  cancelRadialAnimation()
-  state.graph.pause?.()
-  state.paused = false
-  elements.toggleSim.textContent = 'Pause'
-
-  const pending = pendingVisiblePoints()
-  if (!pending.length) {
-    startSimulationWindow(showStatus)
+function refreshEdgeVisibility(skipIndexation = true) {
+  if (!state.graph?.size) {
+    state.renderer?.refresh({ skipIndexation })
     return
   }
-
-  const targetPositions = visibleTargetPositions()
-  const originX = 0
-  const originY = 0
-  frameCenterOutView(targetPositions)
-
-  const currentPositions = state.graph.getPointPositions?.()
-  const startPositions = currentPositions && currentPositions.length === targetPositions.length
-    ? new Float32Array(currentPositions)
-    : new Float32Array(targetPositions)
-  for (const { visibleIndex } of pending) {
-    const offset = visibleIndex * 2
-    startPositions[offset] = originX
-    startPositions[offset + 1] = originY
-  }
-  state.graph.setPointPositions(startPositions)
-  state.graph.render()
-  if (showStatus) setStatus('Expanding nodes from center for 15 seconds...', 'ok')
-
-  const animatedPositions = new Float32Array(startPositions)
-  const startedAt = performance.now()
-  const tick = (now) => {
-    if (state.paused) return
-    const progress = Math.min(1, (now - startedAt) / RADIAL_ANIMATION_MS)
-    const easedProgress = easeInOutSine(progress)
-    for (const { visibleIndex, fullIndex } of pending) {
-      const visibleOffset = visibleIndex * 2
-      const fullOffset = fullIndex * 2
-      const targetX = state.pointTargetPositions[fullOffset] ?? targetPositions[visibleOffset]
-      const targetY = state.pointTargetPositions[fullOffset + 1] ?? targetPositions[visibleOffset + 1]
-      animatedPositions[visibleOffset] = originX + (targetX - originX) * easedProgress
-      animatedPositions[visibleOffset + 1] = originY + (targetY - originY) * easedProgress
-    }
-    state.graph.setPointPositions(animatedPositions)
-    state.graph.render()
-
-    if (progress < 1) {
-      state.radialAnimationFrame = requestAnimationFrame(tick)
-      return
-    }
-
-    state.radialAnimationFrame = null
-    for (const { fullIndex } of pending) state.pendingRadialPointIndexes.delete(fullIndex)
-    syncFullPositionsFromVisiblePositions(animatedPositions)
-    state.graph.unpause?.()
-  }
-
-  state.simulationTimer = setTimeout(() => pauseSimulation(true), SIMULATION_RUN_MS)
-  state.radialAnimationFrame = requestAnimationFrame(tick)
+  state.graph.updateEachEdgeAttributes(
+    (_edgeId, attributes) => ({ ...attributes, hidden: shouldHideEdge(attributes) }),
+    { attributes: ['hidden'] },
+  )
+  state.renderer?.refresh({ skipIndexation })
 }
 
-function applyLodLevel(level, showStatus = false) {
-  if (level === state.lodLevel && state.visibleNodes) return
-  syncVisiblePositionsFromGraph()
-  state.lodLevel = level
-  syncGraphBuffers(false)
-  startCenterOutLayoutWindow()
-  if (showStatus) setStatus(lodSummary(), 'ok')
+function setNodeKindVisibility(showStatus = false) {
+  state.visibleNodeKinds = selectedNodeKinds()
+  persistNodeKindVisibility()
+  if (state.graph?.order) {
+    state.graph.updateEachNodeAttributes(
+      (_nodeId, attributes) => ({ ...attributes, hidden: !isNodeKindVisible(attributes.kind) }),
+      { attributes: ['hidden'] },
+    )
+    refreshEdgeVisibility(false)
+  }
+  if (showStatus) {
+    const count = state.visibleNodeKinds.size
+    setStatus(statusWithSkippedSummary(`${formatNumber(count)} node type${count === 1 ? '' : 's'} visible.`), 'ok')
+  }
 }
 
-function scheduleLodForZoom(zoomLevel) {
-  state.zoomLevel = zoomLevel || 1
-  const nextLevel = lodLevelForZoom(state.zoomLevel)
-  if (nextLevel === state.lodLevel) return
-  if (state.lodFrame) cancelAnimationFrame(state.lodFrame)
-  state.lodFrame = requestAnimationFrame(() => {
-    state.lodFrame = null
-    applyLodLevel(nextLevel, true)
+function incrementNodeDegree(nodeId) {
+  const degree = (state.nodeDegrees.get(nodeId) || 0) + 1
+  state.nodeDegrees.set(nodeId, degree)
+  return degree
+}
+
+function assignNodeType(nodeId, edgeType) {
+  const currentType = state.nodeTypes.get(nodeId)
+  if (currentType && edgeStyle(currentType).priority >= edgeStyle(edgeType).priority) return
+  state.nodeTypes.set(nodeId, edgeType)
+}
+
+function updateNodeStyle(nodeId) {
+  if (!state.graph?.hasNode(nodeId)) return
+  const degree = state.nodeDegrees.get(nodeId) || 0
+  const attributes = state.graph.getNodeAttributes(nodeId)
+  const nextAttributes = {
+    ...attributes,
+    baseColor: kindColor(attributes.kind),
+    baseSize: pointSizeForDegree(degree),
+  }
+  state.graph.replaceNodeAttributes(nodeId, {
+    ...nextAttributes,
+    ...projectedNodeAttributes(nextAttributes),
   })
 }
 
-function layoutScale() {
-  const totalPoints = Math.max(1, state.pointIndexById.size)
-  return {
-    zoneRadius: Math.min(1450, Math.max(420, Math.sqrt(totalPoints) * 4.2)),
-    localStep: totalPoints > 200000 ? 3.8 : totalPoints > 50000 ? 5.2 : 7.8,
+function addPoint(point) {
+  const graph = ensureGraph()
+  if (graph.hasNode(point.id)) return false
+  if (graph.order >= MAX_CLIENT_NODES) {
+    state.skippedNodes += 1
+    return false
   }
+
+  const nodeIndex = graph.order
+  const position = initial3dPosition(point, nodeIndex)
+  const baseAttributes = {
+    ...position,
+    baseColor: kindColor(point.kind),
+    baseSize: pointSizeForDegree(0),
+    forceLabel: false,
+    hidden: !isNodeKindVisible(point.kind),
+    kind: point.kind,
+    label: point.label,
+    rawLabel: point.label,
+    subtitle: point.subtitle,
+  }
+  graph.addNode(point.id, {
+    ...baseAttributes,
+    ...projectedNodeAttributes(baseAttributes),
+  })
+  state.loadedNodeIds.add(point.id)
+  state.nodesById.set(point.id, point)
+  return true
 }
 
-function preSpreadPosition(pointIndex, ordinal) {
-  const point = state.pointsByIndex[pointIndex]
-  const edgeType = state.pointTypeById.get(point.id) || 'UNKNOWN'
-  const zoneIndex = LAYOUT_ZONE_INDEX.get(edgeType) ?? LAYOUT_ZONE_INDEX.get('UNKNOWN')
-  const zoneAngle = -Math.PI / 2 + (Math.PI * 2 * zoneIndex) / LAYOUT_ZONE_ORDER.length
-  const { zoneRadius, localStep } = layoutScale()
-  const degree = state.pointDegrees[pointIndex] || 0
-  const hubPull = Math.min(0.72, Math.log2(degree + 1) / 9)
-  const centerDistance = zoneRadius * (1 - hubPull)
-  const localAngle = ordinal * GOLDEN_ANGLE + zoneIndex * 0.71
-  const localRadius = Math.sqrt(ordinal + 1) * localStep * (1 - hubPull * 0.45)
-  return [
-    Math.cos(zoneAngle) * centerDistance + Math.cos(localAngle) * localRadius,
-    Math.sin(zoneAngle) * centerDistance + Math.sin(localAngle) * localRadius,
-  ]
+function addLink(link, dirtyNodes) {
+  const graph = ensureGraph()
+  if (state.loadedEdgeIds.has(link.id)) return false
+  if (!graph.hasNode(link.source) || !graph.hasNode(link.target)) {
+    state.skippedEdges += 1
+    return false
+  }
+
+  const style = edgeStyle(link.type)
+  const sourceColor = graph.getNodeAttribute(link.source, 'baseColor') || kindColor('Node')
+  const edgeAttributes = {
+    color: sourceColor,
+    edgeType: link.type,
+    label: style.label,
+    size: style.width,
+    sourceNodeId: link.source,
+    targetNodeId: link.target,
+    type: 'line',
+  }
+  graph.addDirectedEdgeWithKey(link.id, link.source, link.target, {
+    ...edgeAttributes,
+    hidden: shouldHideEdge(edgeAttributes),
+  })
+  state.loadedEdgeIds.add(link.id)
+  assignNodeType(link.source, link.type)
+  assignNodeType(link.target, link.type)
+  incrementNodeDegree(link.source)
+  incrementNodeDegree(link.target)
+  dirtyNodes.add(link.source)
+  dirtyNodes.add(link.target)
+  return true
 }
 
-function applyPreSpreadLayout(points) {
-  for (const point of points) {
-    const pointIndex = state.pointIndexById.get(point.id)
-    if (pointIndex === undefined) continue
-    const edgeType = state.pointTypeById.get(point.id) || 'UNKNOWN'
-    const ordinal = state.layoutZoneCounts.get(edgeType) || 0
-    state.layoutZoneCounts.set(edgeType, ordinal + 1)
-    const [x, y] = preSpreadPosition(pointIndex, ordinal)
-    const positionOffset = pointIndex * 2
-    state.pointTargetPositions[positionOffset] = x
-    state.pointTargetPositions[positionOffset + 1] = y
-    state.pointPositions[positionOffset] = 0
-    state.pointPositions[positionOffset + 1] = 0
-    state.pendingRadialPointIndexes.add(pointIndex)
-  }
-}
+function appendBatchToGraph(batch) {
+  let addedNodes = 0
+  let addedEdges = 0
+  const dirtyNodes = new Set()
 
-function centerTargetLayout() {
-  if (!state.pointTargetPositions.length) return
-  let minX = Infinity
-  let maxX = -Infinity
-  let minY = Infinity
-  let maxY = -Infinity
-  for (let offset = 0; offset < state.pointTargetPositions.length; offset += 2) {
-    const x = state.pointTargetPositions[offset]
-    const y = state.pointTargetPositions[offset + 1]
-    if (!Number.isFinite(x) || !Number.isFinite(y)) continue
-    if (x < minX) minX = x
-    if (x > maxX) maxX = x
-    if (y < minY) minY = y
-    if (y > maxY) maxY = y
-  }
-  if (!Number.isFinite(minX) || !Number.isFinite(minY)) return
-  const centerX = (minX + maxX) / 2
-  const centerY = (minY + maxY) / 2
-  if (Math.abs(centerX) < 0.001 && Math.abs(centerY) < 0.001) return
-  for (let pointIndex = 0; pointIndex < state.pointsByIndex.length; pointIndex += 1) {
-    const offset = pointIndex * 2
-    state.pointTargetPositions[offset] -= centerX
-    state.pointTargetPositions[offset + 1] -= centerY
-    if (state.pendingRadialPointIndexes.has(pointIndex)) {
-      state.pointPositions[offset] = 0
-      state.pointPositions[offset + 1] = 0
-    } else {
-      state.pointPositions[offset] -= centerX
-      state.pointPositions[offset + 1] -= centerY
-    }
-  }
-}
+  syncProjectionTrig()
 
-function normalizeBatch(batch) {
-  const newPoints = []
   for (const point of batch.points) {
-    if (state.pointIndexById.has(point.id)) continue
-    const index = state.pointIndexById.size
-    state.pointIndexById.set(point.id, index)
-    state.pointsByIndex[index] = point
-    state.pointPositions.push(0, 0)
-    state.pointTargetPositions.push(0, 0)
-    pushColor(state.pointColors, edgeColor('UNKNOWN', POINT_ALPHA))
-    state.pointDegrees.push(0)
-    state.pointSizes.push(pointSizeForDegree(0))
-    newPoints.push(point)
+    if (addPoint(point)) addedNodes += 1
+  }
+  for (const link of batch.links) {
+    if (addLink(link, dirtyNodes)) addedEdges += 1
   }
 
-  const newLinks = []
-  for (const link of batch.links) {
-    if (state.loadedLinkIds.has(link.id)) continue
-    const sourceIndex = state.pointIndexById.get(link.source)
-    const targetIndex = state.pointIndexById.get(link.target)
-    if (sourceIndex === undefined || targetIndex === undefined) continue
-    state.loadedLinkIds.add(link.id)
-    state.linkPairs.push(sourceIndex, targetIndex)
-    pushColor(state.linkColors, edgeColor(link.type, LINK_ALPHA))
-    state.linkTypes.push(link.type)
-    state.linkWidths.push(edgeStyle(link.type).width)
-    incrementPointDegree(sourceIndex)
-    incrementPointDegree(targetIndex)
-    assignPointType(link.source, link.type)
-    assignPointType(link.target, link.type)
-    newLinks.push(link)
+  for (const nodeId of dirtyNodes) {
+    updateNodeStyle(nodeId)
   }
-  applyPreSpreadLayout(newPoints)
-  centerTargetLayout()
-  return { points: newPoints, links: newLinks }
+
+  ensureRenderer()
+  tuneRendererForScale()
+  state.renderer.refresh({ skipIndexation: false })
+  state.loadedNodes = state.graph.order
+  state.loadedEdges = state.graph.size
+  return { addedNodes, addedEdges }
 }
 
-function syncGraphBuffers(syncExistingPositions = true) {
-  if (syncExistingPositions) syncVisiblePositionsFromGraph()
-  if (!state.graph) {
-    state.graph = new Graph(elements.graphRoot, graphConfig())
+function stepRotation(deltaX, deltaY, deltaZ) {
+  state.rotationX += deltaX
+  state.rotationY += deltaY
+  state.rotationZ += deltaZ
+  applyProjectionToAllNodes()
+}
+
+function rotateFrame(now) {
+  if (!state.rotating) return
+  if (now - state.lastRotationAt >= ROTATION_FRAME_MS) {
+    state.lastRotationAt = now
+    stepRotation(0.004, 0.012, 0.002)
   }
-  const visible = buildVisibleGraphBuffers()
-  state.graph.setPointPositions(new Float32Array(visible.pointPositions))
-  state.graph.setPointColors(new Float32Array(visible.pointColors))
-  state.graph.setPointSizes(new Float32Array(visible.pointSizes))
-  state.graph.setLinks(new Float32Array(visible.linkPairs))
-  state.graph.setLinkColors(new Float32Array(visible.linkColors))
-  state.graph.setLinkWidths(new Float32Array(visible.linkWidths))
-  state.graph.render()
+  state.rotationFrame = requestAnimationFrame(rotateFrame)
+}
+
+function startRotationWindow(showStatus = false) {
+  if (!state.graph?.order) return
+  if (state.graph.order > LIVE_ROTATION_NODE_LIMIT) {
+    stepRotation(0.08, 0.18, 0.03)
+    setStatus(statusWithSkippedSummary('Applied one 3D projection step for the large graph.'), 'ok')
+    return
+  }
+  stopRotation()
+  state.rotating = true
+  state.lastRotationAt = 0
+  elements.toggleSim.textContent = 'Stop'
+  if (showStatus) setStatus('Rotating the 3D projection...', 'ok')
+  state.rotationFrame = requestAnimationFrame(rotateFrame)
 }
 
 async function appendBatch(batch, reset) {
-  if (state.graph) syncVisiblePositionsFromGraph()
-  const normalized = normalizeBatch(batch)
-  if (!state.graph || reset) {
-    await destroyGraph()
-  }
-  syncGraphBuffers(false)
-  startCenterOutLayoutWindow()
-
-  state.loadedNodes += normalized.points.length
-  state.loadedEdges += normalized.links.length
-  state.hasNext = batch.next_offset !== null
-  state.nextOffset = batch.next_offset ?? (batch.offset + batch.links.length)
+  if (reset) await destroyGraph()
+  const normalized = appendBatchToGraph(batch)
+  state.hasNext = batch.next_offset !== null && state.loadedNodes < MAX_CLIENT_NODES
+  state.nextOffset = batch.next_offset ?? (batch.offset + batch.points.length)
   elements.loadNext.disabled = !state.hasNext
   updateCounters()
+  if (reset || normalized.addedNodes) fitGraph()
+  return normalized
 }
 
 async function loadStats(projectName) {
   const stats = await api(`/api/viewer/graphs/${encodeURIComponent(projectName)}/stats`)
   elements.dbNodes.textContent = formatNumber(stats.total_nodes)
   elements.dbEdges.textContent = formatNumber(stats.total_edges)
+  if (stats.max_chunk_limit) {
+    elements.chunkLimit.max = String(Math.min(MAX_CHUNK_LIMIT, stats.max_chunk_limit))
+  }
 }
 
 async function loadChunk(reset = false) {
@@ -709,22 +770,23 @@ async function loadChunk(reset = false) {
 
   elements.loadFirst.disabled = true
   elements.loadNext.disabled = true
-  setStatus(`Loading ${formatNumber(chunkLimit())} edges from ${projectName}...`)
+  setStatus(`Loading ${formatNumber(chunkLimit())} nodes from ${projectName}...`)
   try {
     if (reset) {
-      await destroyGraph()
       resetState()
       await loadStats(projectName)
     }
     const batch = await api(`/api/viewer/graphs/${encodeURIComponent(projectName)}/chunk?${params}`)
-    await appendBatch(batch, reset)
-    const more = batch.next_offset === null ? 'No more chunks for this filter.' : 'Ready for the next chunk.'
-    setStatus(`Loaded ${formatNumber(batch.points.length)} nodes and ${formatNumber(batch.links.length)} edges. ${lodSummary()} ${more}`, 'ok')
+    const normalized = await appendBatch(batch, reset)
+    const more = state.loadedNodes >= MAX_CLIENT_NODES
+      ? 'The 500,000-node client cap has been reached.'
+      : batch.next_offset === null ? 'No more chunks for this filter.' : 'Ready for the next chunk.'
+    setStatus(statusWithSkippedSummary(`Loaded ${formatNumber(normalized.addedNodes)} nodes and ${formatNumber(normalized.addedEdges)} edges. ${more}`), 'ok')
   } catch (error) {
     setStatus(error.message, 'error')
   } finally {
     elements.loadFirst.disabled = false
-    if (state.hasNext && state.graph) elements.loadNext.disabled = false
+    if (state.hasNext && state.renderer) elements.loadNext.disabled = false
   }
 }
 
@@ -762,37 +824,27 @@ function wireEvents() {
     resetState()
     setStatus('Graph cleared.', 'ok')
   })
-  elements.fitView.addEventListener('click', () => state.graph?.fitView?.(350, 0.12))
+  elements.fitView.addEventListener('click', fitGraph)
   elements.toggleEdges.addEventListener('click', () => setEdgesVisible(!state.edgesVisible, true))
+  elements.nodeTypeInputs.forEach((input) => input.addEventListener('change', () => setNodeKindVisibility(true)))
   elements.toggleSim.addEventListener('click', () => {
     if (!state.graph) return
-    if (state.paused) startCenterOutLayoutWindow(true)
-    else pauseSimulation()
+    if (state.rotating) stopRotation()
+    else startRotationWindow(true)
   })
   elements.projectSelect.addEventListener('change', async () => {
     if (elements.projectSelect.value) await loadStats(elements.projectSelect.value)
   })
-  elements.saveToken.addEventListener('click', () => {
-    const value = elements.tokenInput.value.trim()
-    if (value) {
-      localStorage.setItem('cg_jwt', value)
-      elements.tokenInput.value = ''
-      elements.tokenInput.placeholder = 'Using saved session token'
-    }
-    setStatus('Session token saved.', 'ok')
-  })
-  elements.forgetToken.addEventListener('click', () => {
-    localStorage.removeItem('cg_jwt')
-    elements.tokenInput.value = ''
-    elements.tokenInput.placeholder = 'Uses cg_jwt from Admin'
-    setStatus('Session token removed.', 'ok')
-  })
 }
 
 async function boot() {
-  if (token()) elements.tokenInput.placeholder = 'Using saved session token'
+  elements.chunkLimit.max = String(MAX_CHUNK_LIMIT)
+  if (Number(elements.chunkLimit.value) > MAX_CHUNK_LIMIT) elements.chunkLimit.value = String(DEFAULT_CHUNK_LIMIT)
   setControlPanelCollapsed(localStorage.getItem('cg_viewer_controls_collapsed') === '1')
-  setEdgesVisible(localStorage.getItem('cg_viewer_edges_visible') !== '0')
+  restoreNodeKindVisibility()
+  const storedEdgeVisibility = localStorage.getItem(EDGE_VISIBILITY_STORAGE_KEY)
+  setEdgesVisible(storedEdgeVisibility === null ? DEFAULT_EDGE_VISIBILITY : storedEdgeVisibility === '1')
+  startFpsCounter()
   wireEvents()
   await loadProjects()
 }

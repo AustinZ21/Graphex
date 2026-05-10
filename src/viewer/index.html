@@ -4,11 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Viewer</title>
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=1.29.74" />
   <script type="importmap">
     {
       "imports": {
-        "@cosmos.gl/graph": "https://esm.sh/@cosmos.gl/graph@3.0.0-beta.8"
+        "graphology": "https://esm.sh/graphology@0.26.0",
+        "sigma": "https://esm.sh/sigma@3.0.3"
       }
     }
   </script>
@@ -33,7 +34,6 @@
           <select id="project-select"></select>
           <div class="field-row">
             <button id="refresh-projects" class="btn secondary" type="button">Refresh</button>
-            <button id="load-first" class="btn primary" type="button">Load</button>
           </div>
         </section>
 
@@ -42,20 +42,21 @@
           <label for="search-input">Search</label>
           <input id="search-input" placeholder="symbol, path, or name" />
 
-          <label for="chunk-limit">Chunk size</label>
-          <input id="chunk-limit" type="number" min="1000" max="100000" step="1000" value="50000" />
+          <label for="chunk-limit">Rendering Node Types</label>
+          <input id="chunk-limit" type="number" min="1" max="500000" step="250" value="250" />
 
           <div class="edge-grid" aria-label="Edge types">
-            <label style="--edge-color:#ff5c63"><input type="checkbox" name="edge-type" value="CALLS" checked /><i class="edge-dot"></i><span>Calls</span></label>
+            <label style="--edge-color:#4ae387"><input type="checkbox" name="edge-type" value="CALLS" checked /><i class="edge-dot"></i><span>Calls</span></label>
             <label style="--edge-color:#5badff"><input type="checkbox" name="edge-type" value="IMPORTS" checked /><i class="edge-dot"></i><span>Imports</span></label>
             <label style="--edge-color:#ffd642"><input type="checkbox" name="edge-type" value="DEFINES" checked /><i class="edge-dot"></i><span>Defines</span></label>
-            <label style="--edge-color:#ad80ff"><input type="checkbox" name="edge-type" value="CONTAINS" checked /><i class="edge-dot"></i><span>Contains</span></label>
-            <label style="--edge-color:#42e694"><input type="checkbox" name="edge-type" value="USES_VARIABLE" checked /><i class="edge-dot"></i><span>Uses variable</span></label>
-            <label style="--edge-color:#ff8c40"><input type="checkbox" name="edge-type" value="FLOWS_TO" checked /><i class="edge-dot"></i><span>Flows to</span></label>
+            <label style="--edge-color:#adb8cc"><input type="checkbox" name="edge-type" value="CONTAINS" checked /><i class="edge-dot"></i><span>Contains</span></label>
+            <label style="--edge-color:#42e694"><input type="checkbox" name="edge-type" value="USES_VARIABLE" /><i class="edge-dot"></i><span>Uses variable</span></label>
+            <label style="--edge-color:#4ae387"><input type="checkbox" name="edge-type" value="FLOWS_TO" /><i class="edge-dot"></i><span>Flows to</span></label>
           </div>
 
           <div class="field-row">
-            <button id="load-next" class="btn secondary" type="button" disabled>Next Chunk</button>
+            <button id="load-first" class="btn primary" type="button">Load</button>
+            <button id="load-next" class="btn secondary" type="button" disabled>Load more</button>
             <button id="clear-graph" class="btn secondary" type="button">Clear</button>
           </div>
         </section>
@@ -64,8 +65,16 @@
           <div class="section-title">View</div>
           <div class="field-row">
             <button id="fit-view" class="btn secondary" type="button">Fit</button>
-            <button id="toggle-sim" class="btn secondary" type="button">Run</button>
-            <button id="toggle-edges" class="btn secondary" type="button" aria-pressed="true">Hide Edges</button>
+            <button id="toggle-sim" class="btn secondary" type="button">3D Rotate</button>
+            <button id="toggle-edges" class="btn secondary" type="button" aria-pressed="false">Show Edges</button>
+          </div>
+          <div class="filter-title">Rendering Node Types</div>
+          <div class="node-type-grid" aria-label="Rendering Node Types">
+            <label style="--node-color:#4ae387"><input type="checkbox" name="node-type" value="Repository" checked /><i class="node-dot"></i><span>Repository</span></label>
+            <label style="--node-color:#5badff"><input type="checkbox" name="node-type" value="File" checked /><i class="node-dot"></i><span>File</span></label>
+            <label style="--node-color:#ffd642"><input type="checkbox" name="node-type" value="Symbol" checked /><i class="node-dot"></i><span>Symbol</span></label>
+            <label style="--node-color:#42e694"><input type="checkbox" name="node-type" value="Variable" checked /><i class="node-dot"></i><span>Variable</span></label>
+            <label style="--node-color:#adb8cc"><input type="checkbox" name="node-type" value="Node" checked /><i class="node-dot"></i><span>Other</span></label>
           </div>
         </section>
 
@@ -80,23 +89,16 @@
           </dl>
         </section>
 
-        <section>
-          <div class="section-title">Session Token</div>
-          <input id="token-input" type="password" autocomplete="off" placeholder="Uses cg_jwt from Admin" />
-          <div class="field-row">
-            <button id="save-token" class="btn secondary" type="button">Save</button>
-            <button id="forget-token" class="btn secondary" type="button">Forget</button>
-          </div>
-        </section>
       </aside>
 
       <section class="graph-stage" aria-label="Graph canvas">
         <div id="graph-root"></div>
         <div id="status-line" class="status-line">Loading viewer...</div>
+        <div id="fps-counter" class="fps-counter">FPS --</div>
       </section>
     </main>
   </div>
 
-  <script type="module" src="./main.js"></script>
+  <script type="module" src="./main.js?v=1.29.74"></script>
 </body>
 </html>

@@ -210,7 +210,8 @@ select:focus {
   flex: 1;
 }
 
-.edge-grid {
+.edge-grid,
+.node-type-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px 10px;
@@ -221,7 +222,8 @@ select:focus {
   background: rgba(23, 28, 39, 0.64);
 }
 
-.edge-grid label {
+.edge-grid label,
+.node-type-grid label {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -231,9 +233,17 @@ select:focus {
   font-weight: 500;
 }
 
-.edge-grid input {
+.edge-grid input,
+.node-type-grid input {
   width: 15px;
   min-height: 15px;
+}
+
+.filter-title {
+  margin: 12px 0 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .edge-dot {
@@ -243,6 +253,15 @@ select:focus {
   border-radius: 999px;
   background: var(--edge-color);
   box-shadow: 0 0 10px color-mix(in srgb, var(--edge-color), transparent 45%);
+}
+
+.node-dot {
+  width: 10px;
+  height: 10px;
+  flex: 0 0 10px;
+  border-radius: 999px;
+  background: var(--node-color);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--node-color), transparent 45%);
 }
 
 .stats-panel dl {
@@ -299,6 +318,24 @@ select:focus {
 .status-line[data-tone="ok"] { color: var(--accent); }
 .status-line[data-tone="warn"] { color: var(--warn); }
 .status-line[data-tone="error"] { color: var(--danger); }
+
+.fps-counter {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  min-width: 74px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(58, 67, 86, 0.85);
+  background: rgba(20, 24, 33, 0.88);
+  color: var(--focus);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+  pointer-events: none;
+}
 
 @media (max-width: 920px) {
   .workspace {

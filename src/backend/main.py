@@ -69,6 +69,15 @@ CACHE_REDIS_URL = os.getenv("CACHE_REDIS_URL", "redis://localhost:6380")  # db=2
 TRACE_ENABLED = os.getenv("TRACE_ENABLED", "true").lower() == "true"
 REPO_ROOT = Path(os.getenv("CONTEXTGRAPH_REPO_ROOT", ".")).resolve()
 
+
+class NoStoreStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope: dict) -> Response:
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+
 _registry = GraphRegistry(host=FALKORDB_HOST, port=FALKORDB_PORT)
 _producer = MCPProducer(redis_url=QUEUE_REDIS_URL)
 _consumer: IndexerConsumer | None = None
@@ -543,7 +552,7 @@ async def graph_viewer_ui():
 
 
 if _VIEWER.is_dir():
-    app.mount("/viewer", StaticFiles(directory=str(_VIEWER), html=True), name="viewer")
+    app.mount("/viewer", NoStoreStaticFiles(directory=str(_VIEWER), html=True), name="viewer")
 
 
 if _FRONTEND.is_dir():

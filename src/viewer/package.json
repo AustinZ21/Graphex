@@ -9,7 +9,8 @@
     "preview": "vite preview --host 127.0.0.1 --port 5179"
   },
   "dependencies": {
-    "@cosmos.gl/graph": "^3.0.0-beta.8"
+    "graphology": "^0.26.0",
+    "sigma": "^3.0.3"
   },
   "devDependencies": {
     "vite": "^6.3.0"

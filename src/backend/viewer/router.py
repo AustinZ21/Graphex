@@ -12,7 +12,8 @@ from backend.auth.dependencies import get_registry, require_admin
 KNOWN_EDGE_TYPES = ("CONTAINS", "DEFINES", "IMPORTS", "CALLS", "USES_VARIABLE", "FLOWS_TO")
 KNOWN_NODE_LABELS = ("Repository", "File", "Symbol", "Variable")
 DEFAULT_CHUNK_LIMIT = 50_000
-MAX_CHUNK_LIMIT = 100_000
+MAX_CHUNK_LIMIT = 500_000
+VIEWER_QUERY_TIMEOUT_MS = 60_000
 _PROJECT_NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 router = APIRouter(prefix="/viewer", tags=["viewer"])
@@ -90,17 +91,35 @@ def _node_payload(row: list[Any], offset: int) -> dict[str, Any]:
     }
 
 
-def _chunk_from_rows(project_name: str, rows: list[list[Any]], offset: int, limit: int) -> dict[str, Any]:
+def _coerce_internal_id(value: Any, fallback: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
+def _chunk_from_node_and_edge_rows(
+    project_name: str,
+    node_rows: list[list[Any]],
+    edge_rows: list[list[Any]],
+    offset: int,
+    limit: int,
+) -> dict[str, Any]:
+    visible_node_rows = node_rows[:limit]
     points_by_id: dict[str, dict[str, Any]] = {}
     links: list[dict[str, Any]] = []
 
-    for row in rows:
+    for row in visible_node_rows:
+        point = _node_payload(row, 0)
+        points_by_id.setdefault(point["id"], point)
+
+    for row in edge_rows:
         rel_id = row[0]
         rel_type = str(row[1])
         source = _node_payload(row, 2)
         target = _node_payload(row, 11)
-        points_by_id.setdefault(source["id"], source)
-        points_by_id.setdefault(target["id"], target)
+        if source["id"] not in points_by_id or target["id"] not in points_by_id:
+            continue
         links.append(
             {
                 "id": f"{rel_type}:{rel_id}",
@@ -110,11 +129,15 @@ def _chunk_from_rows(project_name: str, rows: list[list[Any]], offset: int, limi
             }
         )
 
+    next_offset = None
+    if len(node_rows) > limit:
+        next_offset = _coerce_internal_id(node_rows[limit][0], offset + len(visible_node_rows))
+
     return {
         "project_name": project_name,
         "offset": offset,
         "limit": limit,
-        "next_offset": offset + len(links) if len(links) == limit else None,
+        "next_offset": next_offset,
         "points": list(points_by_id.values()),
         "links": links,
     }
@@ -175,35 +198,53 @@ async def graph_chunk(
     if normalized_search:
         search_clause = """
 AND (
-  toLower(coalesce(source.qualified_name, '')) CONTAINS $search OR
-  toLower(coalesce(source.path, '')) CONTAINS $search OR
-  toLower(coalesce(source.name, '')) CONTAINS $search OR
-  toLower(coalesce(target.qualified_name, '')) CONTAINS $search OR
-  toLower(coalesce(target.path, '')) CONTAINS $search OR
-  toLower(coalesce(target.name, '')) CONTAINS $search
+  toLower(coalesce(node.qualified_name, '')) CONTAINS $search OR
+  toLower(coalesce(node.path, '')) CONTAINS $search OR
+  toLower(coalesce(node.name, '')) CONTAINS $search
 )
 """
 
-    query = f"""
+    node_query = f"""
+MATCH (node)
+WHERE id(node) >= $offset
+{search_clause}
+WITH node
+ORDER BY id(node)
+LIMIT $node_fetch_limit
+RETURN
+  id(node), labels(node), node.qualified_name, node.path, node.name, node.symbol_type, node.language, node.file_path, node.line_start
+"""
+    edge_query = """
 MATCH (source)-[rel]->(target)
 WHERE type(rel) IN $edge_types
-{search_clause}
+AND id(source) IN $node_ids
+AND id(target) IN $node_ids
 WITH source, rel, target
 ORDER BY id(rel)
-SKIP $offset
-LIMIT $limit
+LIMIT $edge_limit
 RETURN
   id(rel), type(rel),
   id(source), labels(source), source.qualified_name, source.path, source.name, source.symbol_type, source.language, source.file_path, source.line_start,
   id(target), labels(target), target.qualified_name, target.path, target.name, target.symbol_type, target.language, target.file_path, target.line_start
 """
     graph = registry.get(normalized_project)
-    params = {
-        "edge_types": selected_edge_types,
+    node_params = {
         "offset": offset,
-        "limit": limit,
+        "node_fetch_limit": min(limit + 1, MAX_CHUNK_LIMIT + 1),
         "search": normalized_search,
     }
-    result = graph.query(query, params)
-    rows = getattr(result, "result_set", None) or []
-    return _chunk_from_rows(normalized_project, rows, offset, limit)
+    node_result = graph.query(node_query, node_params, timeout=VIEWER_QUERY_TIMEOUT_MS)
+    node_rows = getattr(node_result, "result_set", None) or []
+    visible_node_ids = [_coerce_internal_id(row[0], offset + index) for index, row in enumerate(node_rows[:limit])]
+
+    edge_rows: list[list[Any]] = []
+    if visible_node_ids:
+        edge_params = {
+            "edge_types": selected_edge_types,
+            "node_ids": visible_node_ids,
+            "edge_limit": MAX_CHUNK_LIMIT,
+        }
+        edge_result = graph.query(edge_query, edge_params, timeout=VIEWER_QUERY_TIMEOUT_MS)
+        edge_rows = getattr(edge_result, "result_set", None) or []
+
+    return _chunk_from_node_and_edge_rows(normalized_project, node_rows, edge_rows, offset, limit)

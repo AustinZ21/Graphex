@@ -41,10 +41,10 @@ class GraphClient:
             except Exception:
                 pass
 
-    def query(self, cypher: str, params: dict | None = None):
+    def query(self, cypher: str, params: dict | None = None, timeout: int | None = None):
         if not self._graph:
             raise RuntimeError("GraphClient not connected – call connect() first")
-        return self._graph.query(cypher, params or {})
+        return self._graph.query(cypher, params or {}, timeout=timeout)
 
     def ensure_indexes(self) -> None:
         """Idempotently create FalkorDB property indexes."""

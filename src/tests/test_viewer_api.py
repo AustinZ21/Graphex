@@ -67,79 +67,87 @@ def test_viewer_stats_returns_known_node_and_edge_counts() -> None:
         "total_nodes": 10,
         "total_edges": 90,
         "default_chunk_limit": 50000,
-        "max_chunk_limit": 100000,
+        "max_chunk_limit": 500000,
     }
     assert registry.requested_projects == ["contextgraph"]
 
 
-def test_viewer_chunk_deduplicates_points_and_returns_next_offset() -> None:
+def test_viewer_chunk_uses_limit_as_node_count_and_returns_next_offset() -> None:
     graph = MagicMock()
-    graph.query.return_value = _result(
-        [
+    graph.query.side_effect = [
+        _result(
             [
-                7,
-                "CALLS",
-                1,
-                ["Symbol"],
-                "pkg.source",
-                None,
-                "source",
-                "function",
-                None,
-                "src/source.py",
-                10,
-                2,
-                ["Symbol"],
-                "pkg.target",
-                None,
-                "target",
-                "function",
-                None,
-                "src/target.py",
-                20,
-            ],
+                [1, ["Symbol"], "pkg.source", None, "source", "function", None, "src/source.py", 10],
+                [2, ["Symbol"], "pkg.target", None, "target", "function", None, "src/target.py", 20],
+                [3, ["File"], None, "src/third.py", None, None, "python", "src/third.py", None],
+            ]
+        ),
+        _result(
             [
-                8,
-                "CALLS",
-                1,
-                ["Symbol"],
-                "pkg.source",
-                None,
-                "source",
-                "function",
-                None,
-                "src/source.py",
-                10,
-                3,
-                ["File"],
-                None,
-                "src/third.py",
-                None,
-                None,
-                "python",
-                "src/third.py",
-                None,
-            ],
-        ]
-    )
+                [
+                    7,
+                    "CALLS",
+                    1,
+                    ["Symbol"],
+                    "pkg.source",
+                    None,
+                    "source",
+                    "function",
+                    None,
+                    "src/source.py",
+                    10,
+                    2,
+                    ["Symbol"],
+                    "pkg.target",
+                    None,
+                    "target",
+                    "function",
+                    None,
+                    "src/target.py",
+                    20,
+                ],
+                [
+                    8,
+                    "CALLS",
+                    1,
+                    ["Symbol"],
+                    "pkg.source",
+                    None,
+                    "source",
+                    "function",
+                    None,
+                    "src/source.py",
+                    10,
+                    3,
+                    ["File"],
+                    None,
+                    "src/third.py",
+                    None,
+                    None,
+                    "python",
+                    "src/third.py",
+                    None,
+                ],
+            ]
+        ),
+    ]
     registry = _FakeRegistry(graph)
 
     app.dependency_overrides[require_admin] = lambda: {"role": "admin"}
     app.dependency_overrides[get_registry] = lambda: registry
     try:
-        response = TestClient(app).get("/api/viewer/graphs/contextgraph/chunk?offset=40&limit=2")
+        response = TestClient(app).get("/api/viewer/graphs/contextgraph/chunk?offset=1&limit=2")
     finally:
         app.dependency_overrides.clear()
 
     assert response.status_code == 200
     body = response.json()
     assert body["project_name"] == "contextgraph"
-    assert body["offset"] == 40
+    assert body["offset"] == 1
     assert body["limit"] == 2
-    assert body["next_offset"] == 42
+    assert body["next_offset"] == 3
     assert body["links"] == [
         {"id": "CALLS:7", "source": "Symbol:pkg.source", "target": "Symbol:pkg.target", "type": "CALLS"},
-        {"id": "CALLS:8", "source": "Symbol:pkg.source", "target": "File:src/third.py", "type": "CALLS"},
     ]
     assert body["points"] == [
         {
@@ -158,13 +166,40 @@ def test_viewer_chunk_deduplicates_points_and_returns_next_offset() -> None:
             "file_path": "src/target.py",
             "line_start": 20,
         },
+    ]
+    assert graph.query.call_count == 2
+    assert graph.query.call_args_list[0].args[1]["node_fetch_limit"] == 3
+    assert graph.query.call_args_list[1].args[1]["node_ids"] == [1, 2]
+
+
+def test_viewer_chunk_returns_no_more_cursor_when_node_page_is_not_full() -> None:
+    graph = MagicMock()
+    graph.query.side_effect = [
+        _result([[1, ["Symbol"], "pkg.source", None, "source", "function", None, "src/source.py", 10]]),
+        _result([]),
+    ]
+    registry = _FakeRegistry(graph)
+
+    app.dependency_overrides[require_admin] = lambda: {"role": "admin"}
+    app.dependency_overrides[get_registry] = lambda: registry
+    try:
+        response = TestClient(app).get("/api/viewer/graphs/contextgraph/chunk?offset=1&limit=2")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["limit"] == 2
+    assert body["next_offset"] is None
+    assert body["links"] == []
+    assert body["points"] == [
         {
-            "id": "File:src/third.py",
-            "label": "src/third.py",
-            "kind": "File",
-            "subtitle": "python",
-            "file_path": "src/third.py",
-            "line_start": None,
+            "id": "Symbol:pkg.source",
+            "label": "source",
+            "kind": "Symbol",
+            "subtitle": "function",
+            "file_path": "src/source.py",
+            "line_start": 10,
         },
     ]
 
@@ -185,6 +220,47 @@ def test_viewer_entrypoint_is_served() -> None:
 
     assert response.status_code == 200
     assert "<title>Viewer</title>" in response.text
+    assert '"sigma"' in response.text
+    assert '"graphology"' in response.text
+    assert 'src="./main.js?v=1.29.74"' in response.text
+    assert '<label for="chunk-limit">Rendering Node Types</label>' in response.text
+    assert 'value="250"' in response.text
+    assert 'value="USES_VARIABLE" />' in response.text
+    assert 'value="FLOWS_TO" />' in response.text
+    assert 'id="toggle-edges" class="btn secondary" type="button" aria-pressed="false">Show Edges</button>' in response.text
+    assert '<div class="filter-title">Rendering Node Types</div>' in response.text
+    assert 'class="node-type-grid" aria-label="Rendering Node Types"' in response.text
+    assert 'name="node-type" value="Repository" checked' in response.text
+    assert 'name="node-type" value="Variable" checked' in response.text
+    assert '<div id="fps-counter" class="fps-counter">FPS --</div>' in response.text
+    assert '>Load more</button>' in response.text
+    normalized_html = response.text.replace("\r\n", "\n")
+    assert '<button id="load-first" class="btn primary" type="button">Load</button>\n            <button id="load-next" class="btn secondary" type="button" disabled>Load more</button>\n            <button id="clear-graph" class="btn secondary" type="button">Clear</button>' in normalized_html
+    assert "Session Token" not in response.text
+    assert 'id="token-input"' not in response.text
+    assert response.headers["cache-control"] == "no-store, no-cache, must-revalidate, max-age=0"
+
+
+def test_viewer_static_assets_are_not_cached() -> None:
+    response = TestClient(app).get("/viewer/main.js")
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store, no-cache, must-revalidate, max-age=0"
+    assert "Sigma" in response.text
+    assert "DEFAULT_CHUNK_LIMIT = 250" in response.text
+    assert "DEFAULT_EDGE_VISIBILITY = false" in response.text
+    assert "EDGE_VISIBILITY_STORAGE_KEY = 'cg_viewer_edges_visible_v4'" in response.text
+    assert "NODE_KIND_VISIBILITY_STORAGE_KEY" in response.text
+    assert "ROTATION_RUN_MS = 60000" in response.text
+    assert "function setNodeKindVisibility" in response.text
+    assert "function startFpsCounter" in response.text
+    assert "Loading ${formatNumber(chunkLimit())} nodes" in response.text
+    assert "defaultDrawNodeHover: drawNodeHover" in response.text
+    assert "HOVER_LABEL_FONT" in response.text
+    assert "renderLabels: false" in response.text
+    assert "forceLabel: false" in response.text
+    assert "Sigma 3D projection" not in response.text
+    assert "saveToken" not in response.text
 
 
 def test_viewer_entrypoint_redirects_to_trailing_slash() -> None:
@@ -192,3 +268,26 @@ def test_viewer_entrypoint_redirects_to_trailing_slash() -> None:
 
     assert response.status_code == 307
     assert response.headers["location"] == "/viewer/"
+
+
+def test_admin_embeds_versioned_graph_viewer() -> None:
+    response = TestClient(app).get("/admin")
+
+    assert response.status_code == 200
+    assert 'data-src="/viewer/?v=1.29.74"' in response.text
+
+
+def test_viewer_stats_advertises_500k_chunk_limit() -> None:
+    graph = MagicMock()
+    graph.query.return_value = _result([[0]])
+    registry = _FakeRegistry(graph)
+
+    app.dependency_overrides[require_admin] = lambda: {"role": "admin"}
+    app.dependency_overrides[get_registry] = lambda: registry
+    try:
+        response = TestClient(app).get("/api/viewer/graphs/contextgraph/stats")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["max_chunk_limit"] == 500000
