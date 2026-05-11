@@ -17,9 +17,33 @@
       --danger: #e35a5a;
       --danger-soft: #3a1e1e;
       --input-bg: #1a1f2b;
+      --scrollbar-thumb: #465068;
+      --scrollbar-thumb-hover: #5a6680;
+      --scrollbar-track: #1f242f;
       --radius: 10px;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+      scrollbar-width: thin;
+    }
+    *::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    *::-webkit-scrollbar-track {
+      background: var(--scrollbar-track);
+    }
+    *::-webkit-scrollbar-thumb {
+      background: var(--scrollbar-thumb);
+      border: 2px solid var(--scrollbar-track);
+      border-radius: 999px;
+    }
+    *::-webkit-scrollbar-thumb:hover {
+      background: var(--scrollbar-thumb-hover);
+    }
     body {
       background: radial-gradient(circle at 20% 10%, #2f394d 0%, var(--bg) 45%, #191d27 100%);
       color: var(--text);

@@ -11,9 +11,35 @@
   --warn: #f5b85b;
   --danger: #ef6b73;
   --focus: #66d9ef;
+  --scrollbar-thumb: #3a4356;
+  --scrollbar-thumb-hover: #59657c;
+  --scrollbar-track: #151922;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: thin;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border: 2px solid var(--scrollbar-track);
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
 
 body {
   margin: 0;
@@ -78,7 +104,16 @@ select {
   border-right: 1px solid var(--line);
   overflow: auto;
   padding: 16px;
+  scrollbar-color: var(--scrollbar-thumb) var(--panel);
   transition: opacity 160ms ease, padding 180ms ease, border-color 180ms ease;
+}
+
+.control-panel::-webkit-scrollbar-track {
+  background: var(--panel);
+}
+
+.control-panel::-webkit-scrollbar-thumb {
+  border-color: var(--panel);
 }
 
 .panel-toggle {
