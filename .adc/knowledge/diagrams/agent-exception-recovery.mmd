@@ -1,46 +1,54 @@
 sequenceDiagram
     autonumber
-    participant U as User
-    participant RA as RA (Coordinator)
-    participant CA as CA (Context)
-    participant EA as EA (Execution)
-    participant IA as IA (Integration)
-    participant MA as MA (Monitoring)
-    participant OA as OA (Optimization)
-    participant VA as VA (Validation)
+    participant A as External Agent
+    participant MW as ProjectTokenMiddleware
+    participant M as MCP Tool Handler
+    participant C as Query Cache
+    participant G as GraphRegistry and FalkorDB
+    participant P as MCPProducer
+    participant Q as Redis Jobs Stream
+    participant I as IndexerConsumer
+    participant Admin as Admin API
 
-    U->>RA: Submit task
-    RA->>CA: Request context package
-    CA-->>RA: Context package
-    RA->>EA: Execute task
-    EA-->>RA: Execution result
-    RA->>IA: Integrate result
-    IA-->>RA: Integrated output
+    A->>MW: Call ContextGraph MCP tool
+    alt Token missing or revoked
+        MW-->>A: Reject request with 401 or 403
+    else Token accepted
+        MW->>M: Continue request in project scope
+        opt Cache unavailable
+            M->>C: Attempt cache read
+            C-->>M: Cache error
+            Note over M,C: Tool continues without cache
+        end
 
-    RA->>VA: Validate output
-    VA-->>RA: Validation failed (policy/rule)
-    RA->>MA: Check runtime health
-    MA-->>RA: Alert: high error rate
-
-    alt Recoverable issue
-        RA->>OA: Request optimization strategy
-        OA-->>RA: Tuned parameters + fallback action
-        RA->>EA: Retry execution (attempt #2)
-        EA-->>RA: New execution result
-        RA->>IA: Re-integrate
-        IA-->>RA: Updated output
-        RA->>VA: Re-validate
-        VA-->>RA: Validation passed
-        RA-->>U: Return verified result
-    else Non-recoverable issue
-        RA->>MA: Raise incident with trace bundle
-        MA-->>RA: Incident created + severity
-        RA-->>U: Escalated failure (manual intervention required)
+        alt Graph retrieval is weak or incomplete
+            M->>G: Query graph anyway
+            G-->>M: Sparse result set
+            Note over M,A: CG-first strategy falls back to bounded local snippets
+            M-->>A: Partial graph evidence plus local fallback
+        else Graph retrieval is healthy
+            M-->>A: Graph-backed answer
+        end
     end
 
-    opt Safety rollback path
-        RA->>IA: Trigger rollback to last known good state
-        IA-->>RA: Rollback completed
-        RA->>MA: Publish rollback event
-        MA-->>RA: Observability updated
+    A->>M: Request index_repo_changes
+    alt Deleted or renamed files detected
+        Note over M,P: Tool escalates to full index because incremental does not purge stale symbols
+        M->>P: Enqueue full index job
+    else Safe incremental change set
+        M->>P: Enqueue incremental index job
+    end
+
+    P->>Q: Publish job
+    I->>Q: Consume job
+    alt Pipeline failure while processing
+        Note over I,Q: Job marked failed and stream entry is not ACKed
+        I-->>Admin: Failed job visible in index status
+    else Worker stalls on processing
+        Admin->>I: Recover stale jobs by repo
+        I->>Q: ACK stale stream entry during recovery
+        I-->>Admin: Job marked failed for manual retry
+    else Pipeline succeeds
+        I->>Q: ACK message
+        I-->>Admin: Job status becomes done
     end

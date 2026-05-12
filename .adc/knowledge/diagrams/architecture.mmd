@@ -1,126 +1,81 @@
 flowchart TB
-    %% Entry and experience layer
-    User[User / Operator]
-    Browser[Web Browser UI]
-    APIClient[CLI / SDK Client]
+    Operator[Operator / Admin]
+    Browser[Browser]
+    AgentClient[Agent / MCP Client]
+    GitRepo[Repository on Disk]
+    GitHub[GitHub OAuth]
+    FdbBrowser[FalkorDB Browser UI]
 
-    %% Runtime platform
-    subgraph Runtime[Runtime Platform]
+    subgraph Runtime[ContextGraph Runtime]
         direction TB
 
-        subgraph Edge[Edge Access Layer]
-            Gateway[Gateway API]
-            Auth[Auth & Policy]
-            RateLimit[Rate Limit / Guardrails]
+        subgraph Entry[HTTP Entry Surfaces]
+            AdminSPA[Admin SPA at /admin]
+            ViewerStatic[Viewer Static App at /viewer]
+            AuthAPI[Auth and Admin API at /api/auth]
+            ViewerAPI[Viewer API at /api/viewer]
+            MCPServer[MCP SSE Server at /mcp]
+            AuditMW[Audit Middleware]
+            TokenMW[ProjectTokenMiddleware]
         end
 
-        subgraph Control[Control Plane]
-            RA[RA - Coordinator]
-            PolicyMgr[Policy Manager]
-            TaskPlanner[Task Planner]
-        end
-
-        subgraph Safety[Sandbox Safety Plane]
-            SandboxPolicy[Sandbox Policy Engine]
-            SandboxRuntime[Sandbox Runtime]
-            SandboxCtrl[Controlled Read Write Execute Share]
-            SandboxFS[Sandboxed File System]
-        end
-
-        subgraph Query[Query Plane]
-            Strategy[Strategy Router]
-            CA[CA - Context Agent]
-            GE[Graph Query Engine]
-            EA[EA - Execution Agent]
-            IA[IA - Integration Agent]
-            VA[VA - Validation Agent]
-            OA[OA - Optimization Agent]
-            MA[MA - Monitoring Agent]
-        end
-
-        subgraph Index[Index Plane]
-            IndexAPI[Index API]
-            Incremental[Incremental Index Worker]
-            FullIndex[Full Index Worker]
-            ChangeDetector[Git Change Detector]
+        subgraph Services[Application Services]
+            GraphRegistry[GraphRegistry]
+            QueryStrategy[CG-first Query Strategy]
+            JobProducer[MCPProducer]
+            JobConsumer[IndexerConsumer]
+            IndexPipeline[IndexPipeline]
+            QueryCache[Redis Query Cache]
+            TraceRecorder[Trace Recorder]
+            TraceEvaluator[Trace Evaluator]
         end
     end
 
-    %% Data and state
-    subgraph Data[Data & State Layer]
-        GraphStore[(Graph Store)]
-        VectorStore[(Vector Store)]
-        KV[(Redis / KV Cache)]
-        SQL[(PostgreSQL Metadata)]
-        Artifact[(Artifacts / Logs)]
+    subgraph State[State and Infrastructure]
+        AuthDB[(SQLite Auth and Audit DB)]
+        JobStream[(Redis Streams: contextgraph:jobs)]
+        TraceStream[(Redis Traces and Cache DB)]
+        Falkor[(FalkorDB Project Graphs)]
     end
 
-    %% External dependencies
-    subgraph External[External Systems]
-        SCM[Git Repository]
-        LLM[LLM / Embedding Provider]
-        Telemetry[Observability / Metrics]
-    end
+    Operator --> Browser
+    Browser --> AdminSPA
+    Browser --> ViewerStatic
+    Browser --> AuthAPI
+    AgentClient --> MCPServer
 
-    %% User entry paths
-    User --> Browser
-    User --> APIClient
-    Browser --> Gateway
-    APIClient --> Gateway
+    AuthAPI --> AuditMW
+    ViewerAPI --> AuditMW
+    MCPServer --> AuditMW
+    MCPServer --> TokenMW
 
-    %% Access and governance
-    Gateway --> Auth
-    Gateway --> RateLimit
-    Auth --> PolicyMgr
-    RateLimit --> RA
+    AdminSPA --> AuthAPI
+    AdminSPA --> ViewerAPI
+    AdminSPA -->|launch browser| FdbBrowser
+    ViewerStatic --> ViewerAPI
 
-    %% Control-plane execution
-    Gateway --> RA
-    RA --> TaskPlanner
-    RA --> PolicyMgr
-    RA --> SandboxPolicy
-    TaskPlanner --> Strategy
+    AuthAPI --> AuthDB
+    AuthAPI --> GitHub
+    ViewerAPI --> GraphRegistry
+    MCPServer --> QueryStrategy
+    MCPServer --> QueryCache
+    MCPServer --> TraceRecorder
+    MCPServer --> JobProducer
 
-    %% Query-plane execution
-    Gateway --> Strategy
-    Strategy --> CA
-    Strategy --> EA
-    CA --> GE
-    GE --> GraphStore
-    GE --> VectorStore
-    CA --> LLM
-    EA --> IA
-    EA --> SandboxRuntime
-    IA --> SandboxRuntime
-    IA --> VA
-    VA --> RA
-    MA --> OA
-    OA --> EA
-    GE --> KV
-    IA --> SQL
-    SandboxPolicy --> SandboxRuntime
-    SandboxRuntime --> SandboxCtrl
-    SandboxCtrl --> SandboxFS
-    SandboxRuntime --> SandboxFS
-    SandboxFS --> Artifact
+    QueryStrategy --> GraphRegistry
+    QueryStrategy --> QueryCache
+    GraphRegistry --> Falkor
 
-    %% Indexing flow
-    SCM --> ChangeDetector
-    ChangeDetector --> Incremental
-    IndexAPI --> Incremental
-    IndexAPI --> FullIndex
-    FullIndex --> GraphStore
-    FullIndex --> VectorStore
-    Incremental --> GraphStore
-    Incremental --> VectorStore
-    Incremental --> SQL
+    JobProducer --> JobStream
+    JobConsumer --> JobStream
+    JobConsumer --> IndexPipeline
+    IndexPipeline --> GitRepo
+    IndexPipeline --> GraphRegistry
 
-    %% Runtime state and telemetry
-    PolicyMgr --> KV
-    RA --> SQL
-    RA --> Artifact
-    Gateway --> Telemetry
-    RA --> Telemetry
-    GE --> Telemetry
-    MA --> Telemetry
-    Incremental --> Telemetry
+    QueryCache --> TraceStream
+    TraceRecorder --> TraceStream
+    TraceEvaluator --> TraceStream
+    TraceEvaluator --> Falkor
+
+    AuthAPI --> JobConsumer
+    AuthAPI --> GraphRegistry

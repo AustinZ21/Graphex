@@ -1,0 +1,2101 @@
+{
+  "ok": true,
+  "metric": "hallucination-pressure-score",
+  "method": "hps-context-quality-v1",
+  "weights": {
+    "missingEvidence": 0.45,
+    "noise": 0.35,
+    "redundancy": 0.1,
+    "ambiguity": 0.1
+  },
+  "cases": [
+    {
+      "id": "codexcli-real-config-mcp-edit",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/config/src/mcp_edit_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/config/src/mcp_edit_tests.rs#real-test",
+        "file:codex-rs/config/src/mcp_edit.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_config.mcp_edit"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 5064,
+        "usefulTokens": 625,
+        "uselessTokens": 4439,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/config/src/mcp_edit_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/config/src/mcp_edit.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.1234,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.8766,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 59.85
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 2516,
+        "usefulTokens": 2050,
+        "uselessTokens": 466,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/config/src/mcp_edit.rs#real-implementation",
+          "file:codex-rs/config/src/mcp_edit_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8148,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1852,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 6.48
+      },
+      "comparison": {
+        "tokenReductionPercent": 50.32,
+        "uselessTokenReductionPercent": 89.5,
+        "hpsReductionPercent": 89.17,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.6914
+      }
+    },
+    {
+      "id": "codexcli-real-config-types",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/config/src/types_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/config/src/types_tests.rs#real-test",
+        "file:codex-rs/config/src/types.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_config.types"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 5020,
+        "usefulTokens": 581,
+        "uselessTokens": 4439,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/config/src/types_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/config/src/types.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.1157,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.8843,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 60.12
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 2497,
+        "usefulTokens": 2197,
+        "uselessTokens": 300,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/config/src/types.rs#real-implementation",
+          "file:codex-rs/config/src/types_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8799,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1201,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 4.21
+      },
+      "comparison": {
+        "tokenReductionPercent": 50.26,
+        "uselessTokenReductionPercent": 93.24,
+        "hpsReductionPercent": 93.0,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.7642
+      }
+    },
+    {
+      "id": "codexcli-real-config-merge",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/config/src/merge_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/config/src/merge_tests.rs#real-test",
+        "file:codex-rs/config/src/merge.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_config.merge"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 4970,
+        "usefulTokens": 531,
+        "uselessTokens": 4439,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/config/src/merge_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/config/src/merge.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.1068,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.8932,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 60.43
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 1297,
+        "usefulTokens": 831,
+        "uselessTokens": 466,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/config/src/merge.rs#real-implementation",
+          "file:codex-rs/config/src/merge_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.6407,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.3593,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 12.58
+      },
+      "comparison": {
+        "tokenReductionPercent": 73.9,
+        "uselessTokenReductionPercent": 89.5,
+        "hpsReductionPercent": 79.18,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.5339
+      }
+    },
+    {
+      "id": "codexcli-real-core-apply-patch",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/core/src/apply_patch_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/core/src/apply_patch_tests.rs#real-test",
+        "file:codex-rs/core/src/apply_patch.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_core.apply_patch"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 4581,
+        "usefulTokens": 142,
+        "uselessTokens": 4439,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/apply_patch_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/core/src/apply_patch.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.031,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.969,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 63.08
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 1681,
+        "usefulTokens": 1143,
+        "uselessTokens": 538,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/apply_patch.rs#real-implementation",
+          "file:codex-rs/core/src/apply_patch_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.68,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.32,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 11.2
+      },
+      "comparison": {
+        "tokenReductionPercent": 63.3,
+        "uselessTokenReductionPercent": 87.88,
+        "hpsReductionPercent": 82.24,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.649
+      }
+    },
+    {
+      "id": "codexcli-real-core-agents-md",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/core/src/agents_md_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/core/src/agents_md_tests.rs#real-test",
+        "file:codex-rs/core/src/agents_md.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_core.agents_md"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 8669,
+        "usefulTokens": 4230,
+        "uselessTokens": 4439,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/agents_md_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/core/src/agents_md.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.4879,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.5121,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 47.09
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 3283,
+        "usefulTokens": 2745,
+        "uselessTokens": 538,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/agents_md.rs#real-implementation",
+          "file:codex-rs/core/src/agents_md_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8361,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1639,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 5.74
+      },
+      "comparison": {
+        "tokenReductionPercent": 62.13,
+        "uselessTokenReductionPercent": 87.88,
+        "hpsReductionPercent": 87.81,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.3482
+      }
+    },
+    {
+      "id": "codexcli-real-core-client-common",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/core/src/client_common_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/core/src/client_common_tests.rs#real-test",
+        "file:codex-rs/core/src/client_common.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_core.client_common"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 6166,
+        "usefulTokens": 1727,
+        "uselessTokens": 4439,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/client_common_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/core/src/client_common.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.2801,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.7199,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 54.36
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 3010,
+        "usefulTokens": 2472,
+        "uselessTokens": 538,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/client_common.rs#real-implementation",
+          "file:codex-rs/core/src/client_common_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8213,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1787,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 6.26
+      },
+      "comparison": {
+        "tokenReductionPercent": 51.18,
+        "uselessTokenReductionPercent": 87.88,
+        "hpsReductionPercent": 88.48,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.5412
+      }
+    },
+    {
+      "id": "codexcli-real-core-config-schema",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/core/src/config/schema_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/core/src/config/schema_tests.rs#real-test",
+        "file:codex-rs/core/src/config/schema.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_core.config.schema"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 13626,
+        "usefulTokens": 756,
+        "uselessTokens": 12870,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/config/schema_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/core/src/config/schema.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.0555,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.9445,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 62.22
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 1258,
+        "usefulTokens": 803,
+        "uselessTokens": 455,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/config/schema.rs#real-implementation",
+          "file:codex-rs/core/src/config/schema_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.6383,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.3617,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 12.66
+      },
+      "comparison": {
+        "tokenReductionPercent": 90.77,
+        "uselessTokenReductionPercent": 96.46,
+        "hpsReductionPercent": 79.65,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.5828
+      }
+    },
+    {
+      "id": "codexcli-real-core-config-permissions",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/core/src/config/permissions_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/core/src/config/permissions_tests.rs#real-test",
+        "file:codex-rs/core/src/config/permissions.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_core.config.permissions"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 16338,
+        "usefulTokens": 3468,
+        "uselessTokens": 12870,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/config/permissions_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/core/src/config/permissions.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.2123,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.7877,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 56.74
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 3279,
+        "usefulTokens": 2910,
+        "uselessTokens": 369,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/config/permissions.rs#real-implementation",
+          "file:codex-rs/core/src/config/permissions_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8875,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1125,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 3.94
+      },
+      "comparison": {
+        "tokenReductionPercent": 79.93,
+        "uselessTokenReductionPercent": 97.13,
+        "hpsReductionPercent": 93.06,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.6752
+      }
+    },
+    {
+      "id": "codexcli-real-core-config-edit",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/core/src/config/edit_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/core/src/config/edit_tests.rs#real-test",
+        "file:codex-rs/core/src/config/edit.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_core.config.edit"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 23414,
+        "usefulTokens": 10544,
+        "uselessTokens": 12870,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/config/edit_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/core/src/config/edit.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.4503,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.5497,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 48.41
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 2903,
+        "usefulTokens": 2856,
+        "uselessTokens": 47,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/config/edit.rs#real-implementation",
+          "file:codex-rs/core/src/config/edit_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.9838,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.0162,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 0.57
+      },
+      "comparison": {
+        "tokenReductionPercent": 87.6,
+        "uselessTokenReductionPercent": 99.63,
+        "hpsReductionPercent": 98.82,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.5335
+      }
+    },
+    {
+      "id": "codexcli-real-core-environment-context",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/core/src/context/environment_context_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/core/src/context/environment_context_tests.rs#real-test",
+        "file:codex-rs/core/src/context/environment_context.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_core.context.environment_context"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 6556,
+        "usefulTokens": 2117,
+        "uselessTokens": 4439,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/context/environment_context_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/core/src/context/environment_context.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.3229,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.6771,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 52.86
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 3026,
+        "usefulTokens": 2488,
+        "uselessTokens": 538,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/context/environment_context.rs#real-implementation",
+          "file:codex-rs/core/src/context/environment_context_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8222,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1778,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 6.22
+      },
+      "comparison": {
+        "tokenReductionPercent": 53.84,
+        "uselessTokenReductionPercent": 87.88,
+        "hpsReductionPercent": 88.23,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.4993
+      }
+    },
+    {
+      "id": "codexcli-real-handler-apply-patch",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/core/src/tools/handlers/apply_patch_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/core/src/tools/handlers/apply_patch_tests.rs#real-test",
+        "file:codex-rs/core/src/tools/handlers/apply_patch.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_core.tools.handlers.apply_patch"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 7675,
+        "usefulTokens": 2282,
+        "uselessTokens": 5393,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/tools/handlers/apply_patch_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/core/src/tools/handlers/apply_patch.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.2973,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.7027,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 53.76
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 3203,
+        "usefulTokens": 2648,
+        "uselessTokens": 555,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/tools/handlers/apply_patch.rs#real-implementation",
+          "file:codex-rs/core/src/tools/handlers/apply_patch_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8267,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1733,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 6.06
+      },
+      "comparison": {
+        "tokenReductionPercent": 58.27,
+        "uselessTokenReductionPercent": 89.71,
+        "hpsReductionPercent": 88.73,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.5294
+      }
+    },
+    {
+      "id": "codexcli-real-handler-shell",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/core/src/tools/handlers/shell_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/core/src/tools/handlers/shell_tests.rs#real-test",
+        "file:codex-rs/core/src/tools/handlers/shell.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_core.tools.handlers.shell"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 12822,
+        "usefulTokens": 2645,
+        "uselessTokens": 10177,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/tools/handlers/shell_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/core/src/tools/handlers/shell.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.2063,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.7937,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 56.95
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 3245,
+        "usefulTokens": 2916,
+        "uselessTokens": 329,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/tools/handlers/shell.rs#real-implementation",
+          "file:codex-rs/core/src/tools/handlers/shell_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8986,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1014,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 3.55
+      },
+      "comparison": {
+        "tokenReductionPercent": 74.69,
+        "uselessTokenReductionPercent": 96.77,
+        "hpsReductionPercent": 93.77,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.6923
+      }
+    },
+    {
+      "id": "codexcli-real-handler-unified-exec",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/core/src/tools/handlers/unified_exec_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/core/src/tools/handlers/unified_exec_tests.rs#real-test",
+        "file:codex-rs/core/src/tools/handlers/unified_exec.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_core.tools.handlers.unified_exec"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 10504,
+        "usefulTokens": 3392,
+        "uselessTokens": 7112,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/tools/handlers/unified_exec_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/core/src/tools/handlers/unified_exec.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.3229,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.6771,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 52.86
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 2540,
+        "usefulTokens": 2081,
+        "uselessTokens": 459,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core/src/tools/handlers/unified_exec.rs#real-implementation",
+          "file:codex-rs/core/src/tools/handlers/unified_exec_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8193,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1807,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 6.32
+      },
+      "comparison": {
+        "tokenReductionPercent": 75.82,
+        "uselessTokenReductionPercent": 93.55,
+        "hpsReductionPercent": 88.04,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.4964
+      }
+    },
+    {
+      "id": "codexcli-real-exec-cli",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/exec/src/cli_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/exec/src/cli_tests.rs#real-test",
+        "file:codex-rs/exec/src/cli.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_exec.cli"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 28165,
+        "usefulTokens": 537,
+        "uselessTokens": 27628,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/exec/src/cli_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/exec/src/cli.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.0191,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.9809,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 63.5
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 2438,
+        "usefulTokens": 1907,
+        "uselessTokens": 531,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/exec/src/cli.rs#real-implementation",
+          "file:codex-rs/exec/src/cli_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.7822,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.2178,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 7.62
+      },
+      "comparison": {
+        "tokenReductionPercent": 91.34,
+        "uselessTokenReductionPercent": 98.08,
+        "hpsReductionPercent": 88.0,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.7631
+      }
+    },
+    {
+      "id": "codexcli-real-exec-lib",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/exec/src/lib_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/exec/src/lib_tests.rs#real-test",
+        "file:codex-rs/exec/src/lib.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_exec.lib"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 32297,
+        "usefulTokens": 4669,
+        "uselessTokens": 27628,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/exec/src/lib_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/exec/src/lib.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.1446,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.8554,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 59.11
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 3446,
+        "usefulTokens": 2974,
+        "uselessTokens": 472,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/exec/src/lib.rs#real-implementation",
+          "file:codex-rs/exec/src/lib_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.863,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.137,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 4.79
+      },
+      "comparison": {
+        "tokenReductionPercent": 89.33,
+        "uselessTokenReductionPercent": 98.29,
+        "hpsReductionPercent": 91.9,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.7184
+      }
+    },
+    {
+      "id": "codexcli-real-app-server-transport",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/app-server/src/transport_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/app-server/src/transport_tests.rs#real-test",
+        "file:codex-rs/app-server/src/transport.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_app_server.transport"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 36325,
+        "usefulTokens": 4578,
+        "uselessTokens": 31747,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/app-server/src/transport_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/app-server/src/transport.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.126,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.874,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 59.76
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 3005,
+        "usefulTokens": 2738,
+        "uselessTokens": 267,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/app-server/src/transport.rs#real-implementation",
+          "file:codex-rs/app-server/src/transport_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.9111,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.0889,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 3.11
+      },
+      "comparison": {
+        "tokenReductionPercent": 91.73,
+        "uselessTokenReductionPercent": 99.16,
+        "hpsReductionPercent": 94.8,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.7851
+      }
+    },
+    {
+      "id": "codexcli-real-app-server-config-manager-service",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/app-server/src/config_manager_service_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/app-server/src/config_manager_service_tests.rs#real-test",
+        "file:codex-rs/app-server/src/config_manager_service.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_app_server.config_manager_service"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 38189,
+        "usefulTokens": 6442,
+        "uselessTokens": 31747,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/app-server/src/config_manager_service_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/app-server/src/config_manager_service.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.1687,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.8313,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 58.26
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 2954,
+        "usefulTokens": 2536,
+        "uselessTokens": 418,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/app-server/src/config_manager_service.rs#real-implementation",
+          "file:codex-rs/app-server/src/config_manager_service_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8585,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1415,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 4.95
+      },
+      "comparison": {
+        "tokenReductionPercent": 92.26,
+        "uselessTokenReductionPercent": 98.68,
+        "hpsReductionPercent": 91.5,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.6898
+      }
+    },
+    {
+      "id": "codexcli-real-protocol-common",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/app-server-protocol/src/protocol/common_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/app-server-protocol/src/protocol/common_tests.rs#real-test",
+        "file:codex-rs/app-server-protocol/src/protocol/common.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_app_server_protocol.common"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 6740,
+        "usefulTokens": 342,
+        "uselessTokens": 6398,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/app-server-protocol/src/protocol/common_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/app-server-protocol/src/protocol/common.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.0507,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.9493,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 62.39
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 2097,
+        "usefulTokens": 2026,
+        "uselessTokens": 71,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/app-server-protocol/src/protocol/common.rs#real-implementation",
+          "file:codex-rs/app-server-protocol/src/protocol/common_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.9661,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.0339,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 1.19
+      },
+      "comparison": {
+        "tokenReductionPercent": 68.89,
+        "uselessTokenReductionPercent": 98.89,
+        "hpsReductionPercent": 98.09,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.9154
+      }
+    },
+    {
+      "id": "codexcli-real-protocol-v2",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/app-server-protocol/src/protocol/v2/tests.rs?",
+      "goldItems": [
+        "file:codex-rs/app-server-protocol/src/protocol/v2/tests.rs#real-test",
+        "file:codex-rs/app-server-protocol/src/protocol/v2/mod.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_app_server_protocol.v2"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 33828,
+        "usefulTokens": 27430,
+        "uselessTokens": 6398,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/app-server-protocol/src/protocol/v2/tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/app-server-protocol/src/protocol/v2/mod.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.8109,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.1891,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 35.79
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 1877,
+        "usefulTokens": 1485,
+        "uselessTokens": 392,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/app-server-protocol/src/protocol/v2/mod.rs#real-implementation",
+          "file:codex-rs/app-server-protocol/src/protocol/v2/tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.7912,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.2088,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 7.31
+      },
+      "comparison": {
+        "tokenReductionPercent": 94.45,
+        "uselessTokenReductionPercent": 93.87,
+        "hpsReductionPercent": 79.58,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": -0.0197
+      }
+    },
+    {
+      "id": "codexcli-real-mcp-connection-manager",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/codex-mcp/src/connection_manager_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/codex-mcp/src/connection_manager_tests.rs#real-test",
+        "file:codex-rs/codex-mcp/src/connection_manager.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_mcp.connection_manager"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 14550,
+        "usefulTokens": 8152,
+        "uselessTokens": 6398,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/codex-mcp/src/connection_manager_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/codex-mcp/src/connection_manager.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.5603,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.4397,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 44.56
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 3192,
+        "usefulTokens": 2811,
+        "uselessTokens": 381,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/codex-mcp/src/connection_manager.rs#real-implementation",
+          "file:codex-rs/codex-mcp/src/connection_manager_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8806,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1194,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 4.18
+      },
+      "comparison": {
+        "tokenReductionPercent": 78.06,
+        "uselessTokenReductionPercent": 94.05,
+        "hpsReductionPercent": 90.62,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.3203
+      }
+    },
+    {
+      "id": "codexcli-real-core-skills-loader",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/core-skills/src/loader_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/core-skills/src/loader_tests.rs#real-test",
+        "file:codex-rs/core-skills/src/loader.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_core_skills.loader"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 28202,
+        "usefulTokens": 13567,
+        "uselessTokens": 14635,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core-skills/src/loader_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/core-skills/src/loader.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.4811,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.5189,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 47.33
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 2833,
+        "usefulTokens": 2485,
+        "uselessTokens": 348,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core-skills/src/loader.rs#real-implementation",
+          "file:codex-rs/core-skills/src/loader_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8772,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1228,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 4.3
+      },
+      "comparison": {
+        "tokenReductionPercent": 89.95,
+        "uselessTokenReductionPercent": 97.62,
+        "hpsReductionPercent": 90.91,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.3961
+      }
+    },
+    {
+      "id": "codexcli-real-core-skills-manager",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/core-skills/src/manager_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/core-skills/src/manager_tests.rs#real-test",
+        "file:codex-rs/core-skills/src/manager.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_core_skills.manager"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 29594,
+        "usefulTokens": 6735,
+        "uselessTokens": 22859,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core-skills/src/manager_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/core-skills/src/manager.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.2276,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.7724,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 56.2
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 3037,
+        "usefulTokens": 2667,
+        "uselessTokens": 370,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core-skills/src/manager.rs#real-implementation",
+          "file:codex-rs/core-skills/src/manager_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8782,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1218,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 4.26
+      },
+      "comparison": {
+        "tokenReductionPercent": 89.74,
+        "uselessTokenReductionPercent": 98.38,
+        "hpsReductionPercent": 92.42,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.6506
+      }
+    },
+    {
+      "id": "codexcli-real-core-plugins-store",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/core-plugins/src/store_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/core-plugins/src/store_tests.rs#real-test",
+        "file:codex-rs/core-plugins/src/store.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_core_plugins.store"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 9649,
+        "usefulTokens": 2642,
+        "uselessTokens": 7007,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core-plugins/src/store_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/core-plugins/src/store.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.2738,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.7262,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 54.58
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 3274,
+        "usefulTokens": 2690,
+        "uselessTokens": 584,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core-plugins/src/store.rs#real-implementation",
+          "file:codex-rs/core-plugins/src/store_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8216,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1784,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 6.24
+      },
+      "comparison": {
+        "tokenReductionPercent": 66.07,
+        "uselessTokenReductionPercent": 91.67,
+        "hpsReductionPercent": 88.57,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.5478
+      }
+    },
+    {
+      "id": "codexcli-real-core-plugins-loader",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/core-plugins/src/loader_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/core-plugins/src/loader_tests.rs#real-test",
+        "file:codex-rs/core-plugins/src/loader.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_core_plugins.loader"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 14960,
+        "usefulTokens": 2536,
+        "uselessTokens": 12424,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core-plugins/src/loader_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/core-plugins/src/loader.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.1695,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.8305,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 58.23
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 2782,
+        "usefulTokens": 2443,
+        "uselessTokens": 339,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/core-plugins/src/loader.rs#real-implementation",
+          "file:codex-rs/core-plugins/src/loader_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8781,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1219,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 4.26
+      },
+      "comparison": {
+        "tokenReductionPercent": 81.4,
+        "uselessTokenReductionPercent": 97.27,
+        "hpsReductionPercent": 92.68,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.7086
+      }
+    },
+    {
+      "id": "codexcli-real-hooks-output-spill",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/hooks/src/output_spill_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/hooks/src/output_spill_tests.rs#real-test",
+        "file:codex-rs/hooks/src/output_spill.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_hooks.output_spill"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 7421,
+        "usefulTokens": 309,
+        "uselessTokens": 7112,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/hooks/src/output_spill_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/hooks/src/output_spill.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.0416,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.9584,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 62.71
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 1564,
+        "usefulTokens": 1261,
+        "uselessTokens": 303,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/hooks/src/output_spill.rs#real-implementation",
+          "file:codex-rs/hooks/src/output_spill_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8063,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1937,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 6.78
+      },
+      "comparison": {
+        "tokenReductionPercent": 78.92,
+        "uselessTokenReductionPercent": 95.74,
+        "hpsReductionPercent": 89.19,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.7647
+      }
+    },
+    {
+      "id": "codexcli-real-models-manager-manager",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/models-manager/src/manager_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/models-manager/src/manager_tests.rs#real-test",
+        "file:codex-rs/models-manager/src/manager.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_models_manager.manager"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 32056,
+        "usefulTokens": 6483,
+        "uselessTokens": 25573,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/models-manager/src/manager_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/models-manager/src/manager.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.2022,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.7978,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 57.09
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 3321,
+        "usefulTokens": 2755,
+        "uselessTokens": 566,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/models-manager/src/manager.rs#real-implementation",
+          "file:codex-rs/models-manager/src/manager_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8296,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1704,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 5.97
+      },
+      "comparison": {
+        "tokenReductionPercent": 89.64,
+        "uselessTokenReductionPercent": 97.79,
+        "hpsReductionPercent": 89.54,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.6274
+      }
+    },
+    {
+      "id": "codexcli-real-memories-storage",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/memories/write/src/storage_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/memories/write/src/storage_tests.rs#real-test",
+        "file:codex-rs/memories/write/src/storage.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_memories_write.storage"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 8615,
+        "usefulTokens": 1323,
+        "uselessTokens": 7292,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/memories/write/src/storage_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/memories/write/src/storage.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.1536,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.8464,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 58.79
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 3331,
+        "usefulTokens": 2818,
+        "uselessTokens": 513,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/memories/write/src/storage.rs#real-implementation",
+          "file:codex-rs/memories/write/src/storage_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.846,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.154,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 5.39
+      },
+      "comparison": {
+        "tokenReductionPercent": 61.33,
+        "uselessTokenReductionPercent": 92.96,
+        "hpsReductionPercent": 90.83,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.6924
+      }
+    },
+    {
+      "id": "codexcli-real-memories-guard",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/memories/write/src/guard_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/memories/write/src/guard_tests.rs#real-test",
+        "file:codex-rs/memories/write/src/guard.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_memories_write.guard"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 7827,
+        "usefulTokens": 535,
+        "uselessTokens": 7292,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/memories/write/src/guard_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/memories/write/src/guard.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.0684,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.9316,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 61.77
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 1399,
+        "usefulTokens": 1075,
+        "uselessTokens": 324,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/memories/write/src/guard.rs#real-implementation",
+          "file:codex-rs/memories/write/src/guard_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.7684,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.2316,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 8.11
+      },
+      "comparison": {
+        "tokenReductionPercent": 82.13,
+        "uselessTokenReductionPercent": 95.56,
+        "hpsReductionPercent": 86.87,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.7
+      }
+    },
+    {
+      "id": "codexcli-real-rollout-session-index",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/rollout/src/session_index_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/rollout/src/session_index_tests.rs#real-test",
+        "file:codex-rs/rollout/src/session_index.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_rollout.session_index"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 87939,
+        "usefulTokens": 2637,
+        "uselessTokens": 85302,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/rollout/src/session_index_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/rollout/src/session_index.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.03,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.97,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 63.12
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 3061,
+        "usefulTokens": 2742,
+        "uselessTokens": 319,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/rollout/src/session_index.rs#real-implementation",
+          "file:codex-rs/rollout/src/session_index_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8958,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1042,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 3.65
+      },
+      "comparison": {
+        "tokenReductionPercent": 96.52,
+        "uselessTokenReductionPercent": 99.63,
+        "hpsReductionPercent": 94.22,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.8658
+      }
+    },
+    {
+      "id": "codexcli-real-rollout-recorder",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/rollout/src/recorder_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/rollout/src/recorder_tests.rs#real-test",
+        "file:codex-rs/rollout/src/recorder.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_rollout.recorder"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 96127,
+        "usefulTokens": 10825,
+        "uselessTokens": 85302,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/rollout/src/recorder_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/rollout/src/recorder.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.1126,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.8874,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 60.23
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 2886,
+        "usefulTokens": 2562,
+        "uselessTokens": 324,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/rollout/src/recorder.rs#real-implementation",
+          "file:codex-rs/rollout/src/recorder_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8877,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1123,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 3.93
+      },
+      "comparison": {
+        "tokenReductionPercent": 97.0,
+        "uselessTokenReductionPercent": 99.62,
+        "hpsReductionPercent": 93.48,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.7751
+      }
+    },
+    {
+      "id": "codexcli-real-analytics-client",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/analytics/src/client_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/analytics/src/client_tests.rs#real-test",
+        "file:codex-rs/analytics/src/client.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_analytics.client"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 27596,
+        "usefulTokens": 2023,
+        "uselessTokens": 25573,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/analytics/src/client_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/analytics/src/client.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.0733,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.9267,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 61.6
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 3234,
+        "usefulTokens": 2805,
+        "uselessTokens": 429,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/analytics/src/client.rs#real-implementation",
+          "file:codex-rs/analytics/src/client_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8673,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1327,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 4.64
+      },
+      "comparison": {
+        "tokenReductionPercent": 88.28,
+        "uselessTokenReductionPercent": 98.32,
+        "hpsReductionPercent": 92.47,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.794
+      }
+    },
+    {
+      "id": "codexcli-real-api-bridge",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/codex-api/src/api_bridge_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/codex-api/src/api_bridge_tests.rs#real-test",
+        "file:codex-rs/codex-api/src/api_bridge.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_api.api_bridge"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 27367,
+        "usefulTokens": 1794,
+        "uselessTokens": 25573,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/codex-api/src/api_bridge_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/codex-api/src/api_bridge.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.0656,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.9344,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 61.87
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 3475,
+        "usefulTokens": 3039,
+        "uselessTokens": 436,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/codex-api/src/api_bridge.rs#real-implementation",
+          "file:codex-rs/codex-api/src/api_bridge_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.8745,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.1255,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 4.39
+      },
+      "comparison": {
+        "tokenReductionPercent": 87.3,
+        "uselessTokenReductionPercent": 98.3,
+        "hpsReductionPercent": 92.9,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.8089
+      }
+    },
+    {
+      "id": "codexcli-real-chatgpt-workspace-settings",
+      "project": "CodexCLI",
+      "category": "real-test-source-pair",
+      "query": "Which implementation is covered by codex-rs/chatgpt/src/workspace_settings_tests.rs?",
+      "goldItems": [
+        "file:codex-rs/chatgpt/src/workspace_settings_tests.rs#real-test",
+        "file:codex-rs/chatgpt/src/workspace_settings.rs#real-implementation"
+      ],
+      "targetSymbols": [
+        "codex_chatgpt.workspace_settings"
+      ],
+      "baseline": {
+        "mode": "baseline",
+        "totalTokens": 25668,
+        "usefulTokens": 95,
+        "uselessTokens": 25573,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/chatgpt/src/workspace_settings_tests.rs#real-test"
+        ],
+        "missingGoldItems": [
+          "file:codex-rs/chatgpt/src/workspace_settings.rs#real-implementation"
+        ],
+        "goldCoverage": 0.5,
+        "contextPrecision": 0.0037,
+        "contextRecall": 0.5,
+        "noiseRatio": 0.9963,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 2,
+        "totalSymbolHits": 3,
+        "ambiguityRatio": 0.6667,
+        "hallucinationPressureScore": 64.04
+      },
+      "cg": {
+        "mode": "cg",
+        "totalTokens": 1515,
+        "usefulTokens": 1161,
+        "uselessTokens": 354,
+        "duplicateTokens": 0,
+        "coveredGoldItems": [
+          "file:codex-rs/chatgpt/src/workspace_settings.rs#real-implementation",
+          "file:codex-rs/chatgpt/src/workspace_settings_tests.rs#real-test"
+        ],
+        "missingGoldItems": [],
+        "goldCoverage": 1.0,
+        "contextPrecision": 0.7663,
+        "contextRecall": 1.0,
+        "noiseRatio": 0.2337,
+        "redundancyRatio": 0.0,
+        "ambiguousSymbolHits": 0,
+        "totalSymbolHits": 2,
+        "ambiguityRatio": 0.0,
+        "hallucinationPressureScore": 8.18
+      },
+      "comparison": {
+        "tokenReductionPercent": 94.1,
+        "uselessTokenReductionPercent": 98.62,
+        "hpsReductionPercent": 87.23,
+        "goldCoverageDelta": 0.5,
+        "precisionDelta": 0.7626
+      }
+    }
+  ],
+  "summary": {
+    "caseCount": 33,
+    "avgBaselineHps": 56.96,
+    "avgCgHps": 5.73,
+    "avgHpsReductionPercent": 89.88,
+    "avgBaselineTokens": 21773.33,
+    "avgCgTokens": 2680.58,
+    "avgTokenReductionPercent": 78.2
+  }
+}

@@ -1,61 +1,41 @@
 flowchart TD
-    U[User Client] --> G[Gateway API]
-    G --> Auth[Auth Policy]
-    Auth --> PM[Policy Manager]
+    Agent[Agent / MCP Client] --> SSE[/mcp SSE endpoint/]
+    SSE --> TokenMW[ProjectTokenMiddleware]
 
-    Auth -->|Access denied| Denied[403 Forbidden]
-    Denied --> U
+    TokenMW -->|invalid or missing token| Unauthorized[401 or 403]
+    Unauthorized --> Agent
 
-    Auth -->|Access granted| RA[RA Coordinator]
-    PM --> RA
+    TokenMW -->|project resolved| Tools[MCP retrieval and index tools]
 
-    RA --> KV[Redis KV]
-    RA --> SQL[PostgreSQL Metadata]
-    RA --> SP[Sandbox Policy Engine]
+    Tools --> Cache{Query cache hit?}
+    Cache -->|yes| CachedResult[Cached graph result]
+    CachedResult --> Trace[Trace recorder]
+    Trace --> Agent
 
-    RA --> CA[CA Context]
-    CA --> GE[Graph Query Engine]
-    GE --> GS[Graph Store]
-    GE --> VS[Vector Store]
-    GE --> CA
-    CA --> RA
+    Cache -->|no| GraphLookup[Current project graph]
+    GraphLookup --> Falkor[(Project-scoped FalkorDB graph)]
+    Falkor --> ToolResult[retrieve_context or call-graph result]
+    ToolResult --> CacheWrite[Write cache]
+    CacheWrite --> Trace
 
-    RA --> EA[EA Execution]
-    EA --> RA
-    EA --> SR[Sandbox Runtime]
+    Tools -->|index_full or index_incremental| JobProducer[MCPProducer]
+    JobProducer --> Jobs[(Redis stream contextgraph:jobs)]
+    Jobs --> JobConsumer[IndexerConsumer]
+    JobConsumer --> Pipeline[IndexPipeline]
+    Pipeline --> Repo[Repository files]
+    Pipeline --> Falkor
 
-    RA --> IA[IA Integration]
-    IA --> SQL
-    IA --> RA
-    IA --> SR
+    Admin[Admin UI] --> AuthAPI[/api/auth/]
+    AuthAPI --> AuthDB[(SQLite auth and audit DB)]
+    AuthAPI -->|trigger index| JobProducer
+    AuthAPI -->|queue snapshot and graph stats| JobConsumer
+    AuthAPI -->|live graph stats| GraphLookup
 
-    SP --> SR
-    SR --> CTRL[Controlled Read Write Execute Share]
-    SR --> SFS[Sandboxed File System]
-    CTRL --> SFS
-    SFS --> TYPES[Allowed Types PDF JPG TXT XLS HTML EXE]
-    SFS --> ART[Artifacts Logs]
+    Viewer[Viewer UI] --> ViewerAPI[/api/viewer/]
+    ViewerAPI --> GraphLookup
+    ViewerAPI --> Chunk[graph chunk and stats response]
+    Chunk --> Viewer
 
-    RA --> VA[VA Validation]
-    VA -->|Validation passed| PASS[Verified Result]
-    PASS --> G
-    G --> OK[200 OK Result]
-    OK --> U
-
-    VA -->|Validation failed| FAIL[Validation Failed]
-    FAIL --> MA[MA Monitoring]
-    MA --> Obs[Observability]
-
-    FAIL -->|Recoverable| OA[OA Optimization]
-    OA --> EA
-    EA --> VA
-    VA -->|Recovered| REC[Recovered Result]
-    REC --> G
-    G --> OK2[200 OK Recovered]
-    OK2 --> U
-
-    FAIL -->|Non-recoverable| FATAL[Escalated Failure]
-    FATAL --> KV
-    FATAL --> G
-    G --> ERR[500 Error Incident Ref]
-    ERR --> U
+    Trace --> TraceStore[(Redis traces)]
+    TraceStore --> Eval[TraceEvaluator]
+    Eval --> Metrics[Quality and hallucination proxy metrics]

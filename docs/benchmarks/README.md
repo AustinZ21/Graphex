@@ -13,6 +13,18 @@ python -m src.scripts.run_context_quality_benchmark `
   --markdown docs/benchmarks/context-quality-report.md
 ```
 
+Run the larger CodexCLI real test/source benchmark:
+
+```powershell
+python -m src.scripts.run_context_quality_benchmark `
+  --input docs/benchmarks/context-quality.codexcli-real-snippets.jsonl `
+  --output docs/benchmarks/context-quality.codexcli-real-snippets.report.json `
+  --markdown docs/benchmarks/context-quality.codexcli-real-snippets.report.md `
+  --repo-root d:\Repos\CodexCLI
+```
+
+The CodexCLI real benchmark is generated from actual Rust test files and their paired implementation files. Baseline chunks use broad real files; CG chunks use deterministic source excerpts with `sourceFile` and `lineRange` metadata.
+
 HPS is a pre-answer context risk score. Lower is better. It is deterministic and does not require an LLM call.
 
 ```text

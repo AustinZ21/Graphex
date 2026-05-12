@@ -1,56 +1,36 @@
 flowchart LR
-    %% Coordination hub
-    RA[RA - Runtime Agent Coordinator]
+    ClientAgent[External Coding Agent]
+    Strategy[CGFirstQueryStrategy]
+    MCPTools[ContextGraph MCP Tools]
+    Registry[GraphRegistry]
+    Graph[(Project FalkorDB Graph)]
+    Cache[(Redis Query Cache)]
+    Trace[(Trace Recorder and Evaluator)]
+    LocalFallback[Local Snippet Fallback]
+    Producer[MCPProducer]
+    Queue[(Redis Jobs Stream)]
+    Consumer[IndexerConsumer]
+    Pipeline[IndexPipeline]
+    Repo[Repository Files]
 
-    %% Functional agents
-    CA[CA - Context Agent]
-    EA[EA - Execution Agent]
-    IA[IA - Integration Agent]
-    MA[MA - Monitoring Agent]
-    OA[OA - Optimization Agent]
-    VA[VA - Validation Agent]
+    ClientAgent -->|query| Strategy
+    Strategy -->|retrieve_context and call graph| MCPTools
+    Strategy -->|fallback when graph quality is low| LocalFallback
 
-    %% Shared platform context
-    Relay[Relay Runtime]
-    Bus[(Event / Task Bus)]
-    KV[(Redis / KV)]
-    SQL[(PostgreSQL Metadata)]
+    MCPTools --> Cache
+    MCPTools --> Registry
+    MCPTools --> Trace
+    Registry --> Graph
 
-    %% Control and dispatch
-    RA -->|dispatch tasks| CA
-    RA -->|dispatch tasks| EA
-    RA -->|dispatch tasks| IA
-    RA -->|dispatch tasks| MA
-    RA -->|dispatch tasks| OA
-    RA -->|dispatch tasks| VA
+    MCPTools -->|index requests| Producer
+    Producer --> Queue
+    Consumer --> Queue
+    Consumer --> Pipeline
+    Pipeline --> Repo
+    Pipeline --> Registry
 
-    %% Cross-agent collaboration
-    CA -->|context package| EA
-    CA -->|context package| IA
-    EA -->|execution results| IA
-    IA -->|integration status| EA
-    MA -->|runtime telemetry| OA
-    MA -->|health signals| RA
-    OA -->|optimization hints| EA
-    OA -->|optimization hints| IA
-    VA -->|verification report| RA
-    VA -->|quality gates| EA
-    VA -->|quality gates| IA
-
-    %% Runtime and state interactions
-    RA --> Relay
-    CA --> Bus
-    EA --> Bus
-    IA --> Bus
-    MA --> Bus
-    OA --> Bus
-    VA --> Bus
-
-    Bus --> KV
-    Bus --> SQL
-    KV --> CA
-    KV --> EA
-    SQL --> IA
-    SQL --> MA
-    KV --> OA
-    SQL --> VA
+    Trace -->|quality signals| Strategy
+    Graph -->|symbol and edge context| Strategy
+    Cache -->|warm reads| Strategy
+    LocalFallback -->|bounded code snippets| ClientAgent
+    MCPTools -->|final graph-backed context| ClientAgent
