@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Viewer</title>
-  <link rel="stylesheet" href="./styles.css?v=1.29.79" />
+  <link rel="stylesheet" href="./styles.css?v=1.29.81" />
   <script type="importmap">
     {
       "imports": {
@@ -65,6 +65,7 @@
             <button id="fit-view" class="btn secondary" type="button">Fit</button>
             <button id="toggle-sim" class="btn secondary" type="button">3D Rotate</button>
             <button id="toggle-edges" class="btn secondary" type="button" aria-pressed="false">Show Edges</button>
+            <button id="toggle-performance" class="btn secondary" type="button" aria-pressed="true">Performance On</button>
           </div>
           <div class="filter-title">Rendering Node Types</div>
           <div class="node-type-grid" aria-label="Rendering Node Types">
@@ -91,12 +92,13 @@
 
       <section class="graph-stage" aria-label="Graph canvas">
         <div id="graph-root"></div>
+        <div id="cluster-overlay" class="cluster-overlay" hidden></div>
         <div id="status-line" class="status-line">Loading viewer...</div>
         <div id="fps-counter" class="fps-counter">FPS --</div>
       </section>
     </main>
   </div>
 
-  <script type="module" src="./main.js?v=1.29.79"></script>
+  <script type="module" src="./main.js?v=1.29.81"></script>
 </body>
 </html>

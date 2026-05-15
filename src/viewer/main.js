@@ -1,6 +1,7 @@
 import Graphology from 'graphology'
 import Sigma from 'sigma'
 
+const VIEWER_VERSION = '1.29.81'
 const EDGE_STYLES = {
   CALLS: { label: 'Calls', color: '#4ae387', width: 1.7, priority: 6 },
   IMPORTS: { label: 'Imports', color: '#5badff', width: 1.45, priority: 5 },
@@ -22,12 +23,23 @@ const MAX_CHUNK_LIMIT = 500000
 const MIN_CHUNK_LIMIT = 1
 const DEFAULT_CHUNK_LIMIT = 250
 const DEFAULT_EDGE_VISIBILITY = false
+const DEFAULT_PERFORMANCE_MODE = true
 const FALKOR_CONNECTION_URL = 'falkor://contextgraph-falkordb-dev:6379'
 const EDGE_VISIBILITY_STORAGE_KEY = 'cg_viewer_edges_visible_v4'
 const NODE_KIND_VISIBILITY_STORAGE_KEY = 'cg_viewer_node_kinds_visible_v1'
+const PERFORMANCE_MODE_STORAGE_KEY = 'cg_viewer_performance_mode_v1'
 const FPS_SAMPLE_MS = 500
 const MAX_AUTO_CHUNK_FETCHES = 80
 const LIVE_ROTATION_NODE_LIMIT = 120000
+const LOD_NODE_THRESHOLD = 2500
+const LOD_MID_RATIO = 0.72
+const LOD_FAR_RATIO = 1.05
+const EDGE_THROTTLE_NODE_THRESHOLD = 3500
+const EDGE_MID_RATIO = 0.62
+const EDGE_FAR_RATIO = 0.92
+const CLUSTER_NODE_PREFIX = '__cg_cluster__'
+const CLUSTER_NODE_VISIBILITY_RATIO = 0.84
+const WORKER_TIMEOUT_MS = 8000
 
 const ROTATION_FRAME_MS = 72
 const GOLDEN_ANGLE = 2.399963229728653
@@ -58,8 +70,30 @@ const state = {
   skippedEdges: 0,
   hasNext: false,
   edgesVisible: DEFAULT_EDGE_VISIBILITY,
+  performanceMode: DEFAULT_PERFORMANCE_MODE,
   visibleNodeKinds: new Set(KIND_ORDER),
   controlPanelCollapsed: false,
+  cameraRatio: 1,
+  lodLevel: 'full',
+  edgeLevel: 'full',
+  performanceSignature: '',
+  performanceFrame: null,
+  hoveredNode: null,
+  dataNodeCount: 0,
+  clusterNodes: new Set(),
+  clusterCounts: new Map(),
+  edgesByNode: new Map(),
+  projectionNodeIds: [],
+  nodeProjectionIndex: new Map(),
+  projectionCapacity: 0,
+  projectionX3d: new Float32Array(0),
+  projectionY3d: new Float32Array(0),
+  projectionZ3d: new Float32Array(0),
+  projectionBaseSize: new Float32Array(0),
+  projectionScratch: new Float32Array(0),
+  worker: null,
+  workerRequestId: 0,
+  workerCallbacks: new Map(),
   rotationX: -0.58,
   rotationY: 0.64,
   rotationZ: 0.08,
@@ -82,11 +116,13 @@ const elements = {
   fitView: document.getElementById('fit-view'),
   toggleSim: document.getElementById('toggle-sim'),
   toggleEdges: document.getElementById('toggle-edges'),
+  togglePerformance: document.getElementById('toggle-performance'),
   edgeGrid: document.getElementById('edge-grid'),
   nodeTypeInputs: [...document.querySelectorAll('input[name="node-type"]')],
   searchInput: document.getElementById('search-input'),
   chunkLimit: document.getElementById('chunk-limit'),
   graphRoot: document.getElementById('graph-root'),
+  clusterOverlay: document.getElementById('cluster-overlay'),
   fpsCounter: document.getElementById('fps-counter'),
   statusLine: document.getElementById('status-line'),
   dbNodes: document.getElementById('db-nodes'),
@@ -240,8 +276,8 @@ function syncLoadedCounts() {
     return
   }
   let visibleNodes = 0
-  state.graph.forEachNode((_nodeId, attributes) => {
-    if (attributes.hidden !== true) visibleNodes += 1
+  state.graph.forEachNode((nodeId, attributes) => {
+    if (!state.clusterNodes.has(nodeId) && attributes.hidden !== true) visibleNodes += 1
   })
   state.loadedNodes = visibleNodes
   state.loadedEdges = state.graph.size
@@ -286,6 +322,186 @@ function initial3dPosition(point, nodeIndex) {
     y3d: Math.sin(angle) * radius,
     z3d: layerOffset + depthNoise,
   }
+}
+
+function clusterNodeId(kind) {
+  return `${CLUSTER_NODE_PREFIX}${kind}`
+}
+
+function cluster3dPosition(kind) {
+  const kindIndex = nodeKindIndex(kind)
+  const angle = (kindIndex / KIND_ORDER.length) * Math.PI * 2 - Math.PI / 2
+  const radius = 520
+  return {
+    x3d: Math.cos(angle) * radius,
+    y3d: Math.sin(angle) * radius,
+    z3d: (kindIndex - (KIND_ORDER.length - 1) / 2) * 320,
+  }
+}
+
+function ensureProjectionCapacity(nextCapacity) {
+  if (state.projectionCapacity >= nextCapacity) return
+  let next = Math.max(1024, state.projectionCapacity || 0)
+  while (next < nextCapacity) next *= 2
+
+  const nextX3d = new Float32Array(next)
+  const nextY3d = new Float32Array(next)
+  const nextZ3d = new Float32Array(next)
+  const nextBaseSize = new Float32Array(next)
+  const nextScratch = new Float32Array(next * 4)
+  nextX3d.set(state.projectionX3d)
+  nextY3d.set(state.projectionY3d)
+  nextZ3d.set(state.projectionZ3d)
+  nextBaseSize.set(state.projectionBaseSize)
+  nextScratch.set(state.projectionScratch)
+  state.projectionCapacity = next
+  state.projectionX3d = nextX3d
+  state.projectionY3d = nextY3d
+  state.projectionZ3d = nextZ3d
+  state.projectionBaseSize = nextBaseSize
+  state.projectionScratch = nextScratch
+}
+
+function resetProjectionStorage() {
+  state.projectionNodeIds = []
+  state.nodeProjectionIndex.clear()
+  state.projectionCapacity = 0
+  state.projectionX3d = new Float32Array(0)
+  state.projectionY3d = new Float32Array(0)
+  state.projectionZ3d = new Float32Array(0)
+  state.projectionBaseSize = new Float32Array(0)
+  state.projectionScratch = new Float32Array(0)
+}
+
+function recordProjectionNode(nodeId, position, baseSize) {
+  let index = state.nodeProjectionIndex.get(nodeId)
+  if (index === undefined) {
+    index = state.projectionNodeIds.length
+    state.projectionNodeIds.push(nodeId)
+    state.nodeProjectionIndex.set(nodeId, index)
+    ensureProjectionCapacity(index + 1)
+  }
+  state.projectionX3d[index] = position.x3d
+  state.projectionY3d[index] = position.y3d
+  state.projectionZ3d[index] = position.z3d
+  state.projectionBaseSize[index] = baseSize
+  return index
+}
+
+function projectionAttributesForIndex(index, color) {
+  const projection = project3d(
+    state.projectionX3d[index] || 0,
+    state.projectionY3d[index] || 0,
+    state.projectionZ3d[index] || 0,
+  )
+  const scratchOffset = index * 4
+  const baseSize = state.projectionBaseSize[index] || BASE_NODE_SIZE
+  const size = clamp(baseSize * (0.72 + projection.scale * 0.28), 1.2, MAX_NODE_SIZE + 16)
+  state.projectionScratch[scratchOffset] = projection.x
+  state.projectionScratch[scratchOffset + 1] = projection.y
+  state.projectionScratch[scratchOffset + 2] = size
+  state.projectionScratch[scratchOffset + 3] = projection.depth
+  return {
+    x: projection.x,
+    y: projection.y,
+    size,
+    color,
+    zIndex: projection.depth,
+  }
+}
+
+function pointPositionFromBatch(batch, pointIndex) {
+  if (batch.positions instanceof Float32Array) {
+    const offset = pointIndex * 3
+    return {
+      x3d: batch.positions[offset],
+      y3d: batch.positions[offset + 1],
+      z3d: batch.positions[offset + 2],
+    }
+  }
+  return initial3dPosition(batch.points[pointIndex], state.dataNodeCount)
+}
+
+function rejectWorkerCallbacks(error) {
+  for (const callback of state.workerCallbacks.values()) {
+    window.clearTimeout(callback.timeout)
+    callback.resolve(preprocessBatchOnMainThread(callback.batch, callback.baseNodeIndex))
+  }
+  state.workerCallbacks.clear()
+  console.warn(error)
+}
+
+function handleWorkerMessage(event) {
+  const message = event.data || {}
+  if (message.type !== 'preprocessBatchDone') return
+  const callback = state.workerCallbacks.get(message.id)
+  if (!callback) return
+  state.workerCallbacks.delete(message.id)
+  window.clearTimeout(callback.timeout)
+  callback.resolve({
+    ...callback.batch,
+    positions: new Float32Array(message.positions),
+  })
+}
+
+function ensurePreprocessWorker() {
+  if (state.worker || !('Worker' in window)) return state.worker
+  try {
+    const workerUrl = new URL('./worker.js', import.meta.url)
+    workerUrl.search = `v=${VIEWER_VERSION}`
+    state.worker = new Worker(workerUrl, { type: 'module' })
+    state.worker.addEventListener('message', handleWorkerMessage)
+    state.worker.addEventListener('error', (error) => {
+      state.worker?.terminate()
+      state.worker = null
+      rejectWorkerCallbacks(error)
+    })
+  } catch (error) {
+    state.worker = null
+    console.warn(error)
+  }
+  return state.worker
+}
+
+function preprocessBatchOnMainThread(batch, baseNodeIndex) {
+  const positions = new Float32Array(batch.points.length * 3)
+  for (let index = 0; index < batch.points.length; index += 1) {
+    const position = initial3dPosition(batch.points[index], baseNodeIndex + index)
+    const offset = index * 3
+    positions[offset] = position.x3d
+    positions[offset + 1] = position.y3d
+    positions[offset + 2] = position.z3d
+  }
+  return { ...batch, positions }
+}
+
+async function preprocessBatch(batch, baseNodeIndex) {
+  if (!state.performanceMode) return preprocessBatchOnMainThread(batch, baseNodeIndex)
+  const worker = ensurePreprocessWorker()
+  if (!worker) return preprocessBatchOnMainThread(batch, baseNodeIndex)
+
+  const id = state.workerRequestId + 1
+  state.workerRequestId = id
+  return new Promise((resolve) => {
+    const timeout = window.setTimeout(() => {
+      state.workerCallbacks.delete(id)
+      resolve(preprocessBatchOnMainThread(batch, baseNodeIndex))
+    }, WORKER_TIMEOUT_MS)
+    state.workerCallbacks.set(id, { batch, baseNodeIndex, resolve, timeout })
+    try {
+      worker.postMessage({
+        id,
+        type: 'preprocessBatch',
+        baseNodeIndex,
+        points: batch.points.map((point) => ({ id: point.id, kind: point.kind })),
+      })
+    } catch (error) {
+      window.clearTimeout(timeout)
+      state.workerCallbacks.delete(id)
+      console.warn(error)
+      resolve(preprocessBatchOnMainThread(batch, baseNodeIndex))
+    }
+  })
 }
 
 let _projCosX = Math.cos(-0.58)
@@ -333,12 +549,14 @@ function project3d(x3d, y3d, z3d) {
 }
 
 function projectedNodeAttributes(attributes) {
+  const projectionIndex = state.nodeProjectionIndex.get(attributes.nodeId)
+  if (projectionIndex !== undefined) return projectionAttributesForIndex(projectionIndex, attributes.baseColor || NODE_KIND_COLORS.Node)
   const projection = project3d(attributes.x3d || 0, attributes.y3d || 0, attributes.z3d || 0)
   const baseSize = attributes.baseSize || BASE_NODE_SIZE
   return {
     x: projection.x,
     y: projection.y,
-    size: clamp(baseSize * (0.72 + projection.scale * 0.28), 1.2, MAX_NODE_SIZE + 4),
+    size: clamp(baseSize * (0.72 + projection.scale * 0.28), 1.2, MAX_NODE_SIZE + 16),
     color: attributes.baseColor || NODE_KIND_COLORS.Node,
     zIndex: projection.depth,
   }
@@ -411,6 +629,137 @@ function drawNodeHover(context, nodeData) {
   context.restore()
 }
 
+function computeLodLevel() {
+  if (!state.performanceMode || state.dataNodeCount < LOD_NODE_THRESHOLD) return 'full'
+  if (state.cameraRatio >= LOD_FAR_RATIO) return 'far'
+  if (state.cameraRatio >= LOD_MID_RATIO) return 'mid'
+  return 'full'
+}
+
+function computeEdgeLevel() {
+  if (!state.performanceMode || state.dataNodeCount < EDGE_THROTTLE_NODE_THRESHOLD) return 'full'
+  if (state.rotating || state.cameraRatio >= EDGE_FAR_RATIO) return 'focus'
+  if (state.cameraRatio >= EDGE_MID_RATIO) return 'priority'
+  return 'full'
+}
+
+function shouldShowClusters() {
+  return state.performanceMode
+    && state.dataNodeCount >= LOD_NODE_THRESHOLD
+    && state.cameraRatio >= CLUSTER_NODE_VISIBILITY_RATIO
+}
+
+function kindLodBase(kind) {
+  switch (normalizeNodeKind(kind)) {
+    case 'Repository': return 4
+    case 'Symbol': return 3
+    case 'File': return 2
+    case 'Variable': return 1
+    case 'Node': return 1
+    default: return 1
+  }
+}
+
+function lodTierFor(kind, degree) {
+  const base = kindLodBase(kind)
+  if (degree >= 24) return 4
+  if (degree >= 10) return Math.max(base, 3)
+  if (degree >= 4) return Math.max(base, 2)
+  return base
+}
+
+function nodeHiddenByPerformance(_nodeId, attributes) {
+  if (!state.performanceMode) return false
+  if (attributes.clusterNode === true) return !shouldShowClusters()
+  if (state.lodLevel === 'full') return false
+  const tier = attributes.lodTier || lodTierFor(attributes.kind, attributes.degree || 0)
+  if (state.lodLevel === 'far') return tier < 4
+  if (state.lodLevel === 'mid') return tier < 2
+  return false
+}
+
+function edgeHiddenByPerformance(_edgeId, attributes) {
+  if (!state.performanceMode || attributes.hidden === true) return false
+  if (state.edgeLevel === 'full') return false
+  const hoveredNode = state.hoveredNode
+  if (hoveredNode && (attributes.sourceNodeId === hoveredNode || attributes.targetNodeId === hoveredNode)) return false
+  if (state.edgeLevel === 'focus') return true
+  const style = edgeStyle(attributes.edgeType)
+  if (style.priority >= edgeStyle('DEFINES').priority) return false
+  const sourceDegree = state.nodeDegrees.get(attributes.sourceNodeId) || 0
+  const targetDegree = state.nodeDegrees.get(attributes.targetNodeId) || 0
+  return sourceDegree < 8 && targetDegree < 8
+}
+
+function reduceNode(nodeId, attributes) {
+  const reduced = { ...attributes }
+  if (nodeHiddenByPerformance(nodeId, attributes)) reduced.hidden = true
+  if (attributes.clusterNode === true) {
+    reduced.size = clamp(attributes.baseSize || BASE_NODE_SIZE, 10, MAX_NODE_SIZE + 16)
+    reduced.zIndex = 1
+  }
+  return reduced
+}
+
+function reduceEdge(edgeId, attributes) {
+  const reduced = { ...attributes }
+  if (edgeHiddenByPerformance(edgeId, attributes)) reduced.hidden = true
+  return reduced
+}
+
+function updateClusterOverlay() {
+  if (!elements.clusterOverlay) return
+  const show = shouldShowClusters() && state.clusterCounts.size > 0
+  elements.clusterOverlay.hidden = !show
+  if (!show) {
+    elements.clusterOverlay.replaceChildren()
+    return
+  }
+  const rows = KIND_ORDER
+    .map((kind) => [kind, state.clusterCounts.get(kind) || 0])
+    .filter(([, count]) => count > 0)
+    .map(([kind, count]) => {
+      const row = document.createElement('div')
+      row.style.setProperty('--node-color', kindColor(kind))
+      const dot = document.createElement('i')
+      dot.className = 'node-dot'
+      const label = document.createElement('span')
+      label.textContent = `${kind === 'Node' ? 'Other' : kind} ${formatNumber(count)}`
+      row.append(dot, label)
+      return row
+    })
+  elements.clusterOverlay.replaceChildren(...rows)
+}
+
+function updatePerformanceStateFromCamera() {
+  state.cameraRatio = state.renderer?.getCamera().getState().ratio || 1
+  state.lodLevel = computeLodLevel()
+  state.edgeLevel = computeEdgeLevel()
+}
+
+function performanceSignature() {
+  return [state.performanceMode ? '1' : '0', state.lodLevel, state.edgeLevel, state.hoveredNode || '', state.rotating ? '1' : '0'].join(':')
+}
+
+function refreshPerformanceView(force = false) {
+  if (!state.renderer) return
+  updatePerformanceStateFromCamera()
+  const signature = performanceSignature()
+  updateClusterOverlay()
+  if (!force && signature === state.performanceSignature) return
+  state.performanceSignature = signature
+  state.renderer.refresh({ skipIndexation: true, schedule: true })
+}
+
+function schedulePerformanceRefresh(force = false) {
+  if (!state.renderer) return
+  if (state.performanceFrame) return
+  state.performanceFrame = requestAnimationFrame(() => {
+    state.performanceFrame = null
+    refreshPerformanceView(force)
+  })
+}
+
 function rendererSettings() {
   return {
     allowInvalidContainer: true,
@@ -430,6 +779,8 @@ function rendererSettings() {
     labelRenderedSizeThreshold: Number.POSITIVE_INFINITY,
     labelSize: 11,
     minEdgeThickness: 0.85,
+    nodeReducer: reduceNode,
+    edgeReducer: reduceEdge,
     renderEdgeLabels: false,
     renderLabels: false,
     stagePadding: 28,
@@ -450,8 +801,23 @@ function tuneRendererForScale() {
 }
 
 function bindRendererEvents() {
+  state.renderer.getCamera().on('updated', () => schedulePerformanceRefresh())
+  state.renderer.on('enterNode', ({ node }) => {
+    state.hoveredNode = node
+    schedulePerformanceRefresh(true)
+  })
+  state.renderer.on('leaveNode', ({ node }) => {
+    if (state.hoveredNode === node) state.hoveredNode = null
+    schedulePerformanceRefresh(true)
+  })
   state.renderer.on('clickNode', ({ node }) => {
     const point = state.nodesById.get(node)
+    if (!point && state.graph?.getNodeAttribute(node, 'clusterNode') === true) {
+      const kind = state.graph.getNodeAttribute(node, 'kind')
+      const count = state.graph.getNodeAttribute(node, 'clusterCount') || 0
+      setStatus(`${kind === 'Node' ? 'Other' : kind}: ${formatNumber(count)} loaded nodes in the aggregate view.`, 'ok')
+      return
+    }
     if (!point) return
     const location = point.file_path ? ` - ${point.file_path}${point.line_start ? `:${point.line_start}` : ''}` : ''
     const edgeType = state.nodeTypes.get(node) || 'UNKNOWN'
@@ -466,6 +832,7 @@ function ensureRenderer() {
   if (state.renderer) return state.renderer
   state.renderer = new Sigma(graph, elements.graphRoot, rendererSettings())
   bindRendererEvents()
+  updatePerformanceStateFromCamera()
   tuneRendererForScale()
   return state.renderer
 }
@@ -475,14 +842,18 @@ function stopRotation() {
   state.rotationFrame = null
   state.rotating = false
   elements.toggleSim.textContent = '3D Rotate'
+  schedulePerformanceRefresh(true)
 }
 
 async function destroyGraph() {
   stopRotation()
+  if (state.performanceFrame) cancelAnimationFrame(state.performanceFrame)
+  state.performanceFrame = null
   state.renderer?.kill?.()
   state.renderer = null
   state.graph = null
   elements.graphRoot.replaceChildren()
+  elements.clusterOverlay?.replaceChildren()
 }
 
 function resetState() {
@@ -497,6 +868,16 @@ function resetState() {
   state.skippedNodes = 0
   state.skippedEdges = 0
   state.hasNext = false
+  state.hoveredNode = null
+  state.dataNodeCount = 0
+  state.clusterNodes.clear()
+  state.clusterCounts.clear()
+  state.edgesByNode.clear()
+  state.cameraRatio = 1
+  state.lodLevel = 'full'
+  state.edgeLevel = 'full'
+  state.performanceSignature = ''
+  resetProjectionStorage()
   state.rotationX = -0.58
   state.rotationY = 0.64
   state.rotationZ = 0.08
@@ -508,19 +889,20 @@ function applyProjectionToAllNodes() {
   if (!state.graph || !state.graph.order) return
   syncProjectionTrig()
   state.graph.updateEachNodeAttributes(
-    (_nodeId, attributes) => {
-      const projection = project3d(attributes.x3d || 0, attributes.y3d || 0, attributes.z3d || 0)
-      const baseSize = attributes.baseSize || BASE_NODE_SIZE
+    (nodeId, attributes) => {
+      const projectionIndex = state.nodeProjectionIndex.get(nodeId)
+      if (projectionIndex === undefined) return attributes
+      const projection = projectionAttributesForIndex(projectionIndex, attributes.baseColor || NODE_KIND_COLORS.Node)
       attributes.x = projection.x
       attributes.y = projection.y
-      attributes.size = clamp(baseSize * (0.72 + projection.scale * 0.28), 1.2, MAX_NODE_SIZE + 4)
+      attributes.size = projection.size
       attributes.color = attributes.baseColor || NODE_KIND_COLORS.Node
-      attributes.zIndex = projection.depth
+      attributes.zIndex = projection.zIndex
       return attributes
     },
     { attributes: ['x', 'y', 'size', 'color', 'zIndex'] },
   )
-  state.renderer?.refresh({ skipIndexation: false })
+  refreshPerformanceView(true)
 }
 
 function fitGraph() {
@@ -574,6 +956,17 @@ function setEdgesVisible(visible, showStatus = false) {
   if (showStatus) setStatus(statusWithSkippedSummary(`Edges ${visible ? 'shown' : 'hidden'}.`), 'ok')
 }
 
+function setPerformanceMode(enabled, showStatus = false) {
+  state.performanceMode = enabled
+  if (elements.togglePerformance) {
+    elements.togglePerformance.textContent = enabled ? 'Performance On' : 'Performance Off'
+    elements.togglePerformance.setAttribute('aria-pressed', enabled ? 'true' : 'false')
+  }
+  localStorage.setItem(PERFORMANCE_MODE_STORAGE_KEY, enabled ? '1' : '0')
+  refreshPerformanceView(true)
+  if (showStatus) setStatus(`Performance mode ${enabled ? 'enabled' : 'disabled'}.`, 'ok')
+}
+
 function nodeIsHidden(nodeId) {
   return state.graph?.getNodeAttribute(nodeId, 'hidden') === true
 }
@@ -591,7 +984,8 @@ function refreshEdgeVisibility(skipIndexation = true) {
     (_edgeId, attributes) => ({ ...attributes, hidden: shouldHideEdge(attributes) }),
     { attributes: ['hidden'] },
   )
-  state.renderer?.refresh({ skipIndexation })
+  state.renderer?.refresh({ skipIndexation, schedule: true })
+  refreshPerformanceView(true)
 }
 
 function setNodeKindVisibility(showStatus = false) {
@@ -618,6 +1012,15 @@ function incrementNodeDegree(nodeId) {
   return degree
 }
 
+function indexEdgeForNode(nodeId, edgeId) {
+  let edgeIds = state.edgesByNode.get(nodeId)
+  if (!edgeIds) {
+    edgeIds = new Set()
+    state.edgesByNode.set(nodeId, edgeIds)
+  }
+  edgeIds.add(edgeId)
+}
+
 function assignNodeType(nodeId, edgeType) {
   const currentType = state.nodeTypes.get(nodeId)
   if (currentType && edgeStyle(currentType).priority >= edgeStyle(edgeType).priority) return
@@ -632,31 +1035,39 @@ function updateNodeStyle(nodeId) {
     ...attributes,
     baseColor: kindColor(attributes.kind),
     baseSize: pointSizeForDegree(degree),
+    degree,
+    lodTier: lodTierFor(attributes.kind, degree),
   }
+  const projectionIndex = state.nodeProjectionIndex.get(nodeId)
+  if (projectionIndex !== undefined) state.projectionBaseSize[projectionIndex] = nextAttributes.baseSize
   state.graph.replaceNodeAttributes(nodeId, {
     ...nextAttributes,
     ...projectedNodeAttributes(nextAttributes),
   })
 }
 
-function addPoint(point) {
+function addPoint(point, position) {
   const graph = ensureGraph()
   if (graph.hasNode(point.id)) return false
-  if (graph.order >= MAX_CLIENT_NODES) {
+  if (state.dataNodeCount >= MAX_CLIENT_NODES) {
     state.skippedNodes += 1
     return false
   }
 
-  const nodeIndex = graph.order
-  const position = initial3dPosition(point, nodeIndex)
+  const baseSize = pointSizeForDegree(0)
+  recordProjectionNode(point.id, position, baseSize)
   const baseAttributes = {
     ...position,
+    nodeId: point.id,
     baseColor: kindColor(point.kind),
-    baseSize: pointSizeForDegree(0),
+    baseSize,
+    clusterNode: false,
+    degree: 0,
     forceLabel: false,
     hidden: !isNodeKindVisible(point.kind),
     kind: point.kind,
     label: point.label,
+    lodTier: lodTierFor(point.kind, 0),
     rawLabel: point.label,
     subtitle: point.subtitle,
   }
@@ -664,9 +1075,53 @@ function addPoint(point) {
     ...baseAttributes,
     ...projectedNodeAttributes(baseAttributes),
   })
+  state.dataNodeCount += 1
+  state.clusterCounts.set(normalizeNodeKind(point.kind), (state.clusterCounts.get(normalizeNodeKind(point.kind)) || 0) + 1)
   state.loadedNodeIds.add(point.id)
   state.nodesById.set(point.id, point)
   return true
+}
+
+function syncClusterNodes() {
+  const graph = ensureGraph()
+  for (const kind of KIND_ORDER) {
+    const count = state.clusterCounts.get(kind) || 0
+    if (!count) continue
+    const nodeId = clusterNodeId(kind)
+    const position = cluster3dPosition(kind)
+    const baseSize = clamp(10 + Math.log2(count + 1) * 3.4, 14, MAX_NODE_SIZE + 16)
+    const label = `${kind === 'Node' ? 'Other' : kind}: ${formatNumber(count)}`
+    recordProjectionNode(nodeId, position, baseSize)
+    const attributes = {
+      ...position,
+      nodeId,
+      baseColor: kindColor(kind),
+      baseSize,
+      clusterCount: count,
+      clusterNode: true,
+      degree: count,
+      forceLabel: false,
+      hidden: !isNodeKindVisible(kind),
+      kind,
+      label,
+      lodTier: 5,
+      rawLabel: label,
+      subtitle: 'aggregate',
+    }
+    if (graph.hasNode(nodeId)) {
+      graph.replaceNodeAttributes(nodeId, {
+        ...attributes,
+        ...projectedNodeAttributes(attributes),
+      })
+    } else {
+      graph.addNode(nodeId, {
+        ...attributes,
+        ...projectedNodeAttributes(attributes),
+      })
+      state.clusterNodes.add(nodeId)
+    }
+  }
+  updateClusterOverlay()
 }
 
 function addLink(link, dirtyNodes) {
@@ -692,6 +1147,8 @@ function addLink(link, dirtyNodes) {
     hidden: shouldHideEdge(edgeAttributes),
   })
   state.loadedEdgeIds.add(link.id)
+  indexEdgeForNode(link.source, link.id)
+  indexEdgeForNode(link.target, link.id)
   assignNodeType(link.source, link.type)
   assignNodeType(link.target, link.type)
   incrementNodeDegree(link.source)
@@ -709,8 +1166,9 @@ function appendBatchToGraph(batch) {
 
   syncProjectionTrig()
 
-  for (const point of batch.points) {
-    if (addPoint(point)) addedNodes += 1
+  for (let index = 0; index < batch.points.length; index += 1) {
+    const point = batch.points[index]
+    if (addPoint(point, pointPositionFromBatch(batch, index))) addedNodes += 1
   }
   for (const link of batch.links) {
     if (addLink(link, dirtyNodes)) addedEdges += 1
@@ -719,10 +1177,12 @@ function appendBatchToGraph(batch) {
   for (const nodeId of dirtyNodes) {
     updateNodeStyle(nodeId)
   }
+  syncClusterNodes()
 
   ensureRenderer()
   tuneRendererForScale()
-  state.renderer.refresh({ skipIndexation: false })
+  refreshPerformanceView(true)
+  state.renderer.refresh({ skipIndexation: false, schedule: true })
   syncLoadedCounts()
   return { addedNodes, addedEdges, addedVisibleNodes: Math.max(0, state.loadedNodes - visibleNodesBefore) }
 }
@@ -754,14 +1214,16 @@ function startRotationWindow(showStatus = false) {
   state.rotating = true
   state.lastRotationAt = 0
   elements.toggleSim.textContent = 'Stop'
+  schedulePerformanceRefresh(true)
   if (showStatus) setStatus('Rotating the 3D projection...', 'ok')
   state.rotationFrame = requestAnimationFrame(rotateFrame)
 }
 
 async function appendBatch(batch, reset) {
   if (reset) await destroyGraph()
-  const normalized = appendBatchToGraph(batch)
-  state.hasNext = batch.next_offset !== null && (state.graph?.order || 0) < MAX_CLIENT_NODES
+  const preprocessed = await preprocessBatch(batch, state.dataNodeCount)
+  const normalized = appendBatchToGraph(preprocessed)
+  state.hasNext = batch.next_offset !== null && state.dataNodeCount < MAX_CLIENT_NODES
   state.nextOffset = batch.next_offset ?? (batch.offset + batch.points.length)
   updateCounters()
   if (reset || normalized.addedNodes) fitGraph()
@@ -826,7 +1288,7 @@ async function loadChunk(reset = false) {
     }
     const loadedVisibleNodes = Math.max(0, state.loadedNodes - startingVisibleNodes)
     const hitScanLimit = state.loadedNodes < targetVisibleNodes && state.hasNext
-    const more = state.graph?.order >= MAX_CLIENT_NODES
+    const more = state.dataNodeCount >= MAX_CLIENT_NODES
       ? 'The 500,000-node client cap has been reached.'
       : hitScanLimit ? 'More matching nodes may exist; narrow filters and load again.'
         : state.hasNext ? 'Additional matching nodes remain; increase Display Nodes and load again.' : 'No more chunks for this filter.'
@@ -881,6 +1343,7 @@ function wireEvents() {
   })
   elements.fitView.addEventListener('click', fitGraph)
   elements.toggleEdges.addEventListener('click', () => setEdgesVisible(!state.edgesVisible, true))
+  elements.togglePerformance?.addEventListener('click', () => setPerformanceMode(!state.performanceMode, true))
   elements.nodeTypeInputs.forEach((input) => input.addEventListener('change', () => setNodeKindVisibility(true)))
   elements.toggleSim.addEventListener('click', () => {
     if (!state.graph) return
@@ -900,6 +1363,8 @@ async function boot() {
   restoreNodeKindVisibility()
   const storedEdgeVisibility = localStorage.getItem(EDGE_VISIBILITY_STORAGE_KEY)
   setEdgesVisible(storedEdgeVisibility === null ? DEFAULT_EDGE_VISIBILITY : storedEdgeVisibility === '1')
+  const storedPerformanceMode = localStorage.getItem(PERFORMANCE_MODE_STORAGE_KEY)
+  setPerformanceMode(storedPerformanceMode === null ? DEFAULT_PERFORMANCE_MODE : storedPerformanceMode === '1')
   startFpsCounter()
   wireEvents()
   await loadProjects()

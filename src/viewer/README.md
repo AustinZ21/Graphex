@@ -37,10 +37,11 @@ npm run dev
 - The default display window is 250 nodes and the API caps each chunk at 500,000 nodes.
 - The primary Load action loads the requested visible node window in one step.
 - Each chunk uses an internal node-id cursor and includes edges only when both endpoints are inside the selected node page.
-- The client renders every loaded node and edge instead of hiding lower-detail levels. It enforces a 500,000-node cap so extremely large projects do not grow the browser heap without bound.
+- The client keeps the Sigma 2.5D renderer, uses a worker to precompute deterministic `x/y/z` positions, stores projection scratch data in typed arrays, and enforces a 500,000-node cap so extremely large projects do not grow the browser heap without bound.
 - Labels are hover-only and use a high-contrast dark tooltip so node names remain readable on the dark canvas.
 - The View section can show or hide each loaded node kind bucket: Repository, File, Symbol, Variable, and other Node records.
 - A live FPS badge is displayed in the graph's bottom-right corner so render performance is visible while moving or rotating the graph.
 - The 3D Rotate control updates the projected 3D coordinates live until manually stopped. For graphs above 120,000 nodes, it applies a single projection step per click to avoid long main-thread stalls.
-- Edges are hidden by default, and the high-volume `Uses variable` plus `Flows to` edge filters start unchecked to keep the first graph view readable.
+- Performance mode is on by default. It adds zoom-aware node LOD, kind aggregate cluster nodes, hover-neighborhood edge focus, and lighter scheduled refreshes while keeping the full 2.5D projection path available when zoomed in.
+- Edges are hidden by default, and the high-volume `Uses variable` plus `Flows to` edge filters start unchecked to keep the first graph view readable. When edges are shown, performance mode throttles low-priority edges while zoomed out or rotating.
 - Use edge-type filters and search before loading many chunks; 500,000 nodes plus their edges still depends on browser memory, GPU limits, and the selected edge density.
