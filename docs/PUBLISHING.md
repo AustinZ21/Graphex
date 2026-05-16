@@ -7,7 +7,7 @@ This guide covers the public GitHub release path for CGA, aka ContextGraphAdmin:
 - Source download: GitHub automatically provides zip/tarball downloads for every release tag.
 - Runtime bundle: the release workflow attaches `cga-<version>.tar.gz`, `docker-compose.release.yml`, and `SHA256SUMS.txt`.
 - Container image: tag pushes publish the API/runtime image to GitHub Container Registry:
-  - `ghcr.io/nasco_microsoft/cga-api:<tag>`
+  - `ghcr.io/nascousa/cga-api:<tag>`
 
 ## Maintainer Preflight
 
@@ -27,14 +27,14 @@ Then open `http://localhost:8001/admin` and `http://localhost:8001/mcp`.
 
 ## Tag Release Flow
 
-Use Semantic Versioning tags. Example for `1.29.84`:
+Use Semantic Versioning tags. Example for `1.29.85`:
 
 ```bash
 git status --short
 git checkout main
 git pull origin main
-git tag -a v1.29.84 -m "CGA v1.29.84"
-git push origin v1.29.84
+git tag -a v1.29.85 -m "CGA v1.29.85"
+git push origin v1.29.85
 ```
 
 Pushing the tag runs `.github/workflows/release.yml`, which builds and publishes GHCR images and creates a GitHub Release.
@@ -42,8 +42,8 @@ Pushing the tag runs `.github/workflows/release.yml`, which builds and publishes
 ## User Install From Source
 
 ```bash
-git clone https://github.com/nasco_microsoft/ContextGraphAdmin.git
-cd ContextGraphAdmin
+git clone https://github.com/nascousa/cga.git
+cd cga
 cp .env.example .env
 docker compose --profile dev up --build
 ```
@@ -70,14 +70,14 @@ Open:
 Pin a specific release image by setting `CGA_VERSION` in `.env`:
 
 ```bash
-CGA_VERSION=v1.29.84
+CGA_VERSION=v1.29.85
 ```
 
 ## GitHub Repository Settings
 
 Recommended settings for a public launch:
 
-- Repository name: `ContextGraphAdmin`.
+- Repository name: `cga` under `nascousa`.
 - Repository visibility: Public.
 - Actions permissions: allow GitHub Actions to create releases and write packages.
 - Packages: after first GHCR publish, make packages public if GitHub does not inherit repository visibility automatically.

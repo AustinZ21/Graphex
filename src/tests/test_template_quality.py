@@ -61,7 +61,7 @@ def test_devops_convention_has_cicd_github_webhook_policy() -> None:
         "## CI/CD Policy (GitHub + Webhook Deploy)",
         "CICD=enabled",
         "GITHUB_TOKEN",
-        "https://github.com/nasco_microsoft/",
+        "https://github.com/nascousa/cga",
         "DEPLOY_WEBHOOK_URL",
         "main -> production",
         "Webhook-driven auto deploy",

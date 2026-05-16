@@ -38,7 +38,7 @@
 
 ### Baseline Inputs
 - Git provider and repository URL MUST be defined using GitHub.
-- Repository URL for all projects MUST use prefix `https://github.com/nasco_microsoft/` followed by the repository name.
+- Repository URL for CGA/ContextGraph source distribution MUST use `https://github.com/nascousa/cga`; do not check in ContextGraph/CGA source changes to `nasco_microsoft` remotes.
 - Deployment target MUST include a reachable deployment webhook endpoint.
 - Production deployment branch is `main` unless explicitly overridden.
 - Branch policy: `main -> production`, `dev/* -> staging/non-prod`.

@@ -3,7 +3,7 @@
 
 services:
   cga:
-    image: ghcr.io/nasco_microsoft/cga-api:${CGA_VERSION:-latest}
+    image: ghcr.io/nascousa/cga-api:${CGA_VERSION:-latest}
     container_name: cga-api
     restart: unless-stopped
     ports:

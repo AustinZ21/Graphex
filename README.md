@@ -1,9 +1,9 @@
 # CGA (ContextGraphAdmin)
 
-**Version:** 1.29.84
+**Version:** 1.29.85
 **Status:** Published
 **Author:** Nate Scott
-**Date:** 2026-05-15 (MIT license and public release readiness)
+**Date:** 2026-05-15 (nascousa repository migration)
 
 CGA, aka ContextGraphAdmin, is a local-first graph context service for AI-assisted development. It indexes repository structure, symbols, calls, imports, and lightweight data flow into FalkorDB, then exposes retrieval and analysis tools through an MCP-compatible API.
 
@@ -16,8 +16,8 @@ Prerequisites:
 Run from a fresh clone:
 
 ```bash
-git clone https://github.com/nasco_microsoft/ContextGraphAdmin.git
-cd ContextGraphAdmin
+git clone https://github.com/nascousa/cga.git
+cd cga
 cp .env.example .env
 docker compose --profile dev up --build
 ```
@@ -288,7 +288,7 @@ This file establishes strict boundaries for where certain types of files must li
 - **Versioning Constraints (`.gitignore`)**: "A `.gitignore` file MUST exist at the root. AI assistants MUST automatically ignore common local cache, IDE configs, dependency folders (`node_modules`), logs, and compiled outputs unless explicitly instructed otherwise."
 - **CI/CD & Workflows (`.github/`)**: "All GitHub Actions, issue templates, and pull request templates MUST be centralized in the `.github/` directory. AI agents MUST respect and update these workflows when adding new deployment or testing stages."
 - **Push Protocol Fallback**: "Repository checkins should use HTTPS as the default push protocol. If HTTPS push fails due to transient credential or network issues, retry over SSH as the fallback path. This ensures build/test workflows remain unblocked while preserving protocol resiliency."
-- **Repository URL Prefix Policy**: "All project repositories MUST use the GitHub organization prefix `https://github.com/nasco_microsoft/` and append the project repository name."
+- **Repository URL Prefix Policy**: "This project MUST use `https://github.com/nascousa/cga` for public source distribution and MUST NOT check in future ContextGraph/CGA source changes to `nasco_microsoft` remotes."
 - **Temporary Data**: "Any runtime logs, uploads, or temporary artifacts MUST be written to `src/log/` or `tmp/` respectively. Both paths MUST be explicitly added to `.gitignore`."
 - **Testing Separation**: "All automated tests MUST be placed in an isolated `tests/` directory at the project root. Tests should mirror the `src/` directory structure but must never be mixed within the application source files."
 
