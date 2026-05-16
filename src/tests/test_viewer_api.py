@@ -219,10 +219,10 @@ def test_viewer_entrypoint_is_served() -> None:
     response = TestClient(app).get("/viewer/")
 
     assert response.status_code == 200
-    assert "<title>Viewer</title>" in response.text
+    assert "<title>CGA Viewer</title>" in response.text
     assert '"sigma"' in response.text
     assert '"graphology"' in response.text
-    assert 'src="./main.js?v=1.29.81"' in response.text
+    assert 'src="./main.js?v=1.29.84"' in response.text
     assert 'id="copy-falkor-url"' in response.text
     assert 'aria-label="Copy FalkorDB connection URL"' in response.text
     assert '<label for="chunk-limit">Display Nodes</label>' in response.text
@@ -253,7 +253,7 @@ def test_viewer_static_assets_are_not_cached() -> None:
     assert "DEFAULT_CHUNK_LIMIT = 250" in response.text
     assert "MAX_AUTO_CHUNK_FETCHES = 80" in response.text
     assert "DEFAULT_EDGE_VISIBILITY = false" in response.text
-    assert "FALKOR_CONNECTION_URL = 'falkor://contextgraph-falkordb-dev:6379'" in response.text
+    assert "FALKOR_CONNECTION_URL = 'falkor://cga-falkordb-dev:6379'" in response.text
     assert "EDGE_VISIBILITY_STORAGE_KEY = 'cg_viewer_edges_visible_v4'" in response.text
     assert "NODE_KIND_VISIBILITY_STORAGE_KEY" in response.text
     assert "PERFORMANCE_MODE_STORAGE_KEY = 'cg_viewer_performance_mode_v1'" in response.text
@@ -319,7 +319,7 @@ def test_admin_embeds_versioned_graph_viewer() -> None:
     response = TestClient(app).get("/admin")
 
     assert response.status_code == 200
-    assert 'data-src="/viewer/?v=1.29.81"' in response.text
+    assert 'data-src="/viewer/?v=1.29.84"' in response.text
     assert "const ADMIN_TAB_ROUTES" in response.text
     assert "viewer: '/admin/graph'" in response.text
 
@@ -330,7 +330,7 @@ def test_admin_deep_links_are_served() -> None:
     for path in ["/admin/projects", "/admin/users", "/admin/audit", "/admin/graph"]:
         response = client.get(path)
         assert response.status_code == 200
-        assert "<title>ContextGraph Admin</title>" in response.text
+        assert "<title>CGA (ContextGraphAdmin)</title>" in response.text
         assert "const ADMIN_TAB_ROUTES" in response.text
 
 

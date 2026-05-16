@@ -1,6 +1,6 @@
 {
-  "name": "contextgraph-viewer",
-  "version": "0.1.0",
+  "name": "cga-viewer",
+  "version": "1.29.84",
   "private": true,
   "type": "module",
   "scripts": {

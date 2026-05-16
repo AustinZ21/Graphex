@@ -1,12 +1,12 @@
 # ──────────────────────────────────────────────────────────────────────────────
-# ContextGraph Docker Compose
+# CGA (ContextGraphAdmin) Docker Compose
 #
 # PORT REGISTRY (ADC standard — do not change without updating ADC)
 # ┌──────────────────────────────────────────────────────────────────────────┐
 # │  Host Port │ Container Port │ Service                  │ Profile        │
 # ├──────────────────────────────────────────────────────────────────────────┤
-# │  8001      │ 8000           │ ContextGraph API (dev)   │ dev            │
-# │  8000      │ 8000           │ ContextGraph API         │ prod           │
+# │  8001      │ 8000           │ CGA API (dev)            │ dev            │
+# │  8000      │ 8000           │ CGA API                  │ prod           │
 # │  8080      │ 8080           │ Gateway (nginx)          │ prod           │
 # │  3001      │ 3000           │ Frontend (Next.js)       │ prod           │
 # │  16379     │ 6379           │ FalkorDB (Redis proto)   │ dev + prod     │
@@ -23,7 +23,7 @@ services:
 
   falkordb-dev:
     image: 'falkordb/falkordb:latest'
-    container_name: contextgraph-falkordb-dev
+    container_name: cga-falkordb-dev
     profiles: [dev]
     restart: unless-stopped
     ports:
@@ -47,7 +47,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    container_name: contextgraph-api-dev
+    container_name: cga-api-dev
     profiles: [dev]
     restart: unless-stopped
     ports:
@@ -56,12 +56,12 @@ services:
       - path: .env
         required: false
     environment:
-      - FALKORDB_HOST=contextgraph-falkordb-dev
+      - FALKORDB_HOST=cga-falkordb-dev
       - FALKORDB_PORT=6379
-      - FALKORDB_URL=falkor://contextgraph-falkordb-dev:6379
-      - FALKORDB_URL_HOST=redis://contextgraph-falkordb-dev:6379
-      - QUEUE_REDIS_URL=redis://contextgraph-redis-dev:6379/1
-      - CACHE_REDIS_URL=redis://contextgraph-redis-dev:6379/2
+      - FALKORDB_URL=falkor://cga-falkordb-dev:6379
+      - FALKORDB_URL_HOST=redis://cga-falkordb-dev:6379
+      - QUEUE_REDIS_URL=redis://cga-redis-dev:6379/1
+      - CACHE_REDIS_URL=redis://cga-redis-dev:6379/2
       - AUTH_DB_PATH=/app/data/auth.db
       - 'JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-local-jwt-secret-key}'
       - 'ADMIN_USERNAME=${ADMIN_USERNAME:-admin}'
@@ -77,7 +77,7 @@ services:
       - PYTHONPATH=/app/src
     volumes:
       - auth_db_dev_data:/app/data
-      - d:/Repos:/repos:ro
+      - ${CGA_REPOS_MOUNT:-.}:/repos:ro
     depends_on:
       falkordb-dev:
         condition: service_healthy
@@ -92,7 +92,7 @@ services:
 
   redis-dev:
     image: 'redis:7-alpine'
-    container_name: contextgraph-redis-dev
+    container_name: cga-redis-dev
     profiles: [dev]
     restart: unless-stopped
     ports:
@@ -248,7 +248,7 @@ services:
       start_period: 40s
   falkordb:
     image: 'falkordb/falkordb:latest'
-    container_name: contextgraph-falkordb
+    container_name: cga-falkordb
     profiles: [prod]
     restart: unless-stopped
     ports:

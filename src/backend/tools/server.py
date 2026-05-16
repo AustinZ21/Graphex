@@ -1,4 +1,4 @@
-"""ContextGraph MCP Server – exposes indexing and retrieval tools.
+"""CGA (ContextGraphAdmin) MCP Server – exposes indexing and retrieval tools.
 
 Phase 1 tools
 -------------
@@ -41,7 +41,7 @@ from backend.queue.streams import JobConsumer
 
 log = structlog.get_logger()
 
-mcp = FastMCP("contextgraph")
+mcp = FastMCP("cga")
 
 _registry: GraphRegistry | None = None
 _producer: MCPProducer | None = None

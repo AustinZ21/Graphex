@@ -16,10 +16,6 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-if (-not $env:DOCKER_HOST) {
-    $env:DOCKER_HOST = 'tcp://192.168.1.239:2375'
-}
-
 function Resolve-ComposeFile {
     param(
         [string]$Primary,
@@ -59,7 +55,12 @@ function Resolve-ComposeFile {
 }
 
 $selectedCompose = Resolve-ComposeFile -Primary $ComposeFile -Fallback $FallbackComposeFile
-Write-Host "Using DOCKER_HOST=$($env:DOCKER_HOST)"
+if ($env:DOCKER_HOST) {
+    Write-Host "Using DOCKER_HOST=$($env:DOCKER_HOST)"
+}
+else {
+    Write-Host "Using local Docker context"
+}
 Write-Host "Using compose file: $selectedCompose"
 
 switch ($Command) {

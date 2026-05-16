@@ -1,7 +1,7 @@
 import Graphology from 'graphology'
 import Sigma from 'sigma'
 
-const VIEWER_VERSION = '1.29.81'
+const VIEWER_VERSION = '1.29.84'
 const EDGE_STYLES = {
   CALLS: { label: 'Calls', color: '#4ae387', width: 1.7, priority: 6 },
   IMPORTS: { label: 'Imports', color: '#5badff', width: 1.45, priority: 5 },
@@ -24,7 +24,7 @@ const MIN_CHUNK_LIMIT = 1
 const DEFAULT_CHUNK_LIMIT = 250
 const DEFAULT_EDGE_VISIBILITY = false
 const DEFAULT_PERFORMANCE_MODE = true
-const FALKOR_CONNECTION_URL = 'falkor://contextgraph-falkordb-dev:6379'
+const FALKOR_CONNECTION_URL = 'falkor://cga-falkordb-dev:6379'
 const EDGE_VISIBILITY_STORAGE_KEY = 'cg_viewer_edges_visible_v4'
 const NODE_KIND_VISIBILITY_STORAGE_KEY = 'cg_viewer_node_kinds_visible_v1'
 const PERFORMANCE_MODE_STORAGE_KEY = 'cg_viewer_performance_mode_v1'

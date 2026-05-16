@@ -1,9 +1,46 @@
-# Autonomous Development Constitution (ADC)
+# CGA (ContextGraphAdmin)
 
-**Version:** 1.29.81
+**Version:** 1.29.84
 **Status:** Published
 **Author:** Nate Scott
-**Date:** 2026-05-11 (viewer performance button layout)
+**Date:** 2026-05-15 (MIT license and public release readiness)
+
+CGA, aka ContextGraphAdmin, is a local-first graph context service for AI-assisted development. It indexes repository structure, symbols, calls, imports, and lightweight data flow into FalkorDB, then exposes retrieval and analysis tools through an MCP-compatible API.
+
+## Public Quick Start
+
+Prerequisites:
+- Git
+- Docker Desktop or Docker Engine with Docker Compose v2
+
+Run from a fresh clone:
+
+```bash
+git clone https://github.com/nasco_microsoft/ContextGraphAdmin.git
+cd ContextGraphAdmin
+cp .env.example .env
+docker compose --profile dev up --build
+```
+
+Windows PowerShell equivalent for the environment file:
+
+```powershell
+Copy-Item .env.example .env
+docker compose --profile dev up --build
+```
+
+Open:
+- Admin UI: `http://localhost:8001/admin`
+- MCP discovery: `http://localhost:8001/mcp`
+- FalkorDB Browser: `http://localhost:13000`
+
+Default local credentials come from `.env.example`. Change `JWT_SECRET_KEY`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` before exposing the service beyond localhost.
+
+For release packaging, GitHub tags, GHCR images, and maintainer steps, see [docs/PUBLISHING.md](docs/PUBLISHING.md).
+
+## License
+
+CGA is released under the MIT License. See [LICENSE](LICENSE).
 
 ## 1. Introduction
 
@@ -15,8 +52,8 @@ Unlike traditional documentation, ADC is specifically optimized for both **AI Ag
 
 By design, all ADC materials are stored within a hidden `.adc/` directory at the project root. The `.` prefix ensures that the Constitution remains distinctly separated from application source code, preventing clutter in regular IDE tree views while remaining instantly discoverable to any AI scanner workflow.
 
-### ContextGraph Admin Default Runtime (Solution 1)
-For CG Admin local development, the default supported runtime is **Solution 1**:
+### CGA Default Runtime (Solution 1)
+For CGA local development, the default supported runtime is **Solution 1**:
 - **Backend + Admin UI are served together by `api-dev`** (FastAPI serves `/admin` and static frontend).
 - **Primary local URL:** `http://localhost:8001/admin`.
 - **Recommended one-command startup:**
@@ -290,7 +327,7 @@ Since the ADC acts as the absolute Digital Constitution, altering core rules (li
 
 ## 4. Token Efficiency — CG Context vs. Full Source
 
-ContextGraph's graph-indexed retrieval delivers **precise, structured context** (type signatures, call edges, dependency subgraphs) instead of raw source files. This directly reduces the token budget consumed by each AI Agent turn.
+CGA's graph-indexed retrieval delivers **precise, structured context** (type signatures, call edges, dependency subgraphs) instead of raw source files. This directly reduces the token budget consumed by each AI Agent turn.
 
 ### 4.1 Why Token Savings Matter
 
@@ -342,7 +379,7 @@ Both projects converge near **~68–69% savings / ~3.1–3.2x ratio**, suggestin
 
 ### 4.4 Context Quality HPS Benchmark
 
-ContextGraph also includes a deterministic context-quality benchmark for **Hallucination Pressure Score (HPS)**. HPS estimates pre-answer context risk from missing evidence, useless context, duplicated context, and ambiguous symbol hits.
+CGA also includes a deterministic context-quality benchmark for **Hallucination Pressure Score (HPS)**. HPS estimates pre-answer context risk from missing evidence, useless context, duplicated context, and ambiguous symbol hits.
 
 Run the sample CodexCLI and ClaudeCLI benchmark:
 

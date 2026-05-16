@@ -1,4 +1,4 @@
-"""ContextGraph application entry point.
+"""CGA (ContextGraphAdmin) application entry point.
 
 Startup sequence
 ----------------
@@ -51,7 +51,7 @@ from backend.viewer.router import router as viewer_router
 
 log = structlog.get_logger()
 
-APP_VERSION = "0.0.20"
+APP_VERSION = "1.29.84"
 
 FALKORDB_HOST = os.getenv("FALKORDB_HOST", "localhost")
 FALKORDB_PORT = int(os.getenv("FALKORDB_PORT", "6379"))
@@ -125,7 +125,7 @@ async def lifespan(app: FastAPI):
     app.state.consumer = _consumer
     app.state.registry = _registry
     
-    log.info("contextgraph.started", falkordb=f"{FALKORDB_HOST}:{FALKORDB_PORT}")
+    log.info("cga.started", falkordb=f"{FALKORDB_HOST}:{FALKORDB_PORT}")
 
     yield
 
@@ -146,10 +146,10 @@ async def lifespan(app: FastAPI):
         cache.close()
     await _producer.close()
     _registry.close_all()
-    log.info("contextgraph.stopped")
+    log.info("cga.stopped")
 
 
-app = FastAPI(title="ContextGraph", version="0.2.2", lifespan=lifespan)
+app = FastAPI(title="CGA (ContextGraphAdmin)", version="1.29.84", lifespan=lifespan)
 
 # ── Auth middleware (validates Bearer token on /mcp routes) ────────────────
 app.add_middleware(ProjectTokenMiddleware)
@@ -426,7 +426,7 @@ async def audit_request_middleware(request: Request, call_next):
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "service": "contextgraph", "version": APP_VERSION}
+    return {"status": "ok", "service": "cga", "name": "ContextGraphAdmin", "version": APP_VERSION}
 
 
 @app.get("/mcp")

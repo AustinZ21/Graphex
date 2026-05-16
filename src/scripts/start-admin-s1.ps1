@@ -13,11 +13,12 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
 Set-Location $repoRoot
 
-if (-not $env:DOCKER_HOST) {
-    $env:DOCKER_HOST = 'tcp://192.168.1.239:2375'
+if ($env:DOCKER_HOST) {
+    Write-Host "Using DOCKER_HOST=$($env:DOCKER_HOST)"
 }
-
-Write-Host "Using DOCKER_HOST=$($env:DOCKER_HOST)"
+else {
+    Write-Host "Using local Docker context"
+}
 Write-Host "Working directory: $repoRoot"
 
 switch ($Command) {
