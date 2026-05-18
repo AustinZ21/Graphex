@@ -51,7 +51,7 @@ from backend.viewer.router import router as viewer_router
 
 log = structlog.get_logger()
 
-APP_VERSION = "1.29.85"
+APP_VERSION = "1.29.87"
 
 FALKORDB_HOST = os.getenv("FALKORDB_HOST", "localhost")
 FALKORDB_PORT = int(os.getenv("FALKORDB_PORT", "6379"))
@@ -149,7 +149,7 @@ async def lifespan(app: FastAPI):
     log.info("cga.stopped")
 
 
-app = FastAPI(title="CGA (ContextGraphAdmin)", version="1.29.85", lifespan=lifespan)
+app = FastAPI(title="CGA (ContextGraphAdmin)", version="1.29.87", lifespan=lifespan)
 
 # ── Auth middleware (validates Bearer token on /mcp routes) ────────────────
 app.add_middleware(ProjectTokenMiddleware)

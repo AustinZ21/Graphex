@@ -1,0 +1,76 @@
+name: cga-desktop
+
+services:
+  cga:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: cga-desktop-api
+    restart: unless-stopped
+    ports:
+      - "${CGA_DESKTOP_API_PORT:-18001}:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - FALKORDB_HOST=falkordb
+      - FALKORDB_PORT=6379
+      - FALKORDB_URL=falkor://falkordb:6379
+      - FALKORDB_URL_HOST=redis://localhost:${CGA_DESKTOP_FALKORDB_PORT:-16381}
+      - FALKORDB_BROWSER_URL=http://falkordb:3000
+      - FALKORDB_BROWSER_PUBLIC_URL=http://localhost:${CGA_DESKTOP_BROWSER_PORT:-13001}
+      - QUEUE_REDIS_URL=redis://redis:6379/1
+      - CACHE_REDIS_URL=redis://redis:6379/2
+      - AUTH_DB_PATH=/app/data/auth.db
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-local-jwt-secret-key-32chars}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - PYTHONPATH=/app/src
+    volumes:
+      - auth_db_data:/app/data
+      - ${CGA_REPOS_MOUNT:-.}:/repos:ro
+    depends_on:
+      falkordb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  falkordb:
+    image: falkordb/falkordb:latest
+    container_name: cga-desktop-falkordb
+    restart: unless-stopped
+    ports:
+      - "${CGA_DESKTOP_FALKORDB_PORT:-16381}:6379"
+      - "${CGA_DESKTOP_BROWSER_PORT:-13001}:3000"
+    volumes:
+      - falkordb_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+
+  redis:
+    image: redis:7-alpine
+    container_name: cga-desktop-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  auth_db_data:
+  falkordb_data:
+  redis_data:

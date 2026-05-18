@@ -1,9 +1,9 @@
 # CGA (ContextGraphAdmin)
 
-**Version:** 1.29.85
+**Version:** 1.29.87
 **Status:** Published
 **Author:** Nate Scott
-**Date:** 2026-05-15 (nascousa repository migration)
+**Date:** 2026-05-18 (Docker Desktop launcher polish)
 
 CGA, aka ContextGraphAdmin, is a local-first graph context service for AI-assisted development. It indexes repository structure, symbols, calls, imports, and lightweight data flow into FalkorDB, then exposes retrieval and analysis tools through an MCP-compatible API.
 
@@ -12,6 +12,19 @@ CGA, aka ContextGraphAdmin, is a local-first graph context service for AI-assist
 Prerequisites:
 - Git
 - Docker Desktop or Docker Engine with Docker Compose v2
+
+Docker Desktop one-click path:
+
+```powershell
+Copy-Item .env.example .env
+./src/scripts/start-desktop.ps1 start
+```
+
+Windows Explorer one-click entrypoints:
+- `start-cga-desktop.cmd`: starts containers and opens the Admin UI
+- `open-cga-desktop.cmd`: reopens the Admin UI using the last saved desktop port
+- `stop-cga-desktop.cmd`: stops the desktop stack
+- `logs-cga-desktop.cmd`: tails desktop stack logs for support/debugging
 
 Run from a fresh clone:
 
@@ -30,9 +43,20 @@ docker compose --profile dev up --build
 ```
 
 Open:
-- Admin UI: `http://localhost:8001/admin`
-- MCP discovery: `http://localhost:8001/mcp`
-- FalkorDB Browser: `http://localhost:13000`
+- Admin UI: `http://localhost:18001/admin`
+- MCP discovery: `http://localhost:18001/mcp`
+- FalkorDB Browser: `http://localhost:13001`
+
+Docker Desktop recommended entry files:
+- `docker-compose.desktop.yml`: single-machine local deployment with sane defaults
+- `src/scripts/start-desktop.ps1`: start/stop/status/logs wrapper for local desktop usage
+- `start-cga-desktop.cmd`: Windows double-click launcher
+- `open-cga-desktop.cmd`: Windows reopen launcher
+- `stop-cga-desktop.cmd`: Windows stop launcher
+- `logs-cga-desktop.cmd`: Windows logs launcher
+
+The Docker Desktop package intentionally uses `18001`, `16381`, and `13001` so it does not collide with the legacy dev profile defaults.
+The launcher also saves the last active desktop ports under `tmp/cga-desktop-runtime.json` so reopening from a fresh shell still targets the correct local URL.
 
 Default local credentials come from `.env.example`. Change `JWT_SECRET_KEY`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` before exposing the service beyond localhost.
 
@@ -54,17 +78,29 @@ By design, all ADC materials are stored within a hidden `.adc/` directory at the
 
 ### CGA Default Runtime (Solution 1)
 For CGA local development, the default supported runtime is **Solution 1**:
-- **Backend + Admin UI are served together by `api-dev`** (FastAPI serves `/admin` and static frontend).
-- **Primary local URL:** `http://localhost:8001/admin`.
-- **Recommended one-command startup:**
+- **Backend + Admin UI are served together by the single CGA API container** (FastAPI serves `/admin` and static frontend).
+- **Primary local URL:** `http://localhost:18001/admin`.
+- **Recommended Docker Desktop startup:**
 
 ```powershell
-./src/scripts/start-admin-s1.ps1 start
+./src/scripts/start-desktop.ps1 start
 ```
 
 Useful commands:
 
 ```powershell
+./src/scripts/start-desktop.ps1 status
+./src/scripts/start-desktop.ps1 logs
+./src/scripts/start-desktop.ps1 stop
+./src/scripts/start-desktop.ps1 open
+```
+
+If you want fixed custom desktop ports, set `CGA_DESKTOP_API_PORT`, `CGA_DESKTOP_FALKORDB_PORT`, or `CGA_DESKTOP_BROWSER_PORT` in `.env` or in the shell before running the script.
+
+Legacy dev-profile commands remain available:
+
+```powershell
+./src/scripts/start-admin-s1.ps1 start
 ./src/scripts/start-admin-s1.ps1 status
 ./src/scripts/start-admin-s1.ps1 logs
 ./src/scripts/start-admin-s1.ps1 stop
