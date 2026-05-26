@@ -29,6 +29,7 @@ import structlog
 import uvicorn
 from fastapi import Depends, FastAPI
 from fastapi import HTTPException
+from fastapi import Query
 from fastapi import Request
 from jose import JWTError
 from fastapi.responses import FileResponse
@@ -48,10 +49,12 @@ from backend.tools import server as mcp_server
 from backend.perf.context_quality import benchmark_context_quality, ContextQualityInputError
 from backend.perf.token_efficiency import benchmark_token_efficiency, TokenBenchmarkInputError
 from backend.viewer.router import router as viewer_router
+from backend.workbriefing.service import WorkActivityValidationError, WorkBriefingService
+from backend.workbriefing.store import SqliteActivityStore
 
 log = structlog.get_logger()
 
-APP_VERSION = "1.29.87"
+APP_VERSION = "1.29.93"
 
 FALKORDB_HOST = os.getenv("FALKORDB_HOST", "localhost")
 FALKORDB_PORT = int(os.getenv("FALKORDB_PORT", "6379"))
@@ -83,6 +86,7 @@ _producer = MCPProducer(redis_url=QUEUE_REDIS_URL)
 _consumer: IndexerConsumer | None = None
 _consumer_task: asyncio.Task | None = None
 _trace_evaluator = None
+_work_briefing_service = WorkBriefingService(store=SqliteActivityStore(db_path=DB_PATH))
 
 
 @asynccontextmanager
@@ -116,7 +120,13 @@ async def lifespan(app: FastAPI):
         except Exception as exc:
             log.warning("trace_eval.disabled", reason=str(exc))
 
-    mcp_server.init(registry=_registry, producer=_producer, cache=cache, recorder=recorder)
+    mcp_server.init(
+        registry=_registry,
+        producer=_producer,
+        cache=cache,
+        recorder=recorder,
+        work_briefing_service=_work_briefing_service,
+    )
     _consumer = IndexerConsumer(redis_url=QUEUE_REDIS_URL, registry=_registry)
     mcp_server.set_consumer(_consumer)  # Wire consumer for MCP queue enrichment
     _consumer_task = asyncio.create_task(_consumer.start())
@@ -149,7 +159,7 @@ async def lifespan(app: FastAPI):
     log.info("cga.stopped")
 
 
-app = FastAPI(title="CGA (ContextGraphAdmin)", version="1.29.87", lifespan=lifespan)
+app = FastAPI(title="CGA (ContextGraphAdmin)", version="1.29.93", lifespan=lifespan)
 
 # ── Auth middleware (validates Bearer token on /mcp routes) ────────────────
 app.add_middleware(ProjectTokenMiddleware)
@@ -254,6 +264,28 @@ def _find_usage_dict(obj) -> dict | None:
                     if nested:
                         return nested
     return None
+
+
+def _require_project_token_context(request: Request) -> dict:
+    state = request.scope.get("state", {})
+    project_id = state.get("project_id")
+    project_name = state.get("project_name")
+    if not project_id or not project_name:
+        raise HTTPException(status_code=401, detail="Project token required")
+    return {
+        "project_id": str(project_id),
+        "project_name": str(project_name),
+        "project_db_id": state.get("project_db_id"),
+        "project_token_id": state.get("project_token_id"),
+        "project_token_type": state.get("project_token_type"),
+    }
+
+
+def _resolve_project_scope_id(requested_project_id: str | None, project: dict) -> str:
+    cleaned = requested_project_id.strip() if isinstance(requested_project_id, str) else ""
+    if cleaned and cleaned != project["project_id"]:
+        raise HTTPException(status_code=403, detail="project_id must match the authenticated project")
+    return project["project_id"]
 
 
 @app.middleware("http")
@@ -386,12 +418,16 @@ async def audit_request_middleware(request: Request, call_next):
         raise
     finally:
         duration_ms = int((time.perf_counter() - start) * 1000)
+        scope_state = request.scope.get("state", {})
         if not project_id:
-            project_id = request.scope.get("state", {}).get("project_db_id")
+            project_id = scope_state.get("project_db_id")
         if not project_name:
-            project_name = request.scope.get("state", {}).get("project_name")
+            project_name = scope_state.get("project_name")
         if not token_id:
-            token_id = request.scope.get("state", {}).get("project_token_id")
+            token_id = scope_state.get("project_token_id")
+        if actor_type == "anonymous" and token_id:
+            actor_type = "project_token"
+            actor_name = actor_name or f"token:{token_id}"
         scope_name = "mcp" if path.startswith("/mcp") else "api"
         details_payload = {
             "auth_header_present": bool(raw_auth),
@@ -468,6 +504,80 @@ async def api_benchmark_context_quality(payload: dict) -> dict:
 async def api_admin_runtime_config(_: dict = Depends(require_admin)) -> dict:
     return {
         "falkordb_url": FALKORDB_URL,
+    }
+
+
+@app.get("/api/admin/work-briefing")
+async def api_admin_work_briefing(
+    project_id: str | None = Query(default=None),
+    limit: int = Query(default=25, ge=1, le=100),
+    _: dict = Depends(require_admin),
+) -> dict:
+    cleaned_project_id = project_id.strip() if isinstance(project_id, str) else None
+    return await _work_briefing_service.get_briefing(project_id=cleaned_project_id or None, limit=limit)
+
+
+@app.get("/api/admin/work-briefing/activities")
+async def api_admin_work_briefing_activities(
+    project_id: str | None = Query(default=None),
+    limit: int = Query(default=25, ge=1, le=100),
+    _: dict = Depends(require_admin),
+) -> dict:
+    cleaned_project_id = project_id.strip() if isinstance(project_id, str) else None
+    activities = await _work_briefing_service.list_recent(project_id=cleaned_project_id or None, limit=limit)
+    return {
+        "project_id": cleaned_project_id or None,
+        "count": len(activities),
+        "activities": [activity.to_dict() for activity in activities],
+    }
+
+
+@app.post("/api/project/work-briefing/activity", status_code=201)
+async def api_project_work_briefing_record_activity(
+    payload: dict,
+    request: Request,
+) -> dict:
+    project = _require_project_token_context(request)
+    body = dict(payload or {})
+    body["project_id"] = _resolve_project_scope_id(body.get("project_id"), project)
+    if not body.get("workspace_name"):
+        body["workspace_name"] = project["project_name"]
+
+    try:
+        result = await _work_briefing_service.record_activity(body)
+    except WorkActivityValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        "operation": result.operation,
+        "activity": result.activity.to_dict(),
+    }
+
+
+@app.get("/api/project/work-briefing")
+async def api_project_work_briefing(
+    request: Request,
+    project_id: str | None = Query(default=None),
+    limit: int = Query(default=25, ge=1, le=100),
+) -> dict:
+    project = _require_project_token_context(request)
+    resolved_project_id = _resolve_project_scope_id(project_id, project)
+    return await _work_briefing_service.get_briefing(project_id=resolved_project_id, limit=limit)
+
+
+@app.get("/api/project/work-briefing/activities")
+async def api_project_work_briefing_activities(
+    request: Request,
+    project_id: str | None = Query(default=None),
+    limit: int = Query(default=25, ge=1, le=100),
+) -> dict:
+    project = _require_project_token_context(request)
+    resolved_project_id = _resolve_project_scope_id(project_id, project)
+    activities = await _work_briefing_service.list_recent(project_id=resolved_project_id, limit=limit)
+    return {
+        "project_id": resolved_project_id,
+        "count": len(activities),
+        "activities": [activity.to_dict() for activity in activities],
     }
 
 

@@ -9,23 +9,23 @@ Before starting the application, register with the ContextGraph ecosystem:
 
 ```bash
 # 1. Register this project with ContextGraph
-# Visit: http://localhost:8000/getstarted
+# Open CGA Admin UI: http://localhost:18001/admin
 # Follow the guided setup to:
 #   - Register this project in the ContextGraph catalog
-#   - Retrieve MCP server credentials and edge agent token
+#   - Retrieve CGA MCP server credentials and edge agent token
 #   - Store credentials in .env (see step 2 below)
 
 # 2. Configure ContextGraph environment variables
-echo "CONTEXTGRAPH_MCP_SERVER_URL=http://localhost:8000/mcp" >> .env
-echo "CONTEXTGRAPH_EDGE_AGENT_TOKEN=<token-from-getstarted>" >> .env
-echo "CONTEXTGRAPH_PROJECT_ID=<project-id-from-getstarted>" >> .env
+echo "CONTEXTGRAPH_MCP_SERVER_URL=http://localhost:18001/mcp/sse" >> .env
+echo "CONTEXTGRAPH_EDGE_AGENT_TOKEN=<token-from-cga-admin>" >> .env
+echo "CONTEXTGRAPH_PROJECT_ID=<project-id-from-cga-admin>" >> .env
 ```
 
-After ContextGraph Edge Agent and ContextGraph MCP Server are integrated, initialize a full repository index before starting feature work:
+After ContextGraph Edge Agent and CGA MCP Server are integrated, initialize a full repository index before starting feature work:
 
 ```text
 Required one-time bootstrap indexing flow
-1) Ensure `mcp-servers.json` contains the `cg-edge-mcp-server` endpoint profile and receives project context from environment variables.
+1) Ensure `mcp-servers.json` contains the `cga-mcp-server` endpoint profile and receives project context from environment variables.
 2) Run a full-project indexing call through ContextGraph MCP using:
 	- project_id: CONTEXTGRAPH_PROJECT_ID
 	- repo_path: repository root
@@ -38,14 +38,14 @@ It discovers current worktree changes automatically and includes deleted or rena
 Use `index_repo_changes(repo_path, auto_full_on_destructive=true)` only when you explicitly want a conservative full rebuild.
 Use raw `index_incremental(repo_path, changed_paths)` only when the caller already has an exact changed-file list.
 
-## Auto-Enable CG Edge MCP Server Plugin (ADC Standard)
+## Auto-Enable CGA MCP Server Profile (ADC Standard)
 
-ADC-compliant projects must keep the `cg-edge-mcp-server` profile enabled in `.adc/contextgraph-edge-agent/mcp/mcp-servers.json`.
+ADC-compliant projects must keep the `cga-mcp-server` profile enabled in `.adc/contextgraph-edge-agent/mcp/mcp-servers.json`.
 
 ```text
 Quick enable checklist for downstream projects
 1) Copy the ADC template `.adc/contextgraph-edge-agent/mcp/mcp-servers.json` into the target project.
-2) Confirm `cg-edge-mcp-server` exists and points to a reachable ContextGraph MCP endpoint (default: `http://localhost:8000/mcp`).
+2) Confirm `cga-mcp-server` exists and points to a reachable CGA MCP SSE endpoint (default local dev endpoint: `http://localhost:18001/mcp/sse`).
 3) Set environment variables before starting your IDE/agent host:
 	- CONTEXTGRAPH_MCP_TOKEN
 	- CONTEXTGRAPH_EDGE_AGENT_TOKEN
@@ -90,7 +90,7 @@ curl http://localhost:3001/mcp/health
 curl http://localhost:3002/edges/health
 
 # Verify upstream ContextGraph connectivity
-curl http://localhost:8000/health
+curl http://localhost:18001/health
 ```
 
 

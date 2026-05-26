@@ -6,22 +6,63 @@
   <title>CGA (ContextGraphAdmin)</title>
   <style>
     :root {
-      --bg: #1f242f;
-      --panel: #2c3342;
-      --panel-elevated: #353f52;
-      --text: #e7ebf3;
-      --muted: #9aa8bd;
-      --accent: #4ae387;
-      --accent-soft: #1e3a2c;
-      --border: #465068;
-      --danger: #e35a5a;
-      --danger-soft: #3a1e1e;
-      --input-bg: #1a1f2b;
-      --scrollbar-thumb: #465068;
-      --scrollbar-thumb-hover: #5a6680;
-      --scrollbar-track: #1f242f;
-      --radius: 10px;
+      --bg: #06080d;
+      --panel: #0d1118;
+      --panel-elevated: #11161f;
+      --text: #e6ecf5;
+      --muted: #7a8699;
+      --accent: #4ade80;
+      --accent-soft: rgba(74,222,128,.10);
+      --accent-glow: rgba(74,222,128,.35);
+      --border: #1d2230;
+      --border-strong: #2a3142;
+      --danger: #ef5a5a;
+      --danger-soft: rgba(239,90,90,.10);
+      --input-bg: #0a0d14;
+      --scrollbar-thumb: #1d2230;
+      --scrollbar-thumb-hover: #2a3142;
+      --scrollbar-track: #06080d;
+      --radius: 8px;
     }
+    /* ── Compact dark theme overrides ── */
+    html { font-size: 13px; }
+    body {
+      font-size: 13px;
+      letter-spacing: .1px;
+    }
+    h1 { font-size: 18px; }
+    h2 { font-size: 16px; }
+    h3 { font-size: 14px; }
+    .tab-content { padding: 14px 18px 56px; }
+    .topbar { padding: 8px 18px; }
+    .topbar-nav .tab-btn { padding: 5px 10px; font-size: 12.5px; }
+    th, tbody td { padding: 6px 10px !important; font-size: 12.5px; }
+    th { letter-spacing: .04em; text-transform: uppercase; font-size: 11px !important; color: var(--muted); }
+    tbody tr { border-bottom: 1px solid var(--border) !important; }
+    tbody tr:hover { background: rgba(74,222,128,.04); }
+    .btn { padding: 6px 12px !important; font-size: 12.5px; border-radius: 6px !important; }
+    .btn-sm { padding: 4px 8px !important; font-size: 11.5px; }
+    input, select, textarea {
+      background: var(--input-bg) !important;
+      border: 1px solid var(--border) !important;
+      border-radius: 6px !important;
+      color: var(--text) !important;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none !important;
+      border-color: var(--accent) !important;
+      box-shadow: 0 0 0 2px var(--accent-soft) !important;
+    }
+    .briefing-card,
+    .briefing-command-card {
+      background: linear-gradient(180deg, rgba(20,26,38,.92) 0%, rgba(10,14,22,.96) 100%) !important;
+      border: 1px solid var(--border) !important;
+      box-shadow: 0 1px 0 rgba(255,255,255,.02) inset, 0 8px 24px rgba(0,0,0,.35);
+    }
+    .briefing-template-block { background: rgba(10,14,22,.7) !important; border-color: var(--border) !important; }
+    .briefing-template-code { background: #04060a !important; }
+    .role-tag { letter-spacing: .04em; }
+    a { color: #6ab3ff; }
     * {
       box-sizing: border-box;
       margin: 0;
@@ -45,7 +86,11 @@
       background: var(--scrollbar-thumb-hover);
     }
     body {
-      background: radial-gradient(circle at 20% 10%, #2f394d 0%, var(--bg) 45%, #191d27 100%);
+      background:
+        radial-gradient(circle at 12% 8%, rgba(74,222,128,.08), transparent 38%),
+        radial-gradient(circle at 88% 12%, rgba(70,140,255,.06), transparent 42%),
+        radial-gradient(circle at 50% 110%, rgba(120,80,255,.05), transparent 55%),
+        linear-gradient(180deg, #04060a 0%, #06080d 60%, #03050a 100%);
       color: var(--text);
       font-family: "Segoe UI", "Noto Sans", sans-serif;
       font-size: 14px;
@@ -59,14 +104,17 @@
       min-height: 100vh; padding: 24px;
       overflow: hidden;
       isolation: isolate;
-      background: linear-gradient(135deg, #08101e 0%, #12243c 55%, #0b1728 100%);
+      background: linear-gradient(135deg, rgba(8, 16, 30, 0.15) 0%, rgba(18, 36, 60, 0.15) 55%, rgba(11, 23, 40, 0.15) 100%);
     }
     #login-screen::before {
       content: "";
       position: absolute;
       inset: 0;
       z-index: -2;
-      background: linear-gradient(135deg, rgba(8, 20, 36, 0.75), rgba(7, 15, 29, 0.82));
+      background:
+        radial-gradient(circle at 14% 18%, rgba(55, 180, 255, 0.18), transparent 30%),
+        radial-gradient(circle at 82% 18%, rgba(74, 227, 135, 0.14), transparent 28%),
+        linear-gradient(135deg, rgba(6, 14, 28, 0.98) 0%, rgba(9, 19, 38, 0.96) 45%, rgba(12, 25, 48, 0.94) 100%);
     }
     #login-screen::after {
       content: "";
@@ -81,10 +129,6 @@
     #login-screen > * {
       position: relative;
       z-index: 2;
-    }
-    #login-screen .vanta-canvas {
-      z-index: 0 !important;
-      opacity: 0.58;
     }
     .login-card {
       width: min(400px, 100%);
@@ -163,6 +207,47 @@
     .pane { display: none; }
     .pane.active { display: block; }
 
+    /* ── Settings page ── */
+    .settings-layout { display: flex; gap: 24px; align-items: flex-start; }
+    .settings-subnav {
+      display: flex; flex-direction: column; gap: 2px;
+      min-width: 200px;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px;
+    }
+    .settings-subnav .subtab-btn {
+      text-align: left; padding: 10px 14px;
+      background: transparent; color: var(--muted);
+      border: 0; border-radius: 6px;
+      font-size: 13px; font-weight: 500; cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .settings-subnav .subtab-btn:hover:not(.active) {
+      color: var(--text); background: rgba(255,255,255,.04);
+    }
+    .settings-subnav .subtab-btn.active {
+      color: var(--accent); background: var(--accent-soft);
+    }
+    .settings-body { flex: 1; min-width: 0; }
+    .settings-section { display: none; }
+    .settings-section.active { display: block; }
+    .settings-section h2 { margin: 0 0 4px; font-size: 18px; font-weight: 600; color: var(--text); }
+    .settings-hint { margin: 0 0 16px; color: var(--muted); font-size: 12.5px; }
+    .settings-card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 8px; padding: 4px 16px;
+    }
+    .settings-card .settings-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+      font-size: 13px; gap: 16px;
+    }
+    .settings-card .settings-row:last-child { border-bottom: 0; }
+    .settings-card .settings-row label { color: var(--muted); font-weight: 500; }
+    .settings-card .settings-value { color: var(--text); text-align: right; word-break: break-all; }
+    .settings-card .settings-value.mono { font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 12px; }
+    .settings-actions { display: flex; gap: 8px; padding: 12px 0; }
+
     .viewer-frame {
       display: block;
       width: 100%;
@@ -170,6 +255,167 @@
       min-height: 660px;
       border: 0;
       background: #151922;
+    }
+
+    .briefing-filters {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .briefing-filters select {
+      width: auto;
+      min-width: 160px;
+    }
+    .briefing-metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .briefing-metric {
+      background: linear-gradient(180deg, rgba(53,63,82,.96) 0%, rgba(35,42,56,.98) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 118px;
+    }
+    .briefing-metric label {
+      margin: 0;
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .briefing-metric strong {
+      font-size: 30px;
+      line-height: 1;
+      color: var(--text);
+    }
+    .briefing-metric small {
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .briefing-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(320px, 1.05fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .briefing-stack {
+      display: grid;
+      gap: 16px;
+    }
+    .briefing-panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      min-width: 0;
+    }
+    .briefing-panel-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .briefing-panel-head h3 {
+      font-size: 14px;
+      margin: 0;
+    }
+    .briefing-panel-head span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .briefing-chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .briefing-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(74,227,135,.08);
+      border: 1px solid rgba(74,227,135,.22);
+      color: var(--text);
+      font-size: 12px;
+      min-height: 32px;
+    }
+    .briefing-chip strong {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    .briefing-empty {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+      padding: 8px 0 2px;
+    }
+    .briefing-activity-list {
+      display: grid;
+      gap: 12px;
+    }
+    .briefing-activity {
+      background: rgba(21,28,43,.6);
+      border: 1px solid rgba(70,80,104,.5);
+      border-radius: 12px;
+      padding: 14px;
+      display: grid;
+      gap: 8px;
+    }
+    .briefing-activity-title {
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.45;
+    }
+    .briefing-activity-summary {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .briefing-activity-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .briefing-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(106,179,227,.08);
+      border: 1px solid rgba(106,179,227,.22);
+      color: #9ed2f4;
+      font-size: 11px;
+      letter-spacing: .03em;
+      text-transform: uppercase;
+    }
+    .briefing-pill.status {
+      background: rgba(74,227,135,.08);
+      border-color: rgba(74,227,135,.22);
+      color: var(--accent);
+    }
+    .briefing-pill.priority {
+      background: rgba(227,90,90,.08);
+      border-color: rgba(227,90,90,.22);
+      color: #f0a1a1;
+    }
+    @media (max-width: 1100px) {
+      .briefing-layout {
+        grid-template-columns: 1fr;
+      }
     }
 
     /* ── Tables ── */
@@ -406,6 +652,294 @@
     }
     .copy-note { color: var(--muted); font-size: 12px; margin-top: 6px; }
     .empty-state { text-align: center; padding: 40px; color: var(--muted); }
+    .briefing-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .briefing-toolbar input,
+    .briefing-toolbar select {
+      width: auto;
+      min-width: 140px;
+    }
+    .briefing-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .briefing-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 132px;
+    }
+    .briefing-command-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(280px, .95fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .briefing-command-card {
+      background: linear-gradient(180deg, rgba(53,63,82,.96) 0%, rgba(35,42,56,.98) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      min-width: 0;
+    }
+    .briefing-command-card + .briefing-command-card-full {
+      margin-top: 16px;
+    }
+    .briefing-command-card-full + .briefing-summary-grid {
+      margin-top: 16px;
+    }
+    .briefing-command-card-full + .briefing-section {
+      margin-top: 16px;
+    }
+    .briefing-command-card h3 {
+      font-size: 15px;
+      margin-bottom: 8px;
+    }
+    .briefing-command-card p {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .briefing-collapsible-head,
+    .briefing-section-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .briefing-collapsible-head {
+      margin-bottom: 12px;
+    }
+    .briefing-section-head {
+      margin-bottom: 10px;
+    }
+    .briefing-collapsible-head h3,
+    .briefing-section-head h3 {
+      font-size: 15px;
+      margin: 2px 0 0;
+    }
+    .briefing-collapse-btn {
+      width: 30px;
+      height: 30px;
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      border: 1px solid rgba(70,80,104,.72);
+      background: rgba(21,28,43,.58);
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+    }
+    .briefing-collapse-btn:hover {
+      color: var(--accent);
+      border-color: rgba(74,227,135,.42);
+      background: rgba(74,227,135,.08);
+    }
+    [data-briefing-section].is-collapsed .briefing-collapsible-head,
+    [data-briefing-section].is-collapsed .briefing-section-head {
+      margin-bottom: 0;
+    }
+    [data-briefing-section].is-collapsed [data-briefing-section-content] {
+      display: none;
+    }
+    .briefing-section {
+      min-width: 0;
+      margin-bottom: 16px;
+    }
+    .briefing-section .briefing-summary-grid,
+    .briefing-section .table-wrap {
+      margin-bottom: 0;
+    }
+    .briefing-command-pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .briefing-command-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(74,227,135,.24);
+      background: rgba(74,227,135,.08);
+      color: var(--text);
+      font-size: 12px;
+    }
+    .briefing-command-pill strong {
+      color: var(--accent);
+    }
+    .briefing-focus-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .briefing-focus-item {
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(70,80,104,.42);
+      background: rgba(21,28,43,.58);
+      display: grid;
+      gap: 6px;
+    }
+    .briefing-focus-item strong {
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .briefing-focus-item span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .briefing-shape-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .briefing-shape-row {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr) 40px;
+      gap: 10px;
+      align-items: center;
+      font-size: 12px;
+    }
+    .briefing-shape-row label {
+      margin: 0;
+      color: var(--text);
+    }
+    .briefing-shape-track {
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(21,28,43,.7);
+      overflow: hidden;
+    }
+    .briefing-shape-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, rgba(74,227,135,.65) 0%, rgba(106,179,227,.85) 100%);
+    }
+    .briefing-shape-value {
+      color: var(--muted);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    .briefing-template-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .briefing-template-block {
+      border: 1px solid rgba(70,80,104,.42);
+      border-radius: 12px;
+      background: rgba(21,28,43,.58);
+      overflow: hidden;
+      min-width: 0;
+    }
+    .briefing-template-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(70,80,104,.32);
+    }
+    .briefing-template-head strong {
+      font-size: 13px;
+    }
+    .briefing-template-head span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .briefing-template-code {
+      margin: 0;
+      padding: 14px;
+      color: var(--text);
+      background: rgba(10,14,29,.86);
+      font-family: Consolas, 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 320px;
+      overflow: auto;
+    }
+    .briefing-kicker {
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .briefing-metric {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1;
+    }
+    .briefing-subtle {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .briefing-chip-list,
+    .briefing-tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .briefing-chip,
+    .briefing-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(115,129,156,.22);
+      background: rgba(21,28,43,.78);
+      color: var(--text);
+      font-size: 12px;
+    }
+    .briefing-chip strong {
+      color: var(--accent);
+      font-weight: 700;
+    }
+    .briefing-title-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+    .briefing-title-cell small {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .briefing-time {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+    }
+    @media (max-width: 1100px) {
+      .briefing-command-grid {
+        grid-template-columns: 1fr;
+      }
+    }
     .expand-btn { background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; padding:0 4px; }
     .project-id-cell {
       display: flex;
@@ -855,10 +1389,12 @@
     <span id="app-version" style="font-size:11px;color:var(--muted);padding-left:6px;align-self:center">v…</span>
     <div style="flex:1"></div>
     <div class="topbar-nav">
+      <button class="tab-btn" id="tab-briefing-btn" style="display:none" onclick="switchTab('briefing',this)">Dashboard</button>
       <button class="tab-btn active" id="tab-projects-btn" onclick="switchTab('projects',this)">Project</button>
       <button class="tab-btn" id="tab-users-btn" onclick="switchTab('users',this)">User</button>
       <button class="tab-btn" id="tab-audit-btn" onclick="switchTab('audit',this)">Audit</button>
       <button class="tab-btn" id="tab-viewer-btn" style="display:none" onclick="switchTab('viewer',this)">Graph</button>
+      <button class="tab-btn" id="tab-settings-btn" style="display:none" onclick="switchTab('settings',this)">Settings</button>
     </div>
     <div class="user-badge">
       <div class="user-menu-wrap" id="user-menu-wrap">
@@ -959,9 +1495,154 @@
       <div class="pagination-wrap" id="audit-pagination"></div>
     </div>
 
+    <!-- WORK DASHBOARD -->
+    <div class="pane" id="pane-briefing">
+      <div class="section-header">
+        <h2>Work Dashboard</h2>
+        <div class="briefing-toolbar">
+          <input
+            id="briefing-project-id"
+            list="briefing-project-options"
+            placeholder="Project ID (optional)"
+            onkeydown="if (event.key === 'Enter') { event.preventDefault(); loadWorkBriefing(); }"
+          />
+          <datalist id="briefing-project-options"></datalist>
+          <select id="briefing-limit" onchange="loadWorkBriefing()">
+            <option value="25">25 events</option>
+            <option value="50">50 events</option>
+            <option value="100">100 events</option>
+          </select>
+          <button class="btn btn-accent btn-sm" onclick="refreshWorkBriefing()">Refresh</button>
+        </div>
+      </div>
+
+      <div class="briefing-command-grid">
+        <section class="briefing-command-card" id="briefing-command-center"></section>
+        <section class="briefing-command-card" id="briefing-workload-shape"></section>
+      </div>
+
+      <section class="briefing-command-card briefing-command-card-full" id="briefing-request-templates"></section>
+
+      <section class="briefing-section" data-briefing-section="metrics">
+        <div class="briefing-section-head">
+          <div>
+            <span class="briefing-kicker">Metrics</span>
+            <h3>Dashboard overview</h3>
+          </div>
+          <button type="button" class="briefing-collapse-btn" data-briefing-collapse="metrics" data-briefing-collapse-label="Metrics" aria-expanded="true" aria-controls="briefing-section-metrics-body" title="Collapse section">&#9660;</button>
+        </div>
+        <div class="briefing-summary-grid" id="briefing-section-metrics-body" data-briefing-section-content>
+          <div class="briefing-card">
+            <span class="briefing-kicker">Recent Events</span>
+            <div class="briefing-metric" id="briefing-total-events">0</div>
+            <div class="briefing-subtle">Scope: <span id="briefing-selected-project">all projects</span></div>
+          </div>
+          <div class="briefing-card">
+            <span class="briefing-kicker">Projects Represented</span>
+            <div class="briefing-metric" id="briefing-project-total">0</div>
+            <div class="briefing-chip-list" id="briefing-project-counts"></div>
+          </div>
+          <div class="briefing-card">
+            <span class="briefing-kicker">Event Types</span>
+            <div class="briefing-chip-list" id="briefing-event-types"></div>
+          </div>
+          <div class="briefing-card">
+            <span class="briefing-kicker">Statuses</span>
+            <div class="briefing-chip-list" id="briefing-status-counts"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="briefing-section" data-briefing-section="activity-log">
+        <div class="briefing-section-head">
+          <div>
+            <span class="briefing-kicker">Activity</span>
+            <h3>Recent work events</h3>
+          </div>
+          <button type="button" class="briefing-collapse-btn" data-briefing-collapse="activity-log" data-briefing-collapse-label="Recent work events" aria-expanded="true" aria-controls="briefing-section-activity-log-body" title="Collapse section">&#9660;</button>
+        </div>
+        <div class="table-wrap" id="briefing-section-activity-log-body" data-briefing-section-content>
+          <table>
+            <thead><tr>
+              <th class="center-col-header">Project ID</th>
+              <th class="center-col-header">Project Name</th>
+              <th class="center-col-header">Event</th>
+              <th>Title</th>
+              <th class="center-col-header">Status</th>
+              <th class="center-col-header">Occurred</th>
+              <th>Summary</th>
+            </tr></thead>
+            <tbody id="briefing-activities-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
     <!-- GRAPH VIEWER -->
     <div class="pane" id="pane-viewer">
-      <iframe id="graph-viewer-frame" class="viewer-frame" title="CGA graph viewer" data-src="/viewer/?v=1.29.87"></iframe>
+      <iframe id="graph-viewer-frame" class="viewer-frame" title="CGA graph viewer" data-src="/viewer/?v=1.29.93"></iframe>
+    </div>
+
+    <!-- SETTINGS (admin only) -->
+    <div class="pane" id="pane-settings">
+      <div class="settings-layout">
+        <nav class="settings-subnav" id="settings-subnav">
+          <button class="subtab-btn active" data-subtab="general"      onclick="switchSettingsSubtab('general',this)">General</button>
+          <button class="subtab-btn"        data-subtab="graphdb"      onclick="switchSettingsSubtab('graphdb',this)">Graph Database</button>
+          <button class="subtab-btn"        data-subtab="indexing"     onclick="switchSettingsSubtab('indexing',this)">Indexing</button>
+          <button class="subtab-btn"        data-subtab="integrations" onclick="switchSettingsSubtab('integrations',this)">Integrations</button>
+          <button class="subtab-btn"        data-subtab="security"     onclick="switchSettingsSubtab('security',this)">Security</button>
+        </nav>
+        <div class="settings-body">
+          <section class="settings-section active" id="settings-section-general">
+            <h2>General</h2>
+            <p class="settings-hint">Global ContextGraphAdmin runtime information. Admin only.</p>
+            <div class="settings-card">
+              <div class="settings-row"><label>App Version</label><span id="settings-app-version" class="settings-value">…</span></div>
+              <div class="settings-row"><label>Signed-in User</label><span id="settings-current-user" class="settings-value">…</span></div>
+              <div class="settings-row"><label>Role</label><span id="settings-current-role" class="settings-value">…</span></div>
+            </div>
+          </section>
+
+          <section class="settings-section" id="settings-section-graphdb">
+            <h2>Graph Database</h2>
+            <p class="settings-hint">FalkorDB connection used by indexing and graph queries.</p>
+            <div class="settings-card">
+              <div class="settings-row"><label>FalkorDB URL</label><span id="settings-falkordb-url" class="settings-value mono">…</span></div>
+              <div class="settings-actions">
+                <button class="btn btn-primary" onclick="openFdbBrowser()">Open FalkorDB Browser</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-section" id="settings-section-indexing">
+            <h2>Indexing</h2>
+            <p class="settings-hint">Project indexing defaults. Per-project overrides remain on the Project tab.</p>
+            <div class="settings-card">
+              <div class="settings-row"><label>Incremental Indexing</label><span class="settings-value">Enabled</span></div>
+              <div class="settings-row"><label>Default Token Budget</label><span class="settings-value">1500</span></div>
+            </div>
+          </section>
+
+          <section class="settings-section" id="settings-section-integrations">
+            <h2>Integrations</h2>
+            <p class="settings-hint">External endpoints exposed by this CGA instance.</p>
+            <div class="settings-card">
+              <div class="settings-row"><label>MCP SSE Endpoint</label><span id="settings-mcp-endpoint" class="settings-value mono">/mcp/sse</span></div>
+              <div class="settings-row"><label>Admin API Base</label><span class="settings-value mono">/api</span></div>
+            </div>
+          </section>
+
+          <section class="settings-section" id="settings-section-security">
+            <h2>Security</h2>
+            <p class="settings-hint">Authentication and access policy. Detailed user management lives on the User tab.</p>
+            <div class="settings-card">
+              <div class="settings-row"><label>Authentication</label><span class="settings-value">JWT (local auth DB)</span></div>
+              <div class="settings-row"><label>Admin-only Pages</label><span class="settings-value">Dashboard, User, Audit, Graph, Settings</span></div>
+            </div>
+          </section>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1089,8 +1770,6 @@
 
 <div id="toast-area"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.net.min.js"></script>
 <script>
 let _jwt = localStorage.getItem('cg_jwt') || '';
 let _me = null;
@@ -1098,19 +1777,25 @@ let _currentProjectId = null;
 let _projectsSort = { key: 'created_at', dir: 'desc' };
 let _usersSort = { key: 'id', dir: 'desc' };
 let _auditSort = { key: 'created_at', dir: 'desc' };
-let _loginVanta = null;
 let _projectsPagination = { page: 1, pageSize: 25 };
 let _usersPagination = { page: 1, pageSize: 25 };
 let _auditPagination = { page: 1, pageSize: 25 };
 let _allUsers = [];
 let _auditTotal = 0;
 let _falkordbUrl = 'falkor://localhost:6379';
+let _workBriefingLoading = false;
+let _workBriefingSummary = null;
+
+const BRIEFING_COLLAPSE_STORAGE_KEY = 'cga_work_dashboard_collapsed_sections';
+let _briefingCollapsedSections = loadBriefingCollapsedSections();
 
 const ADMIN_TAB_ROUTES = Object.freeze({
   projects: '/admin/projects',
   users: '/admin/users',
   audit: '/admin/audit',
+  briefing: '/admin/briefing',
   viewer: '/admin/graph',
+  settings: '/admin/settings',
 });
 const ADMIN_PATH_TABS = Object.freeze({
   '/admin': 'projects',
@@ -1119,8 +1804,10 @@ const ADMIN_PATH_TABS = Object.freeze({
   '/admin/users': 'users',
   '/admin/user': 'users',
   '/admin/audit': 'audit',
+  '/admin/briefing': 'briefing',
   '/admin/graph': 'viewer',
   '/admin/viewer': 'viewer',
+  '/admin/settings': 'settings',
 });
 
 function normalizedAdminPath(pathname) {
@@ -1319,6 +2006,81 @@ async function copyText(value, label) {
   }
 }
 
+function loadBriefingCollapsedSections() {
+  try {
+    const raw = localStorage.getItem(BRIEFING_COLLAPSE_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(parsed) ? parsed.map(String) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveBriefingCollapsedSections() {
+  try {
+    localStorage.setItem(BRIEFING_COLLAPSE_STORAGE_KEY, JSON.stringify([..._briefingCollapsedSections]));
+  } catch {}
+}
+
+function isBriefingSectionCollapsed(sectionKey) {
+  return _briefingCollapsedSections.has(String(sectionKey || ''));
+}
+
+function briefingSectionBodyId(sectionKey) {
+  return `briefing-section-${String(sectionKey || '').replace(/[^a-z0-9_-]/gi, '-')}-body`;
+}
+
+function renderBriefingCollapseButton(sectionKey, label) {
+  const collapsed = isBriefingSectionCollapsed(sectionKey);
+  const safeKey = esc(sectionKey);
+  const safeLabel = esc(label || 'section');
+  return `<button type="button" class="briefing-collapse-btn" data-briefing-collapse="${safeKey}" data-briefing-collapse-label="${safeLabel}" aria-expanded="${collapsed ? 'false' : 'true'}" aria-controls="${esc(briefingSectionBodyId(sectionKey))}" title="${collapsed ? 'Expand' : 'Collapse'} section">${collapsed ? '&#9654;' : '&#9660;'}</button>`;
+}
+
+function findBriefingSection(sectionKey) {
+  return [...document.querySelectorAll('[data-briefing-section]')]
+    .find(section => section.getAttribute('data-briefing-section') === String(sectionKey || ''));
+}
+
+function applyBriefingSectionCollapse(sectionKey) {
+  const section = findBriefingSection(sectionKey);
+  if (!section) return;
+  const collapsed = isBriefingSectionCollapsed(sectionKey);
+  section.classList.toggle('is-collapsed', collapsed);
+  const button = [...section.querySelectorAll('[data-briefing-collapse]')]
+    .find(candidate => candidate.getAttribute('data-briefing-collapse') === String(sectionKey || ''));
+  if (!button) return;
+  const label = button.getAttribute('data-briefing-collapse-label') || 'section';
+  button.innerHTML = collapsed ? '&#9654;' : '&#9660;';
+  button.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  button.setAttribute('aria-label', `${collapsed ? 'Expand' : 'Collapse'} ${label}`);
+  button.setAttribute('title', `${collapsed ? 'Expand' : 'Collapse'} section`);
+}
+
+function applyAllBriefingSectionCollapse() {
+  document.querySelectorAll('[data-briefing-section]').forEach(section => {
+    applyBriefingSectionCollapse(section.getAttribute('data-briefing-section'));
+  });
+}
+
+function bindBriefingCollapseButtons(root = document) {
+  root.querySelectorAll('[data-briefing-collapse]').forEach(button => {
+    if (button.dataset.briefingCollapseBound === '1') return;
+    button.dataset.briefingCollapseBound = '1';
+    button.addEventListener('click', () => {
+      const sectionKey = button.getAttribute('data-briefing-collapse');
+      if (!sectionKey) return;
+      if (isBriefingSectionCollapsed(sectionKey)) {
+        _briefingCollapsedSections.delete(sectionKey);
+      } else {
+        _briefingCollapsedSections.add(sectionKey);
+      }
+      saveBriefingCollapsedSections();
+      applyBriefingSectionCollapse(sectionKey);
+    });
+  });
+}
+
 function copyProjectId(projectId) {
   copyText(projectId, 'Project ID');
 }
@@ -1341,33 +2103,9 @@ function showOauthErrorFromQuery() {
 }
 
 function initLoginBackground() {
-  const loginEl = document.getElementById('login-screen');
-  if (!loginEl || loginEl.style.display === 'none' || _loginVanta) return;
-  if (typeof window.VANTA === 'undefined' || typeof window.VANTA.NET !== 'function') return;
-
-  _loginVanta = window.VANTA.NET({
-    el: '#login-screen',
-    mouseControls: true,
-    touchControls: true,
-    gyroControls: false,
-    minHeight: 200,
-    minWidth: 200,
-    scale: 1,
-    scaleMobile: 1,
-    color: 0x37b4ff,
-    backgroundColor: 0x091326,
-    points: 20,
-    maxDistance: 20,
-    spacing: 20,
-    showDots: true,
-  });
 }
 
 function destroyLoginBackground() {
-  if (_loginVanta && typeof _loginVanta.destroy === 'function') {
-    _loginVanta.destroy();
-  }
-  _loginVanta = null;
 }
 
 document.getElementById('login-form').addEventListener('submit', async e => {
@@ -1406,7 +2144,9 @@ async function initApp() {
       const cfg = await api('GET', '/admin/runtime-config');
       if (cfg?.falkordb_url) _falkordbUrl = cfg.falkordb_url;
     } catch {}
+    document.getElementById('tab-briefing-btn').style.display = '';
     document.getElementById('tab-viewer-btn').style.display = '';
+    document.getElementById('tab-settings-btn').style.display = '';
   }
   if (_me.role !== 'admin') {
     document.getElementById('new-project-btn').style.display = 'none';
@@ -1453,6 +2193,34 @@ function goHome(event) {
 function loadGraphViewerFrame() {
   const frame = document.getElementById('graph-viewer-frame');
   if (frame && !frame.src) frame.src = frame.dataset.src || '/viewer/';
+}
+
+async function loadSettings() {
+  if (_me?.role !== 'admin') return;
+  const userEl = document.getElementById('settings-current-user');
+  const roleEl = document.getElementById('settings-current-role');
+  const verEl  = document.getElementById('settings-app-version');
+  const fdbEl  = document.getElementById('settings-falkordb-url');
+  if (userEl) userEl.textContent = _me.username || '';
+  if (roleEl) roleEl.textContent = _me.role || '';
+  if (verEl)  verEl.textContent  = document.getElementById('app-version')?.textContent || '';
+  if (fdbEl)  fdbEl.textContent  = _falkordbUrl || '—';
+  try {
+    const cfg = await api('GET', '/admin/runtime-config');
+    if (cfg?.falkordb_url) {
+      _falkordbUrl = cfg.falkordb_url;
+      if (fdbEl) fdbEl.textContent = _falkordbUrl;
+    }
+  } catch {}
+}
+
+function switchSettingsSubtab(name, btn) {
+  document.querySelectorAll('#pane-settings .settings-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('#settings-subnav .subtab-btn').forEach(b => b.classList.remove('active'));
+  const section = document.getElementById('settings-section-' + name);
+  if (section) section.classList.add('active');
+  const activeBtn = btn || document.querySelector(`#settings-subnav .subtab-btn[data-subtab="${name}"]`);
+  if (activeBtn) activeBtn.classList.add('active');
 }
 
 function refreshGraphViewer() {
@@ -1528,6 +2296,8 @@ function switchTab(name, btn, options = {}) {
   }
   if (nextName === 'viewer') loadGraphViewerFrame();
   if (nextName === 'users') loadUsers();
+  if (nextName === 'briefing') loadWorkBriefing();
+  if (nextName === 'settings') loadSettings();
   if (nextName === 'audit') {
     loadAudit();
     _auditPollInterval = setInterval(() => {
@@ -1637,6 +2407,11 @@ async function loadProjects() {
   _allProjects = await api('GET', '/auth/projects');
   _projectExternalIdByDbId = {};
   _allProjects.forEach(p => { _projectExternalIdByDbId[p.id] = p.project_id; });
+  const briefingOptions = document.getElementById('briefing-project-options');
+  if (briefingOptions) {
+    const projectIds = [...new Set(_allProjects.map(p => p.project_id).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
+    briefingOptions.innerHTML = projectIds.map(projectId => `<option value="${esc(projectId)}"></option>`).join('');
+  }
   // pre-load tokens for all projects (used by search)
   await Promise.all(_allProjects.map(async p => {
     try { _tokensCache[p.id] = await api('GET', `/auth/projects/${p.id}/tokens`); }
@@ -2242,6 +3017,342 @@ async function loadAudit() {
     toast(e.message, 'error');
   } finally {
     _auditLoading = false;
+  }
+}
+
+function refreshWorkBriefing() {
+  loadWorkBriefing();
+}
+
+function renderBriefingChips(counts, emptyLabel) {
+  const entries = Object.entries(counts || {});
+  if (!entries.length) {
+    return `<span class="briefing-subtle">${esc(emptyLabel)}</span>`;
+  }
+  return entries
+    .sort((left, right) => Number(right[1] || 0) - Number(left[1] || 0) || String(left[0]).localeCompare(String(right[0])))
+    .map(([label, value]) => `
+      <span class="briefing-chip">
+        <span>${esc(label || 'unknown')}</span>
+        <strong>${esc(String(value || 0))}</strong>
+      </span>
+    `)
+    .join('');
+}
+
+function renderBriefingTags(tags) {
+  if (!Array.isArray(tags) || !tags.length) return '';
+  return `
+    <div class="briefing-tag-list">
+      ${tags.map(tag => `<span class="briefing-tag">${esc(String(tag || ''))}</span>`).join('')}
+    </div>
+  `;
+}
+
+function getWorkBriefingTemplateProjectId(payload) {
+  const explicit = document.getElementById('briefing-project-id')?.value.trim();
+  if (explicit) return explicit;
+  if (payload?.project_id) return String(payload.project_id);
+  const projectCounts = Object.entries(payload?.project_counts || {})
+    .sort((left, right) => Number(right[1] || 0) - Number(left[1] || 0) || String(left[0]).localeCompare(String(right[0])));
+  return projectCounts[0]?.[0] || 'PROJECT_ID';
+}
+
+function buildWorkBriefingJsonTemplate(payload) {
+  const projectId = getWorkBriefingTemplateProjectId(payload);
+  return {
+    project_id: projectId,
+    workspace_name: payload?.activities?.find(activity => activity?.project_id === projectId)?.workspace_name || projectId,
+    event_type: 'workflow_complete',
+    external_id: `sample:${projectId.toLowerCase()}:workflow-complete`,
+    title: 'Completed workflow validation',
+    summary: 'Published the latest workflow completion state into CGA.',
+    status: 'completed',
+    tags: ['sample', 'cga', 'briefing'],
+    metadata: {
+      workflowName: 'wf-sample',
+      workflowRunId: '20260526-run1',
+      sourceRepo: projectId,
+    },
+  };
+}
+
+function buildWorkBriefingPowerShellTemplate(payload) {
+  const projectId = getWorkBriefingTemplateProjectId(payload);
+  const endpoint = `${window.location.origin}/api/project/work-briefing/activity`;
+  const jsonPayload = JSON.stringify(buildWorkBriefingJsonTemplate(payload), null, 2);
+  return [
+    `$headers = @{`,
+    `  Authorization = \"Bearer $env:CONTEXTGRAPH_EDGE_AGENT_TOKEN\"`,
+    `  \"X-Project-ID\" = \"${projectId}\"`,
+    `}`,
+    `$body = @'`,
+    jsonPayload,
+    `'@`,
+    `Invoke-RestMethod -Uri \"${endpoint}\" -Method Post -Headers $headers -ContentType \"application/json\" -Body $body`,
+  ].join('\n');
+}
+
+function buildWorkBriefingPythonTemplate(payload) {
+  const projectId = getWorkBriefingTemplateProjectId(payload);
+  const endpoint = `${window.location.origin}/api/project/work-briefing/activity`;
+  const jsonPayload = JSON.stringify(buildWorkBriefingJsonTemplate(payload), null, 2);
+  return [
+    `import json`,
+    `from urllib import request`,
+    ``,
+    `payload = ${jsonPayload}`,
+    `req = request.Request(`,
+    `    \"${endpoint}\",`,
+    `    data=json.dumps(payload).encode(\"utf-8\"),`,
+    `    method=\"POST\",`,
+    `    headers={`,
+    `        \"Authorization\": \"Bearer <CONTEXTGRAPH_EDGE_AGENT_TOKEN>\",`,
+    `        \"X-Project-ID\": \"${projectId}\",`,
+    `        \"Content-Type\": \"application/json\",`,
+    `    },`,
+    `)`,
+    `with request.urlopen(req, timeout=10) as response:`,
+    `    print(response.read().decode(\"utf-8\"))`,
+  ].join('\n');
+}
+
+function renderWorkBriefingRequestTemplates(payload) {
+  const host = document.getElementById('briefing-request-templates');
+  if (!host) return;
+  host.setAttribute('data-briefing-section', 'integration-templates');
+  host.classList.add('briefing-collapsible');
+
+  const projectId = getWorkBriefingTemplateProjectId(payload);
+  const jsonTemplate = JSON.stringify(buildWorkBriefingJsonTemplate(payload), null, 2);
+  const powerShellTemplate = buildWorkBriefingPowerShellTemplate(payload);
+  const pythonTemplate = buildWorkBriefingPythonTemplate(payload);
+  const copyTemplates = {
+    powershell: { value: powerShellTemplate, label: 'PowerShell template' },
+    python: { value: pythonTemplate, label: 'Python template' },
+    json: { value: jsonTemplate, label: 'JSON payload' },
+  };
+
+  host.innerHTML = `
+    <div class="briefing-collapsible-head">
+      <div>
+        <span class="briefing-kicker">Integration Templates</span>
+        <h3>Post activity into CGA from other repos</h3>
+      </div>
+      ${renderBriefingCollapseButton('integration-templates', 'Integration Templates')}
+    </div>
+    <div id="${esc(briefingSectionBodyId('integration-templates'))}" data-briefing-section-content>
+      <p>Use any active project-scoped token for <strong>${esc(projectId)}</strong>. These snippets target the live CGA endpoint and can be copied directly into repo helpers, scripts, or local validation steps.</p>
+      <div class="briefing-command-pill-row">
+        <span class="briefing-command-pill"><span>Endpoint</span><strong>/api/project/work-briefing/activity</strong></span>
+        <span class="briefing-command-pill"><span>Project</span><strong>${esc(projectId)}</strong></span>
+        <span class="briefing-command-pill"><span>Token</span><strong>edge_agent or mcp</strong></span>
+      </div>
+      <div class="briefing-template-grid">
+        <section class="briefing-template-block">
+          <div class="briefing-template-head">
+            <div>
+              <strong>PowerShell</strong>
+              <span>BrowserAgent / ADC scripts</span>
+            </div>
+            <button class="btn btn-sm btn-ghost" data-copy-template="powershell">Copy</button>
+          </div>
+          <pre class="briefing-template-code">${esc(powerShellTemplate)}</pre>
+        </section>
+        <section class="briefing-template-block">
+          <div class="briefing-template-head">
+            <div>
+              <strong>Python</strong>
+              <span>WorkAssist / services</span>
+            </div>
+            <button class="btn btn-sm btn-ghost" data-copy-template="python">Copy</button>
+          </div>
+          <pre class="briefing-template-code">${esc(pythonTemplate)}</pre>
+        </section>
+        <section class="briefing-template-block">
+          <div class="briefing-template-head">
+            <div>
+              <strong>Payload JSON</strong>
+              <span>Minimal event contract</span>
+            </div>
+            <button class="btn btn-sm btn-ghost" data-copy-template="json">Copy</button>
+          </div>
+          <pre class="briefing-template-code">${esc(jsonTemplate)}</pre>
+        </section>
+      </div>
+    </div>
+  `;
+
+  host.querySelectorAll('[data-copy-template]').forEach(button => {
+    button.addEventListener('click', () => {
+      const key = button.getAttribute('data-copy-template');
+      const template = key ? copyTemplates[key] : null;
+      if (!template) return;
+      copyText(template.value, template.label);
+    });
+  });
+  applyBriefingSectionCollapse('integration-templates');
+}
+
+function renderWorkBriefing(summary = _workBriefingSummary) {
+  const payload = summary || {
+    project_id: null,
+    total_events: 0,
+    event_type_counts: {},
+    status_counts: {},
+    project_counts: {},
+    activities: [],
+  };
+
+  const activities = Array.isArray(payload.activities) ? payload.activities : [];
+  const projectCounts = payload.project_counts || {};
+  const eventEntries = Object.entries(payload.event_type_counts || {})
+    .sort((left, right) => Number(right[1] || 0) - Number(left[1] || 0) || String(left[0]).localeCompare(String(right[0])));
+  const topProjects = Object.entries(projectCounts)
+    .sort((left, right) => Number(right[1] || 0) - Number(left[1] || 0) || String(left[0]).localeCompare(String(right[0])))
+    .slice(0, 3);
+  const commandCenter = document.getElementById('briefing-command-center');
+  const workloadShape = document.getElementById('briefing-workload-shape');
+
+  if (commandCenter) {
+    commandCenter.setAttribute('data-briefing-section', 'command-center');
+    commandCenter.classList.add('briefing-collapsible');
+    const topActivities = activities.slice(0, 3);
+    commandCenter.innerHTML = `
+      <div class="briefing-collapsible-head">
+        <div>
+          <span class="briefing-kicker">Command Center</span>
+          <h3>${payload.project_id ? `Focus on ${esc(payload.project_id)}` : 'Cross-project work pulse'}</h3>
+        </div>
+        ${renderBriefingCollapseButton('command-center', 'Command Center')}
+      </div>
+      <div id="${esc(briefingSectionBodyId('command-center'))}" data-briefing-section-content>
+        <p>${payload.total_events
+          ? `Tracking ${esc(String(payload.total_events))} recent event${Number(payload.total_events) === 1 ? '' : 's'} across the current dashboard scope.`
+          : 'No work events have been captured yet. Once MCP activity arrives, this panel will summarize what deserves attention first.'}</p>
+        <div class="briefing-command-pill-row">
+          <span class="briefing-command-pill"><span>Scope</span><strong>${esc(payload.project_id || 'All projects')}</strong></span>
+          <span class="briefing-command-pill"><span>Projects</span><strong>${esc(String(Object.keys(projectCounts).length))}</strong></span>
+          <span class="briefing-command-pill"><span>Latest</span><strong>${esc(activities[0]?.occurred_at ? relativeTimeLabel(activities[0].occurred_at) : 'none')}</strong></span>
+        </div>
+        <div class="briefing-focus-list">
+          ${topActivities.length
+            ? topActivities.map(activity => `
+              <article class="briefing-focus-item">
+                <strong>${esc(activity.title || activity.event_type || 'Activity')}</strong>
+                <span>${esc(activity.project_id || 'unknown project')} · ${esc(activity.summary || activity.body_text || 'No summary provided')}</span>
+              </article>
+            `).join('')
+            : `<div class="briefing-empty">Recent focus items will appear here after activity is recorded.</div>`}
+        </div>
+      </div>
+    `;
+  }
+
+  if (workloadShape) {
+    workloadShape.setAttribute('data-briefing-section', 'workload-shape');
+    workloadShape.classList.add('briefing-collapsible');
+    workloadShape.innerHTML = `
+      <div class="briefing-collapsible-head">
+        <div>
+          <span class="briefing-kicker">Workload Shape</span>
+          <h3>Activity distribution</h3>
+        </div>
+        ${renderBriefingCollapseButton('workload-shape', 'Workload Shape')}
+      </div>
+      <div id="${esc(briefingSectionBodyId('workload-shape'))}" data-briefing-section-content>
+        <p>${topProjects.length
+          ? `${esc(topProjects[0][0])} currently leads this snapshot with ${esc(String(topProjects[0][1]))} event${Number(topProjects[0][1]) === 1 ? '' : 's'}.`
+          : 'Project and event concentration will render here once the dashboard has data.'}</p>
+        <div class="briefing-shape-list">
+          ${eventEntries.length
+            ? eventEntries.slice(0, 4).map(([label, value]) => {
+                const percent = payload.total_events ? Math.max(8, Math.round((Number(value || 0) / Math.max(1, Number(payload.total_events || 0))) * 100)) : 0;
+                return `
+                  <div class="briefing-shape-row">
+                    <label>${esc(label)}</label>
+                    <div class="briefing-shape-track"><div class="briefing-shape-fill" style="width:${percent}%"></div></div>
+                    <span class="briefing-shape-value">${esc(String(value || 0))}</span>
+                  </div>
+                `;
+              }).join('')
+            : `<div class="briefing-empty">No event types recorded yet.</div>`}
+        </div>
+      </div>
+    `;
+  }
+
+  renderWorkBriefingRequestTemplates(payload);
+
+  document.getElementById('briefing-total-events').textContent = String(payload.total_events || 0);
+  document.getElementById('briefing-selected-project').textContent = payload.project_id || 'all projects';
+  document.getElementById('briefing-project-total').textContent = String(Object.keys(projectCounts).length);
+  document.getElementById('briefing-project-counts').innerHTML = renderBriefingChips(projectCounts, 'No project activity yet');
+  document.getElementById('briefing-event-types').innerHTML = renderBriefingChips(payload.event_type_counts || {}, 'No event types recorded');
+  document.getElementById('briefing-status-counts').innerHTML = renderBriefingChips(payload.status_counts || {}, 'No statuses recorded');
+
+  const briefingPane = document.getElementById('pane-briefing') || document;
+  bindBriefingCollapseButtons(briefingPane);
+  applyAllBriefingSectionCollapse();
+
+  const tbody = document.getElementById('briefing-activities-body');
+  if (!activities.length) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">No work activity found for the current scope</div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = activities.map(activity => {
+    const projectLabel = activity.project_id || '—';
+    const workspaceLabel = activity.workspace_name || '—';
+    const statusMarkup = activity.status
+      ? `<span class="role-tag${activity.status === 'done' ? '' : ' developer'}">${esc(activity.status)}</span>`
+      : '<span style="color:var(--muted)">—</span>';
+    const summaryText = activity.summary || activity.body_text || '—';
+    const occurredAt = activity.occurred_at || '';
+    return `
+      <tr>
+        <td style="text-align:center;font-family:monospace;font-size:12px">${esc(projectLabel)}</td>
+        <td style="text-align:center;font-size:12px">${esc(workspaceLabel)}</td>
+        <td style="text-align:center">${esc(activity.event_type || '—')}</td>
+        <td>
+          <div class="briefing-title-cell">
+            <strong>${esc(activity.title || 'Untitled activity')}</strong>
+            ${renderBriefingTags(activity.tags)}
+          </div>
+        </td>
+        <td style="text-align:center">${statusMarkup}</td>
+        <td>
+          <div class="briefing-time" title="${esc(occurredAt)}">
+            <span>${esc(relativeTimeLabel(occurredAt))}</span>
+            <span>${esc(occurredAt || '—')}</span>
+          </div>
+        </td>
+        <td style="font-size:12px;line-height:1.5">${esc(summaryText)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function loadWorkBriefing() {
+  if (_workBriefingLoading) return;
+  _workBriefingLoading = true;
+  const tbody = document.getElementById('briefing-activities-body');
+  if (tbody) {
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">Loading dashboard…</div></td></tr>`;
+  }
+
+  try {
+    const projectId = document.getElementById('briefing-project-id')?.value.trim() || '';
+    const limit = Math.max(1, Math.min(Number(document.getElementById('briefing-limit')?.value || 25), 100));
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (projectId) params.set('project_id', projectId);
+    _workBriefingSummary = await api('GET', '/admin/work-briefing?' + params.toString());
+    renderWorkBriefing(_workBriefingSummary);
+  } catch (e) {
+    toast(e.message, 'error');
+    renderWorkBriefing();
+  } finally {
+    _workBriefingLoading = false;
   }
 }
 

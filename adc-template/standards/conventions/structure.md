@@ -12,7 +12,7 @@ project-root/
 │   │   ├── release/         # Final production artifacts
 │   │   ├── staging/         # Pre-production build output
 │   │   └── build/           # Intermediate build cache
-│   ├── contextgraph-mcp/              # ContextGraph MCP Server implementation
+│   ├── contextgraph-mcp/              # CGA MCP Server implementation
 │   ├── contextgraph-edge-agent/       # ContextGraph Edge Agent implementation
 │   ├── scripts/             # Utility scripts for building, deploying, local dev
 │   └── ... (application modules)

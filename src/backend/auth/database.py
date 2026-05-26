@@ -76,13 +76,47 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DE
 CREATE INDEX IF NOT EXISTS idx_audit_logs_scope ON audit_logs(scope);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_project_id ON audit_logs(project_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_name ON audit_logs(actor_name);
+
+CREATE TABLE IF NOT EXISTS work_activities (
+    activity_id       TEXT PRIMARY KEY,
+    plugin_id         TEXT NOT NULL,
+    source_system     TEXT NOT NULL,
+    source_type       TEXT NOT NULL,
+    source_item_id    TEXT NOT NULL,
+    project_id        TEXT NOT NULL,
+    workspace_name    TEXT,
+    event_type        TEXT NOT NULL,
+    title             TEXT NOT NULL,
+    summary           TEXT NOT NULL DEFAULT '',
+    body_text         TEXT NOT NULL DEFAULT '',
+    status            TEXT,
+    priority          TEXT,
+    owner             TEXT,
+    source_url        TEXT,
+    tags_json         TEXT NOT NULL DEFAULT '[]',
+    occurred_at       TEXT NOT NULL,
+    synced_at         TEXT NOT NULL,
+    content_hash      TEXT NOT NULL,
+    raw_metadata_json TEXT NOT NULL DEFAULT '{}',
+    embedding_text    TEXT NOT NULL DEFAULT ''
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_work_activities_identity
+    ON work_activities(plugin_id, project_id, source_type, source_item_id);
+
+CREATE INDEX IF NOT EXISTS idx_work_activities_project_time
+    ON work_activities(project_id, occurred_at DESC, synced_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_work_activities_time
+    ON work_activities(occurred_at DESC, synced_at DESC);
 """
 
 
-async def init_db() -> None:
+async def init_db(db_path: str | None = None) -> None:
     """Create tables if they do not exist."""
-    Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
-    async with aiosqlite.connect(DB_PATH) as db:
+    target_db_path = db_path or DB_PATH
+    Path(target_db_path).parent.mkdir(parents=True, exist_ok=True)
+    async with aiosqlite.connect(target_db_path) as db:
         await db.executescript(_CREATE_TABLES)
         # Migrations: add columns that may not exist in older DBs
         try:

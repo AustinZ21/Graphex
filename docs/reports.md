@@ -11,7 +11,7 @@ This report captures the latest repository structure and convention updates requ
 2. Added ContextGraph integration requirements:
    - ContextGraph project registration endpoint
    - ContextGraph Edge Agent integration guidance
-   - ContextGraph MCP Server integration guidance
+   - CGA MCP Server integration guidance
 3. Standardized build output location to `src/dist`.
 4. Added and standardized runtime log location at `src/log`.
 5. Renamed source utility scripts folder from `src/scripts` to `src/script` and aligned documentation references.

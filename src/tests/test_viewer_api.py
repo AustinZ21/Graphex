@@ -222,7 +222,7 @@ def test_viewer_entrypoint_is_served() -> None:
     assert "<title>CGA Viewer</title>" in response.text
     assert '"sigma"' in response.text
     assert '"graphology"' in response.text
-    assert 'src="./main.js?v=1.29.85"' in response.text
+    assert 'src="./main.js?v=1.29.93"' in response.text
     assert 'id="copy-falkor-url"' in response.text
     assert 'aria-label="Copy FalkorDB connection URL"' in response.text
     assert '<label for="chunk-limit">Display Nodes</label>' in response.text
@@ -319,15 +319,26 @@ def test_admin_embeds_versioned_graph_viewer() -> None:
     response = TestClient(app).get("/admin")
 
     assert response.status_code == 200
-    assert 'data-src="/viewer/?v=1.29.85"' in response.text
+    assert 'data-src="/viewer/?v=1.29.93"' in response.text
     assert "const ADMIN_TAB_ROUTES" in response.text
     assert "viewer: '/admin/graph'" in response.text
+
+
+def test_admin_exposes_settings_tab() -> None:
+    response = TestClient(app).get("/admin")
+
+    assert response.status_code == 200
+    assert "settings: '/admin/settings'" in response.text
+    assert 'id="tab-settings-btn"' in response.text
+    assert 'id="pane-settings"' in response.text
+    # Admin-only visibility is enforced via display:none + canOpenAdminTab.
+    assert 'id="tab-settings-btn" style="display:none"' in response.text
 
 
 def test_admin_deep_links_are_served() -> None:
     client = TestClient(app)
 
-    for path in ["/admin/projects", "/admin/users", "/admin/audit", "/admin/graph"]:
+    for path in ["/admin/projects", "/admin/users", "/admin/audit", "/admin/graph", "/admin/settings"]:
         response = client.get(path)
         assert response.status_code == 200
         assert "<title>CGA (ContextGraphAdmin)</title>" in response.text

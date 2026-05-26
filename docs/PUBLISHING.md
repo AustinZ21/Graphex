@@ -64,7 +64,7 @@ docker compose -f docker-compose.release.yml up -d
 
 Open:
 - Admin UI: `http://localhost:8000/admin`
-- MCP discovery: `http://localhost:8000/mcp`
+- MCP SSE (`cga-mcp-server`): `http://localhost:8000/mcp/sse`
 - FalkorDB Browser: `http://localhost:13000`
 
 Pin a specific release image by setting `CGA_VERSION` in `.env`:

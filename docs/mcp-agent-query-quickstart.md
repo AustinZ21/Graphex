@@ -1,6 +1,6 @@
-# ContextGraph MCP Query Quickstart
+# CGA MCP Query Quickstart
 
-This quickstart shows how an agent can query graph results through the ContextGraph MCP server.
+This quickstart shows how an agent can query graph results through `cga-mcp-server`.
 
 ## 1) Start dependencies
 

@@ -106,6 +106,30 @@ services:
       timeout: 3s
       retries: 3
 
+  backup-dev:
+    image: 'alpine:3.20'
+    container_name: cga-backup-dev
+    profiles: [dev]
+    restart: unless-stopped
+    environment:
+      - BACKUP_STACK_NAME=cga-dev
+      - BACKUP_ROOT=/backups
+      - AUTH_DB_PATH=/authdb/auth.db
+      - FALKORDB_DATA_DIR=/falkordb-data
+      - BACKUP_INTERVAL_SECONDS=${CGA_BACKUP_INTERVAL_SECONDS:-3600}
+      - BACKUP_KEEP_COUNT=${CGA_BACKUP_KEEP_COUNT:-168}
+    volumes:
+      - auth_db_dev_data:/authdb:ro
+      - falkordb_dev_data:/falkordb-data:ro
+      - ${CGA_BACKUP_DIR:-./data/backups}:/backups
+      - ./src/scripts/backup-runtime-data.sh:/usr/local/bin/backup-runtime-data.sh:ro
+    command: ['/bin/sh', '/usr/local/bin/backup-runtime-data.sh']
+    depends_on:
+      api-dev:
+        condition: service_healthy
+      falkordb-dev:
+        condition: service_healthy
+
   gateway:
     build:
       context: .

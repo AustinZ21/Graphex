@@ -1,4 +1,4 @@
-"""Pure-ASGI middleware: validate Bearer project tokens on /mcp paths.
+"""Pure-ASGI middleware: validate Bearer project tokens on /mcp and /api/project paths.
 
 Uses a pure ASGI class (not BaseHTTPMiddleware) so that ContextVar values
 set here propagate correctly into route handlers and MCP tool functions.
@@ -11,14 +11,34 @@ from typing import TYPE_CHECKING
 import aiosqlite
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from backend.auth.context import _current_project_db_id, _current_project_external_id
 from backend.auth.database import DB_PATH
 from backend.auth.security import hash_token
 
 if TYPE_CHECKING:
     pass
 
-# Paths that require project-token authentication
-_PROTECTED_PREFIXES = ("/mcp",)
+_PROTECTED_ROUTE_RULES = (
+    {
+        "prefix": "/mcp",
+        "allowed_token_types": frozenset({"mcp"}),
+        "require_project_id": True,
+        "endpoint_label": "MCP endpoint",
+    },
+    {
+        "prefix": "/api/project",
+        "allowed_token_types": frozenset({"mcp", "edge_agent"}),
+        "require_project_id": False,
+        "endpoint_label": "project endpoint",
+    },
+)
+
+
+def _match_route_rule(path: str) -> dict | None:
+    for rule in _PROTECTED_ROUTE_RULES:
+        if path.startswith(rule["prefix"]):
+            return rule
+    return None
 
 
 async def _send_error(send: Send, body: dict, status: int) -> None:
@@ -37,7 +57,7 @@ async def _send_error(send: Send, body: dict, status: int) -> None:
 
 
 class ProjectTokenMiddleware:
-    """Pure ASGI middleware that validates MCP Bearer tokens per-project."""
+    """Pure ASGI middleware that validates project Bearer tokens by route policy."""
 
     def __init__(self, app: ASGIApp) -> None:
         self.app = app
@@ -48,7 +68,8 @@ class ProjectTokenMiddleware:
             return
 
         path = scope.get("path", "")
-        if not any(path.startswith(p) for p in _PROTECTED_PREFIXES):
+        route_rule = _match_route_rule(path)
+        if route_rule is None:
             await self.app(scope, receive, send)
             return
 
@@ -74,7 +95,7 @@ class ProjectTokenMiddleware:
             project_id_raw = params.get("project_id", "")
 
         project_id = project_id_raw.strip()
-        if not project_id:
+        if not project_id and route_rule["require_project_id"]:
             await _send_error(
                 send, {"detail": "Missing project_id (use X-Project-ID header)"}, 401
             )
@@ -106,13 +127,17 @@ class ProjectTokenMiddleware:
             await _send_error(send, {"detail": "Invalid token"}, 401)
             return
 
-        if row["token_type"] != "mcp":
+        if row["token_type"] not in route_rule["allowed_token_types"]:
             await _send_error(
-                send, {"detail": "Token type not allowed for MCP endpoint"}, 403
+                send,
+                {"detail": f"Token type not allowed for {route_rule['endpoint_label']}"},
+                403,
             )
             return
 
-        if row["project_external_id"] != project_id:
+        effective_project_id = project_id or str(row["project_external_id"])
+
+        if row["project_external_id"] != effective_project_id:
             await _send_error(
                 send, {"detail": "Token is not valid for this project_id"}, 403
             )
@@ -121,17 +146,22 @@ class ProjectTokenMiddleware:
         # Store auth context in ASGI scope state (readable via request.state)
         if "state" not in scope:
             scope["state"] = {}
-        scope["state"]["project_id"] = row["project_external_id"]
+        scope["state"]["project_id"] = effective_project_id
         scope["state"]["project_db_id"] = row["project_id"]
         scope["state"]["project_name"] = row["project_name"]
         scope["state"]["project_token_id"] = row["id"]
+        scope["state"]["project_token_type"] = row["token_type"]
 
         # Set ContextVar so MCP tool functions pick up the right project graph.
         # Pure ASGI middleware propagates ContextVars correctly (unlike BaseHTTPMiddleware).
         from backend.graph.registry import _current_project_name
 
         token_var = _current_project_name.set(row["project_name"].strip().lower())
+        project_id_var = _current_project_external_id.set(effective_project_id)
+        project_db_var = _current_project_db_id.set(int(row["project_id"]))
         try:
             await self.app(scope, receive, send)
         finally:
+            _current_project_db_id.reset(project_db_var)
+            _current_project_external_id.reset(project_id_var)
             _current_project_name.reset(token_var)

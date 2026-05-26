@@ -1,11 +1,48 @@
 # CGA (ContextGraphAdmin)
 
-**Version:** 1.29.87
+**Version:** 1.29.93
 **Status:** Published
 **Author:** Nate Scott
-**Date:** 2026-05-18 (Docker Desktop launcher polish)
+**Date:** 2026-05-26 (CGA MCP server naming standardized as cga-mcp-server and ADC guidance aligned)
 
 CGA, aka ContextGraphAdmin, is a local-first graph context service for AI-assisted development. It indexes repository structure, symbols, calls, imports, and lightweight data flow into FalkorDB, then exposes retrieval and analysis tools through an MCP-compatible API.
+
+It also hosts WA-compatible work briefing aggregation so progress signals from other repos can be recorded and summarized centrally inside CGA through the Admin Dashboard surface.
+
+## Work Briefing Aggregation
+
+CGA now includes a built-in work activity domain adapted from WorkAssist so cross-project progress can roll up into one admin surface.
+
+- Admin UI: `http://localhost:18001/admin/briefing` (collapsible Dashboard tab in the Admin menu)
+- Admin summary API: `/api/admin/work-briefing`
+- Admin activity list API: `/api/admin/work-briefing/activities`
+- Admin briefing dashboard includes copyable PowerShell, Python, and JSON request templates for project-scoped activity publishing.
+- Project-scoped ingest API: `POST /api/project/work-briefing/activity`
+- Project-scoped summary APIs: `GET /api/project/work-briefing`, `GET /api/project/work-briefing/activities`
+- MCP tools: `workassist_record_activity`, `workassist_list_recent_activity`, `workassist_get_activity_briefing`
+
+These WA-compatible tools are hosted directly by `cga-mcp-server`, so CGA does not need a separate WA MCP runtime for the merged work briefing slice.
+
+Recorded activity is stored in the local SQLite auth database under the `work_activities` table, which lets CGA keep project progress local-first alongside its existing project and audit metadata.
+
+## Runtime Persistence And Backup
+
+- CGA runtime state is persisted in Docker volumes for the auth database and FalkorDB graph data.
+- The repo-root desktop stack and the dev-profile stack do not share the same Docker volume names by default, so switching stacks without migration can make the UI appear empty even when the older data still exists in another volume.
+- A backup sidecar now snapshots both `auth.db` and FalkorDB runtime data into `data/backups/` every hour by default.
+- Override the backup destination with `CGA_BACKUP_DIR` and the schedule with `CGA_BACKUP_INTERVAL_SECONDS` / `CGA_BACKUP_KEEP_COUNT`.
+- The latest snapshots are always written as `auth-latest.db` and `falkordb-latest.tgz` under the stack-specific backup folder.
+- Use `src/scripts/manage-runtime-data.ps1` to inspect, back up, restore, or migrate runtime data across `desktop`, `dev-legacy`, and `dev` volume presets.
+- `restore` and `migrate` now emit JSON operation reports under `tmp/runtime-data-reports/`, including backup validation, safety-backup location, and pre/post stack summaries.
+
+Examples:
+
+```powershell
+./src/scripts/manage-runtime-data.ps1 inspect -SourceStack desktop -TargetStack dev-legacy
+./src/scripts/manage-runtime-data.ps1 backup -SourceStack desktop
+./src/scripts/manage-runtime-data.ps1 restore -TargetStack desktop -BackupPath .\data\backups\cga-desktop -Force
+./src/scripts/manage-runtime-data.ps1 migrate -SourceStack dev-legacy -TargetStack desktop -Force
+```
 
 ## Public Quick Start
 
@@ -13,14 +50,25 @@ Prerequisites:
 - Git
 - Docker Desktop or Docker Engine with Docker Compose v2
 
-Docker Desktop one-click path:
+Docker Desktop distribution bundle:
+
+```powershell
+Set-Location .\deploy\docker-desktop
+./start-desktop.ps1 start
+```
+
+Windows Explorer non-technical path:
+- Open `deploy/docker-desktop`
+- Double-click `start-cga-desktop.cmd`
+
+Repository-root desktop path:
 
 ```powershell
 Copy-Item .env.example .env
 ./src/scripts/start-desktop.ps1 start
 ```
 
-Windows Explorer one-click entrypoints:
+Repository-root one-click entrypoints:
 - `start-cga-desktop.cmd`: starts containers and opens the Admin UI
 - `open-cga-desktop.cmd`: reopens the Admin UI using the last saved desktop port
 - `stop-cga-desktop.cmd`: stops the desktop stack
@@ -47,7 +95,28 @@ Open:
 - MCP discovery: `http://localhost:18001/mcp`
 - FalkorDB Browser: `http://localhost:13001`
 
+Recommended non-technical distribution files live under `deploy/docker-desktop`.
+
+To build a zip-ready self-contained package from the repo, run:
+
+```powershell
+Set-Location .\deploy\docker-desktop
+./build-portable-bundle.ps1
+```
+
+To build a versioned release folder and zip archive, run:
+
+```powershell
+Set-Location .\deploy\docker-desktop
+./build-release-bundle.ps1
+```
+
 Docker Desktop recommended entry files:
+- `deploy/docker-desktop/docker-compose.yml`: local-build desktop bundle
+- `deploy/docker-desktop/start-desktop.ps1`: self-contained desktop launcher
+- `deploy/docker-desktop/README.md`: end-user bundle instructions
+- `deploy/docker-desktop/build-portable-bundle.ps1`: generates a zip-ready standalone desktop package under `dist/CGA-Docker-Desktop`
+- `deploy/docker-desktop/build-release-bundle.ps1`: generates a versioned release folder and zip under `dist/releases`
 - `docker-compose.desktop.yml`: single-machine local deployment with sane defaults
 - `src/scripts/start-desktop.ps1`: start/stop/status/logs wrapper for local desktop usage
 - `start-cga-desktop.cmd`: Windows double-click launcher
@@ -58,7 +127,7 @@ Docker Desktop recommended entry files:
 The Docker Desktop package intentionally uses `18001`, `16381`, and `13001` so it does not collide with the legacy dev profile defaults.
 The launcher also saves the last active desktop ports under `tmp/cga-desktop-runtime.json` so reopening from a fresh shell still targets the correct local URL.
 
-Default local credentials come from `.env.example`. Change `JWT_SECRET_KEY`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` before exposing the service beyond localhost.
+Default local credentials come from the active launcher's `.env.example`. Change `JWT_SECRET_KEY`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` before exposing the service beyond localhost.
 
 For release packaging, GitHub tags, GHCR images, and maintainer steps, see [docs/PUBLISHING.md](docs/PUBLISHING.md).
 
@@ -347,7 +416,9 @@ To ensure that human developers always have an accurate mental model of the syst
 To achieve true project portability for AI Agents, the project must ship with its own toolsets. The `.adc/mcp/` directory stores the configuration files required to bootstrap **Model Context Protocol (MCP)** servers.
 - **Portability**: "When cloning this repository on a new machine, the user or AI can directly import `.adc/mcp/mcp-servers.json` into their local AI client (like Cursor or Claude Desktop) to instantly gain access to the project's dedicated database connections, API wrappers, or internal corporate context tools."
 - **Constraint**: "Any new external integrations (e.g., adding a PostgreSQL database) MUST be accompanied by an update to the MCP configuration so that future AI agents inherit the ability to query that database directly."
-- **ContextGraph Bootstrap Indexing**: "After integrating ContextGraph Edge Agent and ContextGraph MCP Server for a project, you MUST initialize one full-project index through ContextGraph before executing feature tasks. Subsequent updates MUST use incremental indexing on changed files."
+- **CGA MCP Server Profile Standard**: "ADC-compliant projects MUST provide a preconfigured `cga-mcp-server` entry in `.adc/contextgraph-edge-agent/mcp/mcp-servers.json` so new repositories automatically inherit the CGA MCP Server wiring."
+- **Default CGA MCP Endpoint**: "For the local dev CGA API profile, use the SSE MCP endpoint `http://localhost:18001/mcp/sse` with `Authorization` and `X-Project-ID` headers."
+- **ContextGraph Bootstrap Indexing**: "After integrating ContextGraph Edge Agent and CGA MCP Server for a project, you MUST initialize one full-project index through ContextGraph before executing feature tasks. Subsequent updates MUST use incremental indexing on changed files."
 - **ContextGraph Policy Rule**: "Use ContextGraph Edge Agent workspace files (`.adc/contextgraph-edge-agent/tasks/`, `.adc/contextgraph-edge-agent/scratchpad/`) for orchestration state only. Canonical requirements and architecture decisions MUST remain in planning/standards/knowledge files."
 - **ContextGraph Execution Rule**: "ContextGraph MCP integrations are for retrieval/indexing and external context operations. Local build/test/deploy execution MUST remain on native project tooling."
 - **ContextGraph Secret Rule**: "ContextGraph credentials (`CONTEXTGRAPH_PROJECT_ID`, `CONTEXTGRAPH_MCP_TOKEN`, `CONTEXTGRAPH_EDGE_AGENT_TOKEN`) MUST be injected through environment variables and MUST NOT be committed in tracked files."

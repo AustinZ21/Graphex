@@ -30,6 +30,7 @@ from pathlib import Path
 import structlog
 from mcp.server.fastmcp import FastMCP
 
+from backend.auth.context import _current_project_external_id
 from backend.agent.query_strategy import run_cg_first_strategy
 from backend.graph.client import GraphClient
 from backend.graph.registry import GraphRegistry
@@ -38,16 +39,18 @@ from backend.perf.context_quality import benchmark_context_quality as run_contex
 from backend.perf.token_efficiency import benchmark_token_efficiency as run_token_efficiency_benchmark
 from backend.tools.producer import MCPProducer
 from backend.queue.streams import JobConsumer
+from backend.workbriefing.service import WorkActivityValidationError, WorkBriefingService
 
 log = structlog.get_logger()
 
-mcp = FastMCP("cga")
+mcp = FastMCP("cga-mcp-server")
 
 _registry: GraphRegistry | None = None
 _producer: MCPProducer | None = None
 _consumer: JobConsumer | None = None
 _cache = None           # QueryCache | None  – set via init()
 _recorder = None        # TraceRecorder | None  – set via init()
+_work_briefing_service: WorkBriefingService | None = None
 _repo_root = Path(os.getenv("CONTEXTGRAPH_REPO_ROOT", ".")).resolve()
 
 
@@ -148,20 +151,42 @@ def init(
     cache=None,
     recorder=None,
     consumer=None,
+    work_briefing_service: WorkBriefingService | None = None,
 ) -> None:
     """Wire dependencies after app startup."""
-    global _registry, _producer, _cache, _recorder, _consumer
+    global _registry, _producer, _cache, _recorder, _consumer, _work_briefing_service
     _registry = registry
     _producer = producer
     _cache = cache
     _recorder = recorder
     _consumer = consumer
+    _work_briefing_service = work_briefing_service
 
 
 def set_consumer(consumer) -> None:
     """Set the consumer after initialization (useful when consumer is created after init)."""
     global _consumer
     _consumer = consumer
+
+
+def _require_work_briefing_service() -> WorkBriefingService:
+    if _work_briefing_service is None:
+        raise RuntimeError("Work briefing service not initialized")
+    return _work_briefing_service
+
+
+def _resolve_project_external_id(project_id: str | None = None) -> str:
+    bound_project_id = _current_project_external_id.get().strip()
+    if project_id is not None:
+        cleaned = project_id.strip()
+        if not cleaned:
+            raise WorkActivityValidationError("project_id is required")
+        if bound_project_id and cleaned != bound_project_id:
+            raise WorkActivityValidationError("project_id must match the authenticated MCP project")
+        return cleaned
+    if bound_project_id:
+        return bound_project_id
+    raise WorkActivityValidationError("project_id is required")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1241,4 +1266,70 @@ def detect_cycles() -> list[dict]:
         ]
     
     return _cached_read("detect_cycles", {}, _fetch)
+
+
+@mcp.tool()
+async def workassist_record_activity(
+    event_type: str,
+    title: str,
+    project_id: str | None = None,
+    workspace_name: str | None = None,
+    external_id: str | None = None,
+    summary: str | None = None,
+    body_text: str | None = None,
+    status: str | None = None,
+    priority: str | None = None,
+    owner: str | None = None,
+    source_url: str | None = None,
+    tags: list[str] | None = None,
+    occurred_at: str | None = None,
+    metadata: dict | None = None,
+) -> dict:
+    """Record one project work event for CGA-hosted WorkAssist briefing aggregation."""
+    service = _require_work_briefing_service()
+    resolved_project_id = _resolve_project_external_id(project_id)
+    payload = {
+        "project_id": resolved_project_id,
+        "workspace_name": workspace_name or _resolve_project_name(),
+        "event_type": event_type,
+        "external_id": external_id,
+        "title": title,
+        "summary": summary,
+        "body_text": body_text,
+        "status": status,
+        "priority": priority,
+        "owner": owner,
+        "source_url": source_url,
+        "tags": tags,
+        "occurred_at": occurred_at,
+        "metadata": metadata,
+    }
+    result = await service.record_activity(payload)
+    return {
+        "operation": result.operation,
+        "activity": result.activity.to_dict(),
+    }
+
+
+@mcp.tool()
+async def workassist_list_recent_activity(project_id: str | None = None, limit: int = 25) -> dict:
+    """List recent activity for the authenticated MCP project."""
+    service = _require_work_briefing_service()
+    resolved_project_id = _resolve_project_external_id(project_id)
+    safe_limit = max(1, min(int(limit), 100))
+    activities = await service.list_recent(project_id=resolved_project_id, limit=safe_limit)
+    return {
+        "project_id": resolved_project_id,
+        "count": len(activities),
+        "activities": [activity.to_dict() for activity in activities],
+    }
+
+
+@mcp.tool()
+async def workassist_get_activity_briefing(project_id: str | None = None, limit: int = 25) -> dict:
+    """Summarize recent activity for the authenticated MCP project."""
+    service = _require_work_briefing_service()
+    resolved_project_id = _resolve_project_external_id(project_id)
+    safe_limit = max(1, min(int(limit), 100))
+    return await service.get_briefing(project_id=resolved_project_id, limit=safe_limit)
 

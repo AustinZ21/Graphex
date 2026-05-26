@@ -98,5 +98,9 @@ out/
 
 *.ps1
 !src/scripts/*.ps1
+!deploy/docker-desktop/*.ps1
+
+# Generated local release bundles
+deploy/docker-desktop/dist/
 
 config/

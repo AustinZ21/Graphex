@@ -1,7 +1,7 @@
 import Graphology from 'graphology'
 import Sigma from 'sigma'
 
-const VIEWER_VERSION = '1.29.87'
+const VIEWER_VERSION = '1.29.93'
 const EDGE_STYLES = {
   CALLS: { label: 'Calls', color: '#4ae387', width: 1.7, priority: 6 },
   IMPORTS: { label: 'Imports', color: '#5badff', width: 1.45, priority: 5 },
@@ -1304,7 +1304,13 @@ async function loadProjects() {
   setStatus('Loading projects...')
   try {
     const projects = await api('/api/auth/projects')
-    const activeProjects = projects.filter((project) => project.is_active)
+    const activeProjects = projects
+      .filter((project) => project.is_active)
+      .sort((left, right) => {
+        const leftName = String(left.project_name || '')
+        const rightName = String(right.project_name || '')
+        return leftName.localeCompare(rightName, undefined, { sensitivity: 'base' })
+      })
     elements.projectSelect.replaceChildren(
       ...activeProjects.map((project) => {
         const option = document.createElement('option')

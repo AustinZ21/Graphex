@@ -13,11 +13,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..")
-$composeFile = Join-Path $repoRoot 'docker-compose.desktop.yml'
-$envExample = Join-Path $repoRoot '.env.example'
-$envFile = Join-Path $repoRoot '.env'
-$runtimeStateFile = Join-Path $repoRoot 'tmp\cga-desktop-runtime.json'
+$bundleRoot = Resolve-Path $PSScriptRoot
+$composeFile = Join-Path $bundleRoot 'docker-compose.yml'
+$envExample = Join-Path $bundleRoot '.env.example'
+$envFile = Join-Path $bundleRoot '.env'
+$runtimeStateFile = Join-Path $bundleRoot 'tmp\cga-desktop-runtime.json'
 
 function Test-PortAvailable {
     param([int]$Port)
@@ -115,7 +115,7 @@ function Invoke-Compose {
     }
 }
 
-Set-Location $repoRoot
+Set-Location $bundleRoot
 
 if (-not (Test-Path $envFile) -and (Test-Path $envExample)) {
     Copy-Item $envExample $envFile
@@ -140,7 +140,7 @@ else {
 $env:CGA_DESKTOP_API_PORT = "$apiPreferred"
 $env:CGA_DESKTOP_FALKORDB_PORT = "$graphPreferred"
 $env:CGA_DESKTOP_BROWSER_PORT = "$browserPreferred"
-$backupLocation = if ($env:CGA_BACKUP_DIR) { $env:CGA_BACKUP_DIR } else { Join-Path $repoRoot 'data\backups' }
+$backupLocation = if ($env:CGA_BACKUP_DIR) { $env:CGA_BACKUP_DIR } else { Join-Path $bundleRoot 'data\backups' }
 
 switch ($Command) {
     'start' {
@@ -152,6 +152,7 @@ switch ($Command) {
         }
         Save-DesktopRuntimeState -ApiPort $apiPreferred -GraphPort $graphPreferred -BrowserPort $browserPreferred
         Write-Host "Admin UI: http://localhost:$apiPreferred/admin"
+        Write-Host "MCP URL: http://localhost:$apiPreferred/mcp"
         Write-Host "FalkorDB Browser: http://localhost:$browserPreferred"
         Write-Host "Backups: $backupLocation"
         if ($OpenBrowser) {

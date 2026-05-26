@@ -74,7 +74,7 @@ def _rpc_call(endpoint: str, method: str, params: dict[str, Any]) -> dict[str, A
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Query ContextGraph MCP server")
+    parser = argparse.ArgumentParser(description="Query CGA MCP server")
     parser.add_argument("--base-url", default="http://127.0.0.1:8011")
     parser.add_argument("--name", default="IndexPipeline", help="Symbol name to query")
     parser.add_argument("--limit", type=int, default=5)

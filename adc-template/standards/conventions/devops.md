@@ -15,14 +15,14 @@
 - **Rotation Update**: When deploy keys rotate, `docs/deploy_key.md` MUST be updated in the same change set.
 
 ## ContextGraph Integration Policy
-- **Authoritative Onboarding URL**: Integration with ContextGraph MUST follow `http://localhost:8000/getstarted` as the single source of setup instructions.
+- **Authoritative Onboarding URL**: Integration with ContextGraph MUST use the CGA Admin UI at `http://localhost:18001/admin` as the local setup surface for project registration and token creation.
 - **No Unreviewed Deviation**: Agents and developers MUST NOT use alternate ContextGraph onboarding flows unless explicitly approved in the same PR description.
 - **Traceability Requirement**: Any PR that introduces or changes ContextGraph integration MUST include a short "ContextGraph integration notes" section describing what step(s) from the onboarding URL were applied.
 - **MCP Alignment**: If ContextGraph integration adds or changes external service endpoints or credentials, `mcp-servers.json` MUST be updated in the same change set.
 
 ## ContextGraph Edge Agent and ContextGraph MCP Use Policy
 - **Responsibility Split**: `contextgraph-edge-agent/` is for local orchestration artifacts (task queues, scratchpad notes, MCP wiring). ContextGraph MCP is for programmatic integration/retrieval against ContextGraph services.
-- **CG Edge MCP Plugin Baseline**: ADC templates MUST ship a `cg-edge-mcp-server` entry in `.adc/contextgraph-edge-agent/mcp/mcp-servers.json` so downstream repositories auto-inherit ContextGraph Edge MCP plugin wiring.
+- **CGA MCP Server Profile Baseline**: ADC templates MUST ship a `cga-mcp-server` entry in `.adc/contextgraph-edge-agent/mcp/mcp-servers.json` so downstream repositories auto-inherit CGA MCP Server wiring.
 - **Runtime Neutrality**: MCP wiring MUST be language-agnostic by default. Do not require a Node-specific local entrypoint unless that repository explicitly ships and maintains one.
 - **Execution Policy**: ContextGraph MCP MUST NOT be used to replace local compile, lint, unit test, or integration test execution. Build/test must run through project-native tooling.
 - **Authority Policy**: Outputs from ContextGraph Edge Agent scratchpad/tasks are operational context, not product truth. Canonical product rules remain in constitution/convention/planning files.

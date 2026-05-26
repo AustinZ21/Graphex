@@ -1,6 +1,6 @@
 import sqlite3
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 import backend.auth.middleware as auth_mw
@@ -63,6 +63,15 @@ def _build_client(db_path: str, monkeypatch) -> TestClient:
     @app.get("/mcp/ping")
     async def ping() -> dict:
         return {"ok": True}
+
+    @app.get("/api/project/ping")
+    async def project_ping(request: Request) -> dict:
+        return {
+            "ok": True,
+            "project_id": getattr(request.state, "project_id", None),
+            "project_name": getattr(request.state, "project_name", None),
+            "project_token_type": getattr(request.state, "project_token_type", None),
+        }
 
     return TestClient(app)
 
@@ -127,3 +136,24 @@ def test_mcp_accepts_matching_mcp_token(tmp_path, monkeypatch):
 
     assert resp.status_code == 200
     assert resp.json() == {"ok": True}
+
+
+def test_project_api_accepts_edge_agent_token_without_explicit_project_id(tmp_path, monkeypatch):
+    db = tmp_path / "auth.db"
+    _setup_db(str(db))
+    client = _build_client(str(db), monkeypatch)
+
+    resp = client.get(
+        "/api/project/ping",
+        headers={
+            "Authorization": "Bearer edge-token",
+        },
+    )
+
+    assert resp.status_code == 200
+    assert resp.json() == {
+        "ok": True,
+        "project_id": "P1",
+        "project_name": "p1",
+        "project_token_type": "edge_agent",
+    }

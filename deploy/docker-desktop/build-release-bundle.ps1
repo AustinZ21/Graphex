@@ -1,0 +1,61 @@
+param(
+    [Parameter(Mandatory = $false)]
+    [string]$Version,
+
+    [Parameter(Mandatory = $false)]
+    [string]$ReleaseRoot = (Join-Path $PSScriptRoot 'dist\releases')
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..')
+$mainPy = Join-Path $repoRoot 'src\backend\main.py'
+$portableBuilder = Join-Path $PSScriptRoot 'build-portable-bundle.ps1'
+
+if (-not $Version) {
+    $mainPyContent = Get-Content -Path $mainPy -Raw
+    $match = [regex]::Match($mainPyContent, 'APP_VERSION\s*=\s*"([^"]+)"')
+    if (-not $match.Success) {
+        throw "Unable to determine APP_VERSION from $mainPy"
+    }
+    $Version = $match.Groups[1].Value
+}
+
+$bundleName = "CGA-Docker-Desktop-$Version"
+$versionedFolder = Join-Path $ReleaseRoot $bundleName
+$zipPath = Join-Path $ReleaseRoot "$bundleName.zip"
+
+if (-not (Test-Path $ReleaseRoot)) {
+    New-Item -ItemType Directory -Path $ReleaseRoot | Out-Null
+}
+
+if (Test-Path $versionedFolder) {
+    Remove-Item -Path $versionedFolder -Recurse -Force
+}
+
+if (Test-Path $zipPath) {
+    Remove-Item -Path $zipPath -Force
+}
+
+& $portableBuilder -OutputFolder $versionedFolder
+if ($LASTEXITCODE -ne 0) {
+    throw "Portable bundle build failed with exit code $LASTEXITCODE"
+}
+
+$releaseNotes = @"
+CGA Docker Desktop Release Package
+Version: $Version
+Built: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+
+Contents:
+- Portable Docker Desktop bundle directory
+- Windows one-click launchers
+- Local repos drop folder
+"@
+Set-Content -Path (Join-Path $versionedFolder 'RELEASE.txt') -Value $releaseNotes -Encoding UTF8
+
+Compress-Archive -Path $versionedFolder -DestinationPath $zipPath -Force
+
+Write-Host "Release folder created at: $versionedFolder"
+Write-Host "Release zip created at: $zipPath"

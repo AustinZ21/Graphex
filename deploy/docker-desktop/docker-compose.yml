@@ -1,11 +1,11 @@
-name: cga-desktop
+name: cga-desktop-bundle
 
 services:
   cga:
     build:
-      context: .
+      context: ../..
       dockerfile: Dockerfile.dev
-    container_name: cga-desktop-api
+    image: cga-desktop-bundle-cga:local
     restart: unless-stopped
     ports:
       - "${CGA_DESKTOP_API_PORT:-18001}:8000"
@@ -22,13 +22,15 @@ services:
       - QUEUE_REDIS_URL=redis://redis:6379/1
       - CACHE_REDIS_URL=redis://redis:6379/2
       - AUTH_DB_PATH=/app/data/auth.db
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-local-jwt-secret-key-32chars}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-at-least-32-chars!!!!!}
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
+      - GITHUB_OAUTH_CALLBACK_URL=${GITHUB_OAUTH_CALLBACK_URL:-http://localhost:${CGA_DESKTOP_API_PORT:-18001}/api/auth/github/callback}
       - PYTHONPATH=/app/src
+      - MCP_ACCESS_TOKEN=${MCP_ACCESS_TOKEN:-}
     volumes:
       - auth_db_data:/app/data
-      - ${CGA_REPOS_MOUNT:-.}:/repos:ro
+      - "${CGA_REPOS_MOUNT:-../../}:/repos:ro"
     depends_on:
       falkordb:
         condition: service_healthy
@@ -43,7 +45,6 @@ services:
 
   falkordb:
     image: falkordb/falkordb:latest
-    container_name: cga-desktop-falkordb
     restart: unless-stopped
     ports:
       - "${CGA_DESKTOP_FALKORDB_PORT:-16381}:6379"
@@ -59,11 +60,10 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: cga-desktop-redis
     restart: unless-stopped
+    command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -72,10 +72,9 @@ services:
 
   backup:
     image: alpine:3.20
-    container_name: cga-desktop-backup
     restart: unless-stopped
     environment:
-      - BACKUP_STACK_NAME=cga-desktop
+      - BACKUP_STACK_NAME=cga-desktop-bundle
       - BACKUP_ROOT=/backups
       - AUTH_DB_PATH=/authdb/auth.db
       - FALKORDB_DATA_DIR=/falkordb-data
@@ -85,7 +84,7 @@ services:
       - auth_db_data:/authdb:ro
       - falkordb_data:/falkordb-data:ro
       - ${CGA_BACKUP_DIR:-./data/backups}:/backups
-      - ./src/scripts/backup-runtime-data.sh:/usr/local/bin/backup-runtime-data.sh:ro
+      - ../../src/scripts/backup-runtime-data.sh:/usr/local/bin/backup-runtime-data.sh:ro
     command: ["/bin/sh", "/usr/local/bin/backup-runtime-data.sh"]
     depends_on:
       cga:

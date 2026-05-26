@@ -6,7 +6,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from backend.auth.context import _current_project_external_id
 import backend.tools.server as mcp_srv
+from backend.workbriefing.service import WorkBriefingService
+from backend.workbriefing.store import SqliteActivityStore
 
 
 @pytest.fixture(autouse=True)
@@ -17,12 +20,14 @@ def reset_server_state():
     mcp_srv._producer = None
     mcp_srv._cache = None
     mcp_srv._recorder = None
+    mcp_srv._work_briefing_service = None
     yield
     mcp_srv._registry = None
     mcp_srv._graph = mcp_srv._GraphProxy()
     mcp_srv._producer = None
     mcp_srv._cache = None
     mcp_srv._recorder = None
+    mcp_srv._work_briefing_service = None
 
 
 def _mock_graph(rows: list[list]) -> MagicMock:
@@ -255,6 +260,141 @@ async def test_index_incremental_uses_explicit_project_name_override():
         ["a.py"],
         project_name="osagent",
     )
+
+
+@pytest.mark.asyncio
+async def test_workassist_record_activity_uses_authenticated_project_context(tmp_path):
+    mcp_srv._work_briefing_service = WorkBriefingService(store=SqliteActivityStore(db_path=str(tmp_path / "briefing.db")))
+    token = _current_project_external_id.set("CGA123")
+    try:
+        result = await mcp_srv.workassist_record_activity(
+            event_type="sync",
+            title="Synced work item",
+            summary="imported progress",
+        )
+    finally:
+        _current_project_external_id.reset(token)
+
+    assert result["operation"] == "created"
+    assert result["activity"]["project_id"] == "CGA123"
+    assert result["activity"]["summary"] == "imported progress"
+
+
+def test_workassist_tools_are_registered_in_existing_cga_mcp_server():
+    tools_by_name = {tool.name: tool for tool in mcp_srv.mcp._tool_manager.list_tools()}
+
+    assert "workassist_record_activity" in tools_by_name
+    assert "workassist_list_recent_activity" in tools_by_name
+    assert "workassist_get_activity_briefing" in tools_by_name
+
+    record_tool = tools_by_name["workassist_record_activity"]
+    assert "project work event" in record_tool.description.lower()
+    assert set(record_tool.parameters["properties"].keys()) >= {
+        "project_id",
+        "event_type",
+        "title",
+        "summary",
+        "metadata",
+    }
+
+    briefing_tool = tools_by_name["workassist_get_activity_briefing"]
+    assert "project_id" in briefing_tool.parameters["properties"]
+    assert briefing_tool.parameters["properties"]["limit"]["default"] == 25
+
+
+@pytest.mark.asyncio
+async def test_workassist_record_activity_rejects_project_spoof(tmp_path):
+    mcp_srv._work_briefing_service = WorkBriefingService(store=SqliteActivityStore(db_path=str(tmp_path / "briefing.db")))
+    token = _current_project_external_id.set("CGA123")
+    try:
+        with pytest.raises(Exception, match="project_id must match"):
+            await mcp_srv.workassist_record_activity(
+                event_type="sync",
+                title="Synced work item",
+                project_id="WA999",
+            )
+    finally:
+        _current_project_external_id.reset(token)
+
+
+async def _seed_workassist_activity_service(tmp_path):
+    service = WorkBriefingService(store=SqliteActivityStore(db_path=str(tmp_path / "briefing.db")))
+    await service.record_activity(
+        {
+            "project_id": "CGA123",
+            "workspace_name": "ContextGraphAdmin",
+            "event_type": "sync",
+            "external_id": "sync-1",
+            "title": "Synced work item",
+            "summary": "imported project progress",
+            "status": "in_progress",
+        }
+    )
+    await service.record_activity(
+        {
+            "project_id": "CGA123",
+            "workspace_name": "ContextGraphAdmin",
+            "event_type": "review",
+            "external_id": "review-1",
+            "title": "Reviewed change",
+            "summary": "validated merged tool behavior",
+            "status": "done",
+        }
+    )
+    await service.record_activity(
+        {
+            "project_id": "WA999",
+            "workspace_name": "WorkAssist",
+            "event_type": "sync",
+            "external_id": "sync-2",
+            "title": "Synced external work item",
+            "summary": "should stay outside authenticated scope",
+            "status": "pending",
+        }
+    )
+    return service
+
+
+@pytest.mark.asyncio
+async def test_workassist_list_recent_activity_uses_authenticated_project_context(tmp_path):
+    mcp_srv._work_briefing_service = await _seed_workassist_activity_service(tmp_path)
+    token = _current_project_external_id.set("CGA123")
+    try:
+        result = await mcp_srv.workassist_list_recent_activity(limit=10)
+    finally:
+        _current_project_external_id.reset(token)
+
+    assert result["project_id"] == "CGA123"
+    assert result["count"] == 2
+    assert [activity["project_id"] for activity in result["activities"]] == ["CGA123", "CGA123"]
+    assert {activity["event_type"] for activity in result["activities"]} == {"sync", "review"}
+
+
+@pytest.mark.asyncio
+async def test_workassist_list_recent_activity_rejects_project_spoof(tmp_path):
+    mcp_srv._work_briefing_service = await _seed_workassist_activity_service(tmp_path)
+    token = _current_project_external_id.set("CGA123")
+    try:
+        with pytest.raises(Exception, match="project_id must match"):
+            await mcp_srv.workassist_list_recent_activity(project_id="WA999", limit=10)
+    finally:
+        _current_project_external_id.reset(token)
+
+
+@pytest.mark.asyncio
+async def test_workassist_get_activity_briefing_uses_authenticated_project_context(tmp_path):
+    mcp_srv._work_briefing_service = await _seed_workassist_activity_service(tmp_path)
+    token = _current_project_external_id.set("CGA123")
+    try:
+        result = await mcp_srv.workassist_get_activity_briefing(limit=10)
+    finally:
+        _current_project_external_id.reset(token)
+
+    assert result["project_id"] == "CGA123"
+    assert result["total_events"] == 2
+    assert result["project_counts"] == {"CGA123": 2}
+    assert result["event_type_counts"] == {"review": 1, "sync": 1}
+    assert result["status_counts"] == {"done": 1, "in_progress": 1}
 
 
 @pytest.mark.asyncio
