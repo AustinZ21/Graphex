@@ -164,6 +164,25 @@ def _resolve_project_repo_path(project: dict) -> str | None:
     return _resolve_repo_path(project["project_name"])
 
 
+def _project_repo_status_paths(project: dict) -> list[str]:
+    candidates: list[str] = []
+    seen: set[str] = set()
+
+    stored = (project.get("repo_path") or "").strip()
+    if stored:
+        candidates.append(stored)
+        seen.add(stored.lower())
+
+    for candidate in _candidate_repo_paths(project["project_name"]):
+        key = candidate.lower()
+        if key in seen:
+            continue
+        candidates.append(candidate)
+        seen.add(key)
+
+    return candidates
+
+
 def _github_oauth_enabled() -> bool:
     return bool(GITHUB_OAUTH_CLIENT_ID and GITHUB_OAUTH_CLIENT_SECRET and GITHUB_OAUTH_CALLBACK_URL)
 
@@ -1057,7 +1076,7 @@ async def list_projects_index_status(
 
     # Get all projects
     async with db.execute(
-        "SELECT id, project_name, project_id FROM projects WHERE is_active = 1 ORDER BY id"
+        "SELECT id, project_name, project_id, repo_path FROM projects WHERE is_active = 1 ORDER BY id"
     ) as cur:
         projects = await cur.fetchall()
 
@@ -1094,7 +1113,7 @@ async def list_projects_index_status(
         # Get latest job status for this project (if consumer available)
         if consumer:
             try:
-                repo_patterns = _candidate_repo_paths(proj_dict["project_name"])
+                repo_patterns = _project_repo_status_paths(proj_dict)
 
                 jobs: list[dict] = []
                 seen_job_ids: set[str] = set()
@@ -1215,7 +1234,7 @@ async def recover_project_stale_index_jobs(
             detail=f"Repository path not found for project_name '{project['project_name']}'",
         )
 
-    repo_paths = _candidate_repo_paths(project["project_name"])
+    repo_paths = _project_repo_status_paths(project)
     recovered = await consumer.recover_stale_jobs_by_repo(repo_paths, INDEX_STALE_AFTER_SEC)
     recovered_jobs = [_build_index_job_status(job, {}, 30, 0) for job in recovered]
     return ProjectIndexRecoveryOut(
