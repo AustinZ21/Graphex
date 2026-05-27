@@ -20,15 +20,21 @@ services:
       - FALKORDB_BROWSER_PUBLIC_URL=http://localhost:13000
       - QUEUE_REDIS_URL=redis://redis:6379/1
       - CACHE_REDIS_URL=redis://redis:6379/2
-      - AUTH_DB_PATH=/app/data/auth.db
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-at-least-32-chars!!!!!}
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
       - PYTHONPATH=/app/src
+      - CGA_POSTGRES_DSN=postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@postgres:5432/${POSTGRES_DB:-appdb}
+      - WORKBRIEFING_POSTGRES_DSN=postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@postgres:5432/${POSTGRES_DB:-appdb}
+      # cga writes manual/UI snapshots into the same host folder the backup
+      # sidecar uses, so the admin UI lists exactly the scheduled snapshots.
+      - BACKUP_DIR=/backups/cga/auth
     volumes:
-      - auth_db_data:/app/data
+      - ${CGA_BACKUP_DIR:-./data/backups}:/backups
       - ${CGA_REPOS_MOUNT:-.}:/repos:ro
     depends_on:
+      postgres:
+        condition: service_healthy
       falkordb:
         condition: service_healthy
       redis:
@@ -39,6 +45,23 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: cga-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-appdb}
+      - POSTGRES_USER=${POSTGRES_USER:-app}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-app}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-appdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   falkordb:
     image: falkordb/falkordb:latest
@@ -69,7 +92,33 @@ services:
       timeout: 3s
       retries: 3
 
+  backup:
+    image: postgres:16-alpine
+    container_name: cga-backup
+    restart: unless-stopped
+    environment:
+      - BACKUP_STACK_NAME=cga
+      - BACKUP_ROOT=/backups
+      - PGHOST=postgres
+      - PGPORT=5432
+      - PGUSER=${POSTGRES_USER:-app}
+      - PGDATABASE=${POSTGRES_DB:-appdb}
+      - PGPASSWORD=${POSTGRES_PASSWORD:-app}
+      - FALKORDB_DATA_DIR=/falkordb-data
+      - BACKUP_INTERVAL_SECONDS=${CGA_BACKUP_INTERVAL_SECONDS:-3600}
+      - BACKUP_KEEP_COUNT=${CGA_BACKUP_KEEP_COUNT:-168}
+    volumes:
+      - falkordb_data:/falkordb-data:ro
+      - ${CGA_BACKUP_DIR:-./data/backups}:/backups
+      - ./src/scripts/backup-runtime-data.sh:/usr/local/bin/backup-runtime-data.sh:ro
+    entrypoint: ["/bin/sh", "/usr/local/bin/backup-runtime-data.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      falkordb:
+        condition: service_healthy
+
 volumes:
-  auth_db_data:
+  postgres_data:
   falkordb_data:
   redis_data:

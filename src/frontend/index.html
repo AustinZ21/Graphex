@@ -1984,7 +1984,7 @@
 
     <!-- GRAPH VIEWER -->
     <div class="pane" id="pane-viewer">
-      <iframe id="graph-viewer-frame" class="viewer-frame" title="CGA graph viewer" data-src="/viewer/?v=1.30.8"></iframe>
+      <iframe id="graph-viewer-frame" class="viewer-frame" title="CGA graph viewer" data-src="/viewer/?v=1.30.9"></iframe>
     </div>
 
     <!-- SETTINGS (admin only) -->
@@ -4026,7 +4026,155 @@ function renderWorkBriefing(summary = _workBriefingSummary) {
   }).join('');
 }
 
+// ===== Weekly Status Report (WSR) =====
+const WSR_LOOP_URL = 'https://loop.cloud.microsoft/p/eyJ3Ijp7InUiOiJodHRwczovL21pY3Jvc29mdC5zaGFyZXBvaW50LmNvbS8%2FbmF2PWN6MGxNa1ltWkQxaUlVcERhbVJNVEdkVFRsVnhXV1JRZVRkc2EwbEJNVWM0WDBOdFRqaFhNVUpPWjJJeU1scHVSVXRNWVRGdlJXOXdZblJOYkhsVVMxSlBZVWRhUTNGc05UVW1aajB3TVVSQlZWQk9WVkpHTlVkQ05rOWFNMFUzUWtSSlJrdGFTRmRCUlVoVlVETk5KbU05Sm1ac2RXbGtQVEUlM0QiLCJyIjpmYWxzZX0sInAiOnsidSI6Imh0dHBzOi8vbWljcm9zb2Z0LnNoYXJlcG9pbnQuY29tL2NvbnRlbnRzdG9yYWdlL0NTUF8yY2RkMjgyNC0xMmI4LTRhMzUtOTg3NC1mY2JiOTY0MjAwZDQvRG9jdW1lbnQlMjBMaWJyYXJ5L0xvb3BBcHBEYXRhL01pY2FoJTIwUmlja3MlMjAxLmxvb3A%2FbmF2PWN6MGxNa1pqYjI1MFpXNTBjM1J2Y21GblpTVXlSa05UVUY4eVkyUmtNamd5TkMweE1tSTRMVFJoTXpVdE9UZzNOQzFtWTJKaU9UWTBNakF3WkRRbVpEMWlJVXBEYW1STVRHZFRUbFZ4V1dSUWVUZHNhMGxCTVVjNFgwTnRUamhYTVVKT1oySXlNbHB1UlV0TVlURnZSVzl3WW5STmJIbFVTMUpQWVVkYVEzRnNOVFVtWmowd01VUkJWVkJPVlZNMVJWb3pWVFJQUjAweVVrRkpTVkpEVWs5TVRVMU5RMVUxSm1NOUpUSkdKbVpzZFdsa1BURSUzRCIsInIiOmZhbHNlfSwiaSI6eyJpIjoiZDcxMTU2MGItMmViNy00NGZiLWJlYjYtMWZmZDBlZmIzNGM2In19';
+const WSR_STORAGE_KEY = 'cga_wsr_last';
+let _wsrAutoTimer = null;
+let _wsrLastMarkdown = '';
+
+function openWsrLoopPage() {
+  window.open(WSR_LOOP_URL, '_blank', 'noopener');
+}
+
+function setWsrStatus(msg) {
+  const el = document.getElementById('wsr-status');
+  if (el) el.textContent = msg;
+}
+
+function _wsrFormatDate(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+function _wsrSummarizeEvents(events, days) {
+  const since = Date.now() - days * 24 * 3600 * 1000;
+  const filtered = (Array.isArray(events) ? events : []).filter(e => {
+    const t = Date.parse(e?.created_at || e?.timestamp || e?.ts || 0);
+    return Number.isFinite(t) ? t >= since : true;
+  });
+  const byProject = new Map();
+  const byType = new Map();
+  const byStatus = new Map();
+  filtered.forEach(e => {
+    const proj = e.project_name || e.project_external_id || e.project_id || 'unscoped';
+    const type = e.event_type || e.kind || 'event';
+    const status = e.status || e.state || '';
+    byProject.set(proj, (byProject.get(proj) || 0) + 1);
+    byType.set(type, (byType.get(type) || 0) + 1);
+    if (status) byStatus.set(status, (byStatus.get(status) || 0) + 1);
+  });
+  return { filtered, byProject, byType, byStatus };
+}
+
+function _wsrMapToBullets(map) {
+  const entries = [...map.entries()].sort((a, b) => b[1] - a[1]);
+  if (!entries.length) return '- _(none)_';
+  return entries.map(([k, v]) => `- **${k}** — ${v}`).join('\n');
+}
+
+function buildWsrMarkdown(summary, days) {
+  const now = new Date();
+  const start = new Date(now.getTime() - days * 24 * 3600 * 1000);
+  const events = summary?.activities || summary?.recent_events || summary?.events || [];
+  const { filtered, byProject, byType, byStatus } = _wsrSummarizeEvents(events, days);
+  const projTotal = summary?.project_total ?? byProject.size;
+  const highlights = filtered.slice(0, 10).map(e => {
+    const proj = e.project_name || e.project_external_id || e.project_id || 'unscoped';
+    const title = e.title || e.summary || e.description || e.event_type || 'activity';
+    const when = e.created_at || e.timestamp || '';
+    return `- [${proj}] ${title}${when ? ` _(${when})_` : ''}`;
+  }).join('\n') || '- _(no activity in window)_';
+
+  return [
+    `# Weekly Status Report`,
+    ``,
+    `**Window:** ${_wsrFormatDate(start)} → ${_wsrFormatDate(now)}  `,
+    `**Generated:** ${now.toISOString()}  `,
+    `**Source:** ContextGraph Admin (Work Dashboard)`,
+    ``,
+    `## Summary`,
+    `- Events in window: **${filtered.length}**`,
+    `- Projects active: **${byProject.size}** (of ${projTotal} total)`,
+    `- Distinct event types: **${byType.size}**`,
+    ``,
+    `## Highlights`,
+    highlights,
+    ``,
+    `## By Project`,
+    _wsrMapToBullets(byProject),
+    ``,
+    `## By Event Type`,
+    _wsrMapToBullets(byType),
+    ``,
+    `## By Status`,
+    _wsrMapToBullets(byStatus),
+    ``,
+    `---`,
+    `_Paste into the linked Microsoft Loop page._`,
+  ].join('\n');
+}
+
+async function generateWorkReport() {
+  const rangeEl = document.getElementById('wsr-range');
+  const days = Math.max(1, Number(rangeEl?.value || 7));
+  setWsrStatus('Generating…');
+  try {
+    const params = new URLSearchParams({ limit: '100' });
+    const summary = await api('GET', '/admin/work-briefing?' + params.toString());
+    const md = buildWsrMarkdown(summary, days);
+    _wsrLastMarkdown = md;
+    const pre = document.getElementById('wsr-preview');
+    if (pre) pre.textContent = md;
+    const stamp = new Date().toISOString();
+    document.getElementById('wsr-generated-at').textContent = stamp;
+    try { localStorage.setItem(WSR_STORAGE_KEY, JSON.stringify({ md, stamp, days })); } catch {}
+    setWsrStatus('Ready.');
+  } catch (e) {
+    setWsrStatus('Failed: ' + (e?.message || e));
+  }
+}
+
+async function copyWorkReport() {
+  if (!_wsrLastMarkdown) { await generateWorkReport(); }
+  try {
+    await navigator.clipboard.writeText(_wsrLastMarkdown || '');
+    toast('WSR markdown copied');
+  } catch (e) {
+    toast('Copy failed: ' + (e?.message || e), 'error');
+  }
+}
+
+function updateWsrAutoSchedule() {
+  const sel = document.getElementById('wsr-auto');
+  const interval = Math.max(0, Number(sel?.value || 0));
+  if (_wsrAutoTimer) { clearInterval(_wsrAutoTimer); _wsrAutoTimer = null; }
+  if (interval > 0) {
+    _wsrAutoTimer = setInterval(() => { generateWorkReport(); }, interval);
+  }
+}
+
+function loadWorkReport() {
+  // Restore last cached report so the tab is not blank.
+  if (!_wsrLastMarkdown) {
+    try {
+      const raw = localStorage.getItem(WSR_STORAGE_KEY);
+      if (raw) {
+        const cached = JSON.parse(raw);
+        if (cached?.md) {
+          _wsrLastMarkdown = cached.md;
+          const pre = document.getElementById('wsr-preview');
+          if (pre) pre.textContent = cached.md;
+          const stampEl = document.getElementById('wsr-generated-at');
+          if (stampEl) stampEl.textContent = cached.stamp || '—';
+        }
+      }
+    } catch {}
+  }
+  updateWsrAutoSchedule();
+  generateWorkReport();
+}
+
 async function loadWorkBriefing() {
+  if (_workBriefingLoading) return;
   _workBriefingLoading = true;
   const tbody = document.getElementById('briefing-activities-body');
   if (tbody) {

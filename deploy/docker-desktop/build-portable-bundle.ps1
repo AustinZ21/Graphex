@@ -15,6 +15,7 @@ if (Test-Path $portableRoot) {
 
 New-Item -ItemType Directory -Path $portableRoot | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $portableRoot 'repos') | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $portableRoot 'src\scripts') -Force | Out-Null
 
 $filesToCopy = @(
     @{ Source = Join-Path $repoRoot 'Dockerfile.dev'; Target = Join-Path $portableRoot 'Dockerfile.dev' },
@@ -34,6 +35,14 @@ foreach ($item in $filesToCopy) {
 
 Copy-Item -Path (Join-Path $repoRoot 'src') -Destination (Join-Path $portableRoot 'src') -Recurse -Force
 
+# The backup sidecar mounts this script directly; make sure it lives at the
+# expected path inside the bundle.
+Copy-Item -Path (Join-Path $repoRoot 'src\scripts\backup-runtime-data.sh') `
+          -Destination (Join-Path $portableRoot 'src\scripts\backup-runtime-data.sh') -Force
+
+# Use a placeholder char (DEL, 0x7F) in the heredoc to bypass PowerShell
+# expansion of $-prefixed compose variables; we replace it with '$' below.
+$D = [char]0x7f
 $portableCompose = @"
 name: cga-desktop-portable
 
@@ -45,7 +54,7 @@ services:
     image: cga-desktop-portable-cga:local
     restart: unless-stopped
     ports:
-      - "{CGA_DESKTOP_API_PORT:-18001}:8000"
+      - "$D{CGA_DESKTOP_API_PORT:-18001}:8000"
     env_file:
       - path: .env
         required: false
@@ -53,22 +62,26 @@ services:
       - FALKORDB_HOST=falkordb
       - FALKORDB_PORT=6379
       - FALKORDB_URL=falkor://falkordb:6379
-      - FALKORDB_URL_HOST=redis://localhost:{CGA_DESKTOP_FALKORDB_PORT:-16381}
+      - FALKORDB_URL_HOST=redis://localhost:$D{CGA_DESKTOP_FALKORDB_PORT:-16381}
       - FALKORDB_BROWSER_URL=http://falkordb:3000
-      - FALKORDB_BROWSER_PUBLIC_URL=http://localhost:{CGA_DESKTOP_BROWSER_PORT:-13001}
+      - FALKORDB_BROWSER_PUBLIC_URL=http://localhost:$D{CGA_DESKTOP_BROWSER_PORT:-13001}
       - QUEUE_REDIS_URL=redis://redis:6379/1
       - CACHE_REDIS_URL=redis://redis:6379/2
-      - AUTH_DB_PATH=/app/data/auth.db
-      - JWT_SECRET_KEY={JWT_SECRET_KEY:-change-me-at-least-32-chars!!!!!}
-      - ADMIN_USERNAME={ADMIN_USERNAME:-admin}
-      - ADMIN_PASSWORD={ADMIN_PASSWORD:-changeme}
-      - GITHUB_OAUTH_CALLBACK_URL={GITHUB_OAUTH_CALLBACK_URL:-http://localhost:{CGA_DESKTOP_API_PORT:-18001}/api/auth/github/callback}
+      - JWT_SECRET_KEY=$D{JWT_SECRET_KEY:-change-me-at-least-32-chars!!!!!}
+      - ADMIN_USERNAME=$D{ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=$D{ADMIN_PASSWORD:-changeme}
+      - GITHUB_OAUTH_CALLBACK_URL=$D{GITHUB_OAUTH_CALLBACK_URL:-http://localhost:$D{CGA_DESKTOP_API_PORT:-18001}/api/auth/github/callback}
       - PYTHONPATH=/app/src
-      - MCP_ACCESS_TOKEN={MCP_ACCESS_TOKEN:-}
+      - MCP_ACCESS_TOKEN=$D{MCP_ACCESS_TOKEN:-}
+      - CGA_POSTGRES_DSN=postgresql://$D{POSTGRES_USER:-app}:$D{POSTGRES_PASSWORD:-app}@postgres:5432/$D{POSTGRES_DB:-appdb}
+      - WORKBRIEFING_POSTGRES_DSN=postgresql://$D{POSTGRES_USER:-app}:$D{POSTGRES_PASSWORD:-app}@postgres:5432/$D{POSTGRES_DB:-appdb}
+      - BACKUP_DIR=/backups/cga-desktop-portable/auth
     volumes:
-      - auth_db_data:/app/data
-      - "{CGA_REPOS_MOUNT:-./repos}:/repos:ro"
+      - $D{CGA_BACKUP_DIR:-./data/backups}:/backups
+      - "$D{CGA_REPOS_MOUNT:-./repos}:/repos:ro"
     depends_on:
+      postgres:
+        condition: service_healthy
       falkordb:
         condition: service_healthy
       redis:
@@ -80,12 +93,28 @@ services:
       retries: 3
       start_period: 30s
 
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=$D{POSTGRES_DB:-appdb}
+      - POSTGRES_USER=$D{POSTGRES_USER:-app}
+      - POSTGRES_PASSWORD=$D{POSTGRES_PASSWORD:-app}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $D{POSTGRES_USER:-app} -d $D{POSTGRES_DB:-appdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   falkordb:
     image: falkordb/falkordb:latest
     restart: unless-stopped
     ports:
-      - "{CGA_DESKTOP_FALKORDB_PORT:-16381}:6379"
-      - "{CGA_DESKTOP_BROWSER_PORT:-13001}:3000"
+      - "$D{CGA_DESKTOP_FALKORDB_PORT:-16381}:6379"
+      - "$D{CGA_DESKTOP_BROWSER_PORT:-13001}:3000"
     volumes:
       - falkordb_data:/data
     healthcheck:
@@ -107,8 +136,33 @@ services:
       timeout: 3s
       retries: 3
 
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - BACKUP_STACK_NAME=cga-desktop-portable
+      - BACKUP_ROOT=/backups
+      - PGHOST=postgres
+      - PGPORT=5432
+      - PGUSER=$D{POSTGRES_USER:-app}
+      - PGDATABASE=$D{POSTGRES_DB:-appdb}
+      - PGPASSWORD=$D{POSTGRES_PASSWORD:-app}
+      - FALKORDB_DATA_DIR=/falkordb-data
+      - BACKUP_INTERVAL_SECONDS=$D{CGA_BACKUP_INTERVAL_SECONDS:-3600}
+      - BACKUP_KEEP_COUNT=$D{CGA_BACKUP_KEEP_COUNT:-168}
+    volumes:
+      - falkordb_data:/falkordb-data:ro
+      - $D{CGA_BACKUP_DIR:-./data/backups}:/backups
+      - ./src/scripts/backup-runtime-data.sh:/usr/local/bin/backup-runtime-data.sh:ro
+    entrypoint: ["/bin/sh", "/usr/local/bin/backup-runtime-data.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      falkordb:
+        condition: service_healthy
+
 volumes:
-  auth_db_data:
+  postgres_data:
   falkordb_data:
   redis_data:
 "@
@@ -126,9 +180,20 @@ CGA_DESKTOP_BROWSER_PORT=13001
 # or point this at another host folder.
 CGA_REPOS_MOUNT=./repos
 
+# Backup snapshots go into this host folder (shared by API and sidecar).
+CGA_BACKUP_DIR=./data/backups
+CGA_BACKUP_INTERVAL_SECONDS=3600
+CGA_BACKUP_KEEP_COUNT=168
+
+# Auth / app
 JWT_SECRET_KEY=change-me-at-least-32-chars!!!!!
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=changeme
+
+# PostgreSQL (auth + work briefings + pgvector)
+POSTGRES_DB=appdb
+POSTGRES_USER=app
+POSTGRES_PASSWORD=app
 
 MCP_ACCESS_TOKEN=
 GITHUB_OAUTH_CLIENT_ID=
@@ -143,6 +208,7 @@ $portableDockerIgnore = @"
 !.env.example
 repos
 tmp
+data/backups
 *.log
 Thumbs.db
 .DS_Store
@@ -152,7 +218,8 @@ Set-Content -Path (Join-Path $portableRoot '.dockerignore') -Value $portableDock
 $portableReadme = @"
 # CGA Portable Docker Desktop Package
 
-This folder is a self-contained CGA package for Docker Desktop.
+This folder is a self-contained CGA package for Docker Desktop. CGA runs on
+PostgreSQL for auth, projects, audit logs, and work-briefing vectors.
 
 ## Use
 
@@ -160,20 +227,29 @@ This folder is a self-contained CGA package for Docker Desktop.
 2. Double-click `start-cga-desktop.cmd`.
 3. Open `http://localhost:18001/admin` if the browser does not open automatically.
 
+## Backups
+
+- The bundled ``backup`` sidecar runs ``pg_dump`` of the auth database and a
+  tar of FalkorDB data every hour by default into ``./data/backups``.
+- The admin UI's **System Settings -> Backup** panel reads and writes the same
+  folder, so manual snapshots are visible to the sidecar and vice versa.
+- Tune ``CGA_BACKUP_INTERVAL_SECONDS`` / ``CGA_BACKUP_KEEP_COUNT`` in ``.env``.
+
 ## Included Launchers
 
-- `start-cga-desktop.cmd`
-- `open-cga-desktop.cmd`
-- `status-cga-desktop.cmd`
-- `logs-cga-desktop.cmd`
-- `stop-cga-desktop.cmd`
+- ``start-cga-desktop.cmd``
+- ``open-cga-desktop.cmd``
+- ``status-cga-desktop.cmd``
+- ``logs-cga-desktop.cmd``
+- ``stop-cga-desktop.cmd``
 
 ## Notes
 
 - The first startup builds the local CGA image from the packaged source files.
-- Edit `.env` if you want different ports, credentials, or a different `CGA_REPOS_MOUNT` path.
-- The default repo drop location is the local `repos` folder beside this README.
-- The packaged `.dockerignore` excludes `repos` so added user repositories do not bloat the Docker build context.
+- Edit ``.env`` if you want different ports, credentials, or a different
+  ``CGA_REPOS_MOUNT`` / ``CGA_BACKUP_DIR`` path.
+- The packaged ``.dockerignore`` excludes ``repos`` and ``data/backups`` so
+  user data does not bloat the Docker build context.
 "@
 Set-Content -Path (Join-Path $portableRoot 'README.md') -Value $portableReadme -Encoding UTF8
 

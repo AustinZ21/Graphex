@@ -2,10 +2,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install tools required by healthchecks and git-aware indexing.
+# Install tools required by healthchecks, git-aware indexing, and PG backups.
 RUN apt-get update && apt-get install -y --no-install-recommends \
 	curl \
 	git \
+	postgresql-client \
 	&& rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
@@ -14,9 +15,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source
 COPY src/ ./src/
-
-# Create data dir for SQLite auth DB
-RUN mkdir -p /app/data
 
 # Entrypoint: init DB then start server
 COPY docker-entrypoint.sh /entrypoint.sh

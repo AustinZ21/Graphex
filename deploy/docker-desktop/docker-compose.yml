@@ -21,17 +21,23 @@ services:
       - FALKORDB_BROWSER_PUBLIC_URL=http://localhost:${CGA_DESKTOP_BROWSER_PORT:-13001}
       - QUEUE_REDIS_URL=redis://redis:6379/1
       - CACHE_REDIS_URL=redis://redis:6379/2
-      - AUTH_DB_PATH=/app/data/auth.db
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-at-least-32-chars!!!!!}
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
       - GITHUB_OAUTH_CALLBACK_URL=${GITHUB_OAUTH_CALLBACK_URL:-http://localhost:${CGA_DESKTOP_API_PORT:-18001}/api/auth/github/callback}
       - PYTHONPATH=/app/src
       - MCP_ACCESS_TOKEN=${MCP_ACCESS_TOKEN:-}
+      - CGA_POSTGRES_DSN=postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@postgres:5432/${POSTGRES_DB:-appdb}
+      - WORKBRIEFING_POSTGRES_DSN=postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@postgres:5432/${POSTGRES_DB:-appdb}
+      # cga writes manual/UI snapshots into the same host folder the backup
+      # sidecar uses, so the admin UI lists exactly the scheduled snapshots.
+      - BACKUP_DIR=/backups/cga-desktop-bundle/auth
     volumes:
-      - auth_db_data:/app/data
+      - ${CGA_BACKUP_DIR:-./data/backups}:/backups
       - "${CGA_REPOS_MOUNT:-../../}:/repos:ro"
     depends_on:
+      postgres:
+        condition: service_healthy
       falkordb:
         condition: service_healthy
       redis:
@@ -42,6 +48,22 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-appdb}
+      - POSTGRES_USER=${POSTGRES_USER:-app}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-app}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-appdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   falkordb:
     image: falkordb/falkordb:latest
@@ -71,28 +93,31 @@ services:
       retries: 3
 
   backup:
-    image: alpine:3.20
+    image: postgres:16-alpine
     restart: unless-stopped
     environment:
       - BACKUP_STACK_NAME=cga-desktop-bundle
       - BACKUP_ROOT=/backups
-      - AUTH_DB_PATH=/authdb/auth.db
+      - PGHOST=postgres
+      - PGPORT=5432
+      - PGUSER=${POSTGRES_USER:-app}
+      - PGDATABASE=${POSTGRES_DB:-appdb}
+      - PGPASSWORD=${POSTGRES_PASSWORD:-app}
       - FALKORDB_DATA_DIR=/falkordb-data
       - BACKUP_INTERVAL_SECONDS=${CGA_BACKUP_INTERVAL_SECONDS:-3600}
       - BACKUP_KEEP_COUNT=${CGA_BACKUP_KEEP_COUNT:-168}
     volumes:
-      - auth_db_data:/authdb:ro
       - falkordb_data:/falkordb-data:ro
       - ${CGA_BACKUP_DIR:-./data/backups}:/backups
       - ../../src/scripts/backup-runtime-data.sh:/usr/local/bin/backup-runtime-data.sh:ro
-    command: ["/bin/sh", "/usr/local/bin/backup-runtime-data.sh"]
+    entrypoint: ["/bin/sh", "/usr/local/bin/backup-runtime-data.sh"]
     depends_on:
-      cga:
+      postgres:
         condition: service_healthy
       falkordb:
         condition: service_healthy
 
 volumes:
-  auth_db_data:
+  postgres_data:
   falkordb_data:
   redis_data:
