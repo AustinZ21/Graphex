@@ -26,10 +26,21 @@ flowchart TD
     Pipeline --> Falkor
 
     Admin[Admin UI] --> AuthAPI[/api/auth/]
-    AuthAPI --> AuthDB[(SQLite auth and audit DB)]
+    AuthAPI --> AuthDB[(PostgreSQL auth, OAuth, and audit DB)]
+    AuthAPI --> MSLogin[Microsoft device-code OAuth]
+    MSLogin --> AuthDB
     AuthAPI -->|trigger index| JobProducer
     AuthAPI -->|queue snapshot and graph stats| JobConsumer
     AuthAPI -->|live graph stats| GraphLookup
+
+    Admin --> ReportAPI[/api/admin/work-briefing/]
+    ReportAPI --> WorkStore[(PostgreSQL work_activities)]
+    ReportAPI -->|include_external=true| AdoEnrich[Azure DevOps enrichment]
+    AdoEnrich --> AuthDB
+    AdoEnrich --> TicketCache[(external_ticket_cache)]
+    AdoEnrich --> AdoAPI[Azure DevOps work item and PR APIs]
+    AdoEnrich --> ReportData[Enriched WSR activity payload]
+    ReportData --> Admin
 
     Viewer[Viewer UI] --> ViewerAPI[/api/viewer/]
     ViewerAPI --> GraphLookup

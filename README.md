@@ -1,9 +1,9 @@
 # CGA (ContextGraphAdmin)
 
-**Version:** 1.30.9
+**Version:** 1.30.18
 **Status:** Published
 **Author:** Nate Scott
-**Date:** 2026-05-26 (Release/bundle/portable distribution cut over to PostgreSQL; sidecar uses pg_dump)
+**Date:** 2026-05-27 (Schedule admin automation page)
 
 CGA, aka ContextGraphAdmin, is a local-first graph context service for AI-assisted development. It indexes repository structure, symbols, calls, imports, and lightweight data flow into FalkorDB, then exposes retrieval and analysis tools through an MCP-compatible API.
 
@@ -17,6 +17,7 @@ CGA now includes a built-in work activity domain adapted from WorkAssist so cros
 - Admin summary API: `/api/admin/work-briefing`
 - Admin activity list API: `/api/admin/work-briefing/activities`
 - Admin briefing dashboard includes copyable PowerShell, Python, and JSON request templates for project-scoped activity publishing.
+- Report tab can connect a Microsoft account with device-code login so generated WSR payloads can enrich stored PBI/PR references with Azure DevOps ticket details.
 - Project-scoped ingest API: `POST /api/project/work-briefing/activity`
 - Project-scoped summary APIs: `GET /api/project/work-briefing`, `GET /api/project/work-briefing/activities`
 - MCP tools: `workassist_record_activity`, `workassist_list_recent_activity`, `workassist_get_activity_briefing`
@@ -24,6 +25,16 @@ CGA now includes a built-in work activity domain adapted from WorkAssist so cros
 These WA-compatible tools are hosted directly by `cga-mcp-server`, so CGA does not need a separate WA MCP runtime for the merged work briefing slice.
 
 Recorded activity is stored in the local SQLite auth database under the `work_activities` table, which lets CGA keep project progress local-first alongside its existing project and audit metadata.
+
+## Admin Schedule Automation
+
+CGA includes an admin-only Schedule surface for recurring automation jobs.
+
+- Admin UI: `http://localhost:18001/admin/schedule` (Schedule tab beside Project)
+- Admin schedule API: `/api/admin/schedules`
+- Supported task types: BrowserAgent command POSTs, agent activation HTTP calls, and generic HTTP POST jobs
+- Each task stores cadence, target URL, project binding, agent ID, JSON payload, last run status, next run time, and recent execution history.
+- A lightweight background worker runs due enabled tasks and records each result in `scheduled_task_runs`.
 
 ## Runtime Persistence And Backup
 

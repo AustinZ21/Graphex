@@ -13,8 +13,9 @@ from pathlib import Path
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse
+from jose import jwt as jose_jwt
 
 from backend.auth.database import get_db
 from backend.auth.dependencies import get_current_user, require_admin, get_consumer, get_registry
@@ -38,6 +39,12 @@ from backend.auth.models import (
     PaginatedAuditOut,
     UserOut,
     UserProfileUpdate,
+)
+from backend.auth.oauth import (
+    deactivate_oauth_connection,
+    get_oauth_connection_status,
+    normalize_token_response,
+    upsert_oauth_connection,
 )
 from backend.tools import server as mcp_server
 from backend.auth.security import (
@@ -67,6 +74,22 @@ GITHUB_OAUTH_STATE_SECRET = os.getenv("GITHUB_OAUTH_STATE_SECRET", os.getenv("JW
 GITHUB_OAUTH_STATE_TTL_SEC = int(os.getenv("GITHUB_OAUTH_STATE_TTL_SEC", "600"))
 INDEX_STALE_AFTER_SEC = int(os.getenv("CONTEXTGRAPH_INDEX_STALE_AFTER_SEC", "900"))
 _LOCAL_REPOS_ROOT = Path(__file__).resolve().parents[4]
+
+MICROSOFT_OAUTH_TENANT = os.getenv("MICROSOFT_OAUTH_TENANT", "organizations").strip() or "organizations"
+MICROSOFT_OAUTH_CLIENT_ID = (
+    os.getenv("MICROSOFT_OAUTH_CLIENT_ID")
+    or os.getenv("CGA_MICROSOFT_CLIENT_ID")
+    or os.getenv("AZURE_DEVOPS_OAUTH_CLIENT_ID")
+    or "04b07795-8ddb-461a-bbee-02f9e1bf7b46"
+).strip()
+MICROSOFT_OAUTH_SCOPE = (
+    os.getenv("MICROSOFT_OAUTH_SCOPE")
+    or "499b84ac-1321-427f-aa17-267ca6975798/.default offline_access openid profile"
+).strip()
+MICROSOFT_OAUTH_PROVIDER = "microsoft"
+MICROSOFT_DEVICE_CODE_URL = f"https://login.microsoftonline.com/{MICROSOFT_OAUTH_TENANT}/oauth2/v2.0/devicecode"
+MICROSOFT_TOKEN_URL = f"https://login.microsoftonline.com/{MICROSOFT_OAUTH_TENANT}/oauth2/v2.0/token"
+_PENDING_MICROSOFT_DEVICE_CODES: dict[str, dict] = {}
 
 
 def _repo_name_key(value: str) -> str:
@@ -228,6 +251,56 @@ def _oauth_success_page(token: str) -> HTMLResponse:
     return HTMLResponse(content=html, status_code=200)
 
 
+def _microsoft_oauth_enabled() -> bool:
+    return bool(MICROSOFT_OAUTH_CLIENT_ID and MICROSOFT_OAUTH_SCOPE)
+
+
+def _cleanup_pending_microsoft_codes() -> None:
+    now = time.time()
+    expired = [key for key, value in _PENDING_MICROSOFT_DEVICE_CODES.items() if float(value.get("expires_at", 0)) <= now]
+    for key in expired:
+        _PENDING_MICROSOFT_DEVICE_CODES.pop(key, None)
+
+
+def _claims_from_jwt(token: str | None) -> dict:
+    if not token:
+        return {}
+    try:
+        claims = jose_jwt.get_unverified_claims(token)
+    except Exception:
+        return {}
+    return claims if isinstance(claims, dict) else {}
+
+
+def _microsoft_account_from_token(token_cache: dict, fallback_user: dict) -> tuple[str, str]:
+    claims = _claims_from_jwt(token_cache.get("id_token"))
+    account_id = str(
+        claims.get("oid")
+        or claims.get("sub")
+        or claims.get("preferred_username")
+        or fallback_user.get("id")
+        or "default"
+    )
+    display_name = str(
+        claims.get("name")
+        or claims.get("preferred_username")
+        or fallback_user.get("email")
+        or fallback_user.get("username")
+        or account_id
+    )
+    return account_id, display_name
+
+
+def _device_code_error_detail(response: httpx.Response) -> tuple[str, str]:
+    try:
+        data = response.json()
+    except Exception:
+        return "http_error", response.text[:500]
+    if not isinstance(data, dict):
+        return "http_error", str(response.status_code)
+    return str(data.get("error") or "http_error"), str(data.get("error_description") or data.get("message") or "")
+
+
 def _parse_iso_datetime(value: str | None) -> datetime | None:
     if not value:
         return None
@@ -326,7 +399,9 @@ def _query_graph_live_stats(registry, project_name: str) -> GraphLiveStats | Non
         return None
     try:
         graph = registry.get(project_name)
-        _q = lambda cypher: (graph.query(cypher).result_set or [[0]])[0][0]
+        def _q(cypher: str):
+            return (graph.query(cypher).result_set or [[0]])[0][0]
+
         files = _q("MATCH (f:File) RETURN count(f)")
         symbols = _q("MATCH (s:Symbol) RETURN count(s)")
         variables = _q("MATCH (v:Variable) RETURN count(v)")
@@ -510,6 +585,132 @@ async def me(user: dict = Depends(get_current_user)):
         role=user["role"],
         created_at="",
         is_active=bool(user["is_active"]),
+    )
+
+
+@router.get("/microsoft/status")
+async def microsoft_connection_status(
+    user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+) -> dict:
+    status_payload = await get_oauth_connection_status(
+        db,
+        user_id=int(user["id"]),
+        provider=MICROSOFT_OAUTH_PROVIDER,
+    )
+    return {
+        "configured": _microsoft_oauth_enabled(),
+        "client_id": MICROSOFT_OAUTH_CLIENT_ID,
+        "tenant": MICROSOFT_OAUTH_TENANT,
+        "scope": MICROSOFT_OAUTH_SCOPE,
+        **status_payload,
+    }
+
+
+@router.post("/microsoft/device/start")
+async def microsoft_device_start(user: dict = Depends(get_current_user)) -> dict:
+    if not _microsoft_oauth_enabled():
+        raise HTTPException(status_code=400, detail="Microsoft OAuth is not configured")
+    _cleanup_pending_microsoft_codes()
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        response = await client.post(
+            MICROSOFT_DEVICE_CODE_URL,
+            data={"client_id": MICROSOFT_OAUTH_CLIENT_ID, "scope": MICROSOFT_OAUTH_SCOPE},
+        )
+    if response.status_code >= 400:
+        error, detail = _device_code_error_detail(response)
+        raise HTTPException(status_code=400, detail=f"{error}: {detail}".strip())
+
+    data = response.json()
+    device_code = str(data.get("device_code") or "")
+    if not device_code:
+        raise HTTPException(status_code=400, detail="Microsoft device flow did not return a device code")
+
+    poll_id = secrets.token_urlsafe(24)
+    expires_in = int(data.get("expires_in") or 900)
+    interval = max(2, int(data.get("interval") or 5))
+    _PENDING_MICROSOFT_DEVICE_CODES[poll_id] = {
+        "user_id": int(user["id"]),
+        "device_code": device_code,
+        "expires_at": time.time() + expires_in,
+        "interval": interval,
+    }
+    return {
+        "poll_id": poll_id,
+        "user_code": data.get("user_code"),
+        "verification_uri": data.get("verification_uri"),
+        "verification_uri_complete": data.get("verification_uri_complete"),
+        "message": data.get("message"),
+        "expires_in": expires_in,
+        "interval": interval,
+    }
+
+
+@router.post("/microsoft/device/poll")
+async def microsoft_device_poll(
+    payload: dict,
+    user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+) -> dict:
+    poll_id = str((payload or {}).get("poll_id") or "")
+    pending = _PENDING_MICROSOFT_DEVICE_CODES.get(poll_id)
+    if not pending or int(pending.get("user_id") or 0) != int(user["id"]):
+        raise HTTPException(status_code=404, detail="Microsoft device login session not found")
+    if float(pending.get("expires_at") or 0) <= time.time():
+        _PENDING_MICROSOFT_DEVICE_CODES.pop(poll_id, None)
+        raise HTTPException(status_code=410, detail="Microsoft device login session expired")
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        response = await client.post(
+            MICROSOFT_TOKEN_URL,
+            data={
+                "client_id": MICROSOFT_OAUTH_CLIENT_ID,
+                "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+                "device_code": pending["device_code"],
+            },
+        )
+    if response.status_code >= 400:
+        error, detail = _device_code_error_detail(response)
+        if error in {"authorization_pending", "slow_down"}:
+            return {
+                "status": "pending",
+                "detail": detail or error,
+                "interval": int(pending.get("interval") or 5) + (5 if error == "slow_down" else 0),
+            }
+        if error in {"authorization_declined", "expired_token", "bad_verification_code"}:
+            _PENDING_MICROSOFT_DEVICE_CODES.pop(poll_id, None)
+        raise HTTPException(status_code=400, detail=f"{error}: {detail}".strip())
+
+    token_data = response.json()
+    token_cache = normalize_token_response(token_data)
+    account_id, display_name = _microsoft_account_from_token(token_cache, user)
+    await upsert_oauth_connection(
+        db,
+        user_id=int(user["id"]),
+        provider=MICROSOFT_OAUTH_PROVIDER,
+        account_id=account_id,
+        display_name=display_name,
+        scope=MICROSOFT_OAUTH_SCOPE,
+        token_cache=token_cache,
+    )
+    _PENDING_MICROSOFT_DEVICE_CODES.pop(poll_id, None)
+    status_payload = await get_oauth_connection_status(
+        db,
+        user_id=int(user["id"]),
+        provider=MICROSOFT_OAUTH_PROVIDER,
+    )
+    return {"status": "connected", "connection": status_payload}
+
+
+@router.delete("/microsoft", status_code=204)
+async def microsoft_disconnect(
+    user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
+) -> None:
+    await deactivate_oauth_connection(
+        db,
+        user_id=int(user["id"]),
+        provider=MICROSOFT_OAUTH_PROVIDER,
     )
 
 

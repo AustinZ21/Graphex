@@ -57,7 +57,14 @@ class WorkBriefingService:
                 "metadata": raw_metadata,
             }
         )
-        source_item_id = self._optional_string(payload, "external_id") or f"generated:{content_hash[:24]}"
+        requested_source_item_id = self._optional_string(payload, "external_id") or f"generated:{content_hash[:24]}"
+        existing_by_content = await self._store.find_by_content_hash(
+            plugin_id=PLUGIN_ID,
+            project_id=project_id,
+            source_type=SOURCE_TYPE,
+            content_hash=content_hash,
+        )
+        source_item_id = existing_by_content.source_item_id if existing_by_content else requested_source_item_id
         activity_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{PLUGIN_ID}:{project_id}:{source_item_id}"))
         embedding_text = self._build_embedding_text(project_id, event_type, title, summary, body_text, tags, status)
 
@@ -84,16 +91,27 @@ class WorkBriefingService:
             raw_metadata=raw_metadata,
             embedding_text=embedding_text,
         )
-        return await self._store.upsert(activity)
+        result = await self._store.upsert(activity)
+        if existing_by_content and existing_by_content.source_item_id != requested_source_item_id:
+            return ActivityUpsertResult(operation="deduplicated", activity=result.activity)
+        return result
 
     async def list_recent(self, project_id: str | None = None, limit: int = 25) -> list[WorkActivity]:
         return await self._store.list_recent(project_id=project_id, limit=limit)
 
+    async def count_recent(self, project_id: str | None = None) -> int:
+        return await self._store.count_recent(project_id=project_id)
+
+    async def cleanup_exact_duplicates(self, project_id: str | None = None, dry_run: bool = True) -> dict[str, Any]:
+        return await self._store.cleanup_exact_duplicates(project_id=project_id, dry_run=dry_run)
+
     async def get_briefing(self, project_id: str | None = None, limit: int = 25) -> dict[str, Any]:
         activities = await self.list_recent(project_id=project_id, limit=limit)
+        total_available = await self.count_recent(project_id=project_id)
         event_type_counts: dict[str, int] = {}
         status_counts: dict[str, int] = {}
         project_counts: dict[str, int] = {}
+        duplicate_activity_map, duplicate_groups = self._detect_suspected_duplicates(activities)
 
         for activity in activities:
             event_type_counts[activity.event_type] = event_type_counts.get(activity.event_type, 0) + 1
@@ -104,10 +122,20 @@ class WorkBriefingService:
         return {
             "project_id": project_id,
             "total_events": len(activities),
+            "total_available": total_available,
+            "has_more": total_available > len(activities),
             "event_type_counts": event_type_counts,
             "status_counts": status_counts,
             "project_counts": project_counts,
-            "activities": [activity.to_dict() for activity in activities],
+            "duplicate_signal_count": len(duplicate_groups),
+            "suspected_duplicates": duplicate_groups,
+            "activities": [
+                {
+                    **activity.to_dict(),
+                    **duplicate_activity_map.get(activity.activity_id, {}),
+                }
+                for activity in activities
+            ],
         }
 
     @staticmethod
@@ -143,7 +171,7 @@ class WorkBriefingService:
             if cleaned and cleaned not in seen:
                 normalized.append(cleaned)
                 seen.add(cleaned)
-        return tuple(normalized)
+        return tuple(sorted(normalized, key=str.casefold))
 
     @staticmethod
     def _normalize_metadata(value: Any) -> dict[str, Any]:
@@ -161,6 +189,69 @@ class WorkBriefingService:
     def _content_hash(payload: dict[str, Any]) -> str:
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
         return hashlib.sha256(encoded).hexdigest()
+
+    @staticmethod
+    def _normalize_duplicate_title(title: str) -> str:
+        return " ".join((title or "").strip().casefold().split())
+
+    @classmethod
+    def _detect_suspected_duplicates(cls, activities: list[WorkActivity]) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
+        grouped: dict[tuple[str, str, str, str], list[WorkActivity]] = {}
+        for activity in activities:
+            key = (
+                activity.project_id,
+                activity.event_type,
+                cls._normalize_duplicate_title(activity.title),
+                activity.occurred_at.date().isoformat(),
+            )
+            grouped.setdefault(key, []).append(activity)
+
+        activity_map: dict[str, dict[str, Any]] = {}
+        duplicate_groups: list[dict[str, Any]] = []
+        for (project_id, event_type, normalized_title, occurred_on), group in grouped.items():
+            if len(group) < 2:
+                continue
+            unique_sources = {item.source_item_id for item in group}
+            unique_hashes = {item.content_hash for item in group}
+            if len(unique_sources) < 2 and len(unique_hashes) < 2:
+                continue
+            sorted_group = sorted(group, key=lambda item: (item.occurred_at, item.synced_at), reverse=True)
+            group_key = f"{project_id}|{event_type}|{normalized_title}|{occurred_on}"
+            duplicate_groups.append(
+                {
+                    "group_key": group_key,
+                    "project_id": project_id,
+                    "event_type": event_type,
+                    "title": sorted_group[0].title,
+                    "occurred_on": occurred_on,
+                    "duplicate_count": len(sorted_group),
+                    "source_item_ids": [item.source_item_id for item in sorted_group],
+                    "content_hashes": len(unique_hashes),
+                    "members": [
+                        {
+                            "activity_id": item.activity_id,
+                            "source_item_id": item.source_item_id,
+                            "content_hash": item.content_hash,
+                            "occurred_at": item.occurred_at.isoformat().replace("+00:00", "Z"),
+                            "synced_at": item.synced_at.isoformat().replace("+00:00", "Z"),
+                            "summary": item.summary,
+                            "status": item.status,
+                        }
+                        for item in sorted_group
+                    ],
+                    "reason": "same project/event/title/day with multiple source items or payload variants",
+                }
+            )
+            for item in sorted_group:
+                activity_map[item.activity_id] = {
+                    "suspected_duplicate": True,
+                    "duplicate_group_key": group_key,
+                    "duplicate_group_count": len(sorted_group),
+                    "duplicate_reason": "same project/event/title/day",
+                }
+
+        duplicate_groups.sort(key=lambda item: (item["occurred_on"], item["duplicate_count"]), reverse=True)
+        return activity_map, duplicate_groups
 
     @staticmethod
     def _build_embedding_text(

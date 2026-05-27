@@ -40,22 +40,26 @@ from fastapi.staticfiles import StaticFiles
 from backend.auth.database import DB_PATH, init_db, insert_audit_log
 from backend.auth.dependencies import require_admin
 from backend.auth.middleware import ProjectTokenMiddleware
+from backend.auth.pgshim import get_pool as get_auth_pool
 from backend.auth.router import router as auth_router
 from backend.auth.security import decode_access_token, hash_token
 from backend.backup import BackupError, BackupService
 from backend.graph.registry import GraphRegistry
+from backend.integrations.azure_devops import AzureDevOpsEnricher, AZURE_DEVOPS_RESOURCE_SCOPE
 from backend.indexer.consumer import IndexerConsumer
 from backend.tools.producer import MCPProducer
 from backend.tools import server as mcp_server
 from backend.perf.context_quality import benchmark_context_quality, ContextQualityInputError
 from backend.perf.token_efficiency import benchmark_token_efficiency, TokenBenchmarkInputError
+from backend.schedules.router import router as schedules_router
+from backend.schedules.service import ScheduledTaskWorker
 from backend.viewer.router import router as viewer_router
 from backend.workbriefing.service import WorkActivityValidationError, WorkBriefingService
 from backend.workbriefing.store import PgVectorActivityStore, resolve_dsn
 
 log = structlog.get_logger()
 
-APP_VERSION = "1.30.9"
+APP_VERSION = "1.30.18"
 
 FALKORDB_HOST = os.getenv("FALKORDB_HOST", "localhost")
 FALKORDB_PORT = int(os.getenv("FALKORDB_PORT", "6379"))
@@ -73,6 +77,15 @@ CACHE_REDIS_URL = os.getenv("CACHE_REDIS_URL", "redis://localhost:6380")  # db=2
 TRACE_ENABLED = os.getenv("TRACE_ENABLED", "true").lower() == "true"
 REPO_ROOT = Path(os.getenv("CONTEXTGRAPH_REPO_ROOT", ".")).resolve()
 BACKUP_DIR = os.getenv("BACKUP_DIR") or "/app/data/backups"
+MICROSOFT_OAUTH_TENANT = os.getenv("MICROSOFT_OAUTH_TENANT", "organizations").strip() or "organizations"
+MICROSOFT_OAUTH_CLIENT_ID = (
+    os.getenv("MICROSOFT_OAUTH_CLIENT_ID")
+    or os.getenv("CGA_MICROSOFT_CLIENT_ID")
+    or os.getenv("AZURE_DEVOPS_OAUTH_CLIENT_ID")
+    or "04b07795-8ddb-461a-bbee-02f9e1bf7b46"
+).strip()
+MICROSOFT_OAUTH_SCOPE = (os.getenv("MICROSOFT_OAUTH_SCOPE") or AZURE_DEVOPS_RESOURCE_SCOPE).strip()
+MICROSOFT_TOKEN_URL = f"https://login.microsoftonline.com/{MICROSOFT_OAUTH_TENANT}/oauth2/v2.0/token"
 
 
 class NoStoreStaticFiles(StaticFiles):
@@ -91,6 +104,7 @@ _trace_evaluator = None
 _work_briefing_pg_dsn = resolve_dsn(os.getenv("WORKBRIEFING_POSTGRES_DSN"))
 _work_briefing_service = WorkBriefingService(store=PgVectorActivityStore(dsn=_work_briefing_pg_dsn))
 _backup_service = BackupService(dsn=DB_PATH, backup_dir=BACKUP_DIR)
+_scheduled_task_worker = ScheduledTaskWorker()
 
 
 def _redact_dsn(dsn: str) -> str:
@@ -161,12 +175,14 @@ async def lifespan(app: FastAPI):
     app.state.registry = _registry
 
     await _backup_service.start()
+    await _scheduled_task_worker.start()
 
     log.info("cga.started", falkordb=f"{FALKORDB_HOST}:{FALKORDB_PORT}")
 
     yield
 
     # Shutdown
+    await _scheduled_task_worker.stop()
     await _backup_service.stop()
     if _consumer:
         await _consumer.stop()
@@ -196,7 +212,7 @@ async def lifespan(app: FastAPI):
     log.info("cga.stopped")
 
 
-app = FastAPI(title="CGA (ContextGraphAdmin)", version="1.30.9", lifespan=lifespan)
+app = FastAPI(title="CGA (ContextGraphAdmin)", version="1.30.18", lifespan=lifespan)
 
 # ── Auth middleware (validates Bearer token on /mcp routes) ────────────────
 app.add_middleware(ProjectTokenMiddleware)
@@ -204,6 +220,7 @@ app.add_middleware(ProjectTokenMiddleware)
 # ── Auth API ───────────────────────────────────────────────────────────────
 app.include_router(auth_router, prefix="/api")
 app.include_router(viewer_router, prefix="/api")
+app.include_router(schedules_router, prefix="/api")
 
 
 def _truncate(value: str | None, limit: int) -> str | None:
@@ -603,17 +620,31 @@ async def api_admin_backups_update_config(payload: dict, _: dict = Depends(requi
 @app.get("/api/admin/work-briefing")
 async def api_admin_work_briefing(
     project_id: str | None = Query(default=None),
-    limit: int = Query(default=25, ge=1, le=100),
-    _: dict = Depends(require_admin),
+    limit: int = Query(default=25, ge=1, le=5000),
+    include_external: bool = Query(default=False),
+    admin: dict = Depends(require_admin),
 ) -> dict:
     cleaned_project_id = project_id.strip() if isinstance(project_id, str) else None
-    return await _work_briefing_service.get_briefing(project_id=cleaned_project_id or None, limit=limit)
+    payload = await _work_briefing_service.get_briefing(project_id=cleaned_project_id or None, limit=limit)
+    if include_external and MICROSOFT_OAUTH_CLIENT_ID:
+        async with get_auth_pool().acquire() as db:
+            enricher = AzureDevOpsEnricher(
+                db=db,
+                user_id=int(admin["id"]),
+                client_id=MICROSOFT_OAUTH_CLIENT_ID,
+                token_url=MICROSOFT_TOKEN_URL,
+                scope=MICROSOFT_OAUTH_SCOPE,
+            )
+            return await enricher.enrich_briefing(payload)
+    if include_external:
+        return {**payload, "external_enrichment": {"status": "not_configured", "provider": "azure_devops"}}
+    return payload
 
 
 @app.get("/api/admin/work-briefing/activities")
 async def api_admin_work_briefing_activities(
     project_id: str | None = Query(default=None),
-    limit: int = Query(default=25, ge=1, le=100),
+    limit: int = Query(default=25, ge=1, le=5000),
     _: dict = Depends(require_admin),
 ) -> dict:
     cleaned_project_id = project_id.strip() if isinstance(project_id, str) else None
@@ -651,7 +682,7 @@ async def api_project_work_briefing_record_activity(
 async def api_project_work_briefing(
     request: Request,
     project_id: str | None = Query(default=None),
-    limit: int = Query(default=25, ge=1, le=100),
+    limit: int = Query(default=25, ge=1, le=5000),
 ) -> dict:
     project = _require_project_token_context(request)
     resolved_project_id = _resolve_project_scope_id(project_id, project)
@@ -662,7 +693,7 @@ async def api_project_work_briefing(
 async def api_project_work_briefing_activities(
     request: Request,
     project_id: str | None = Query(default=None),
-    limit: int = Query(default=25, ge=1, le=100),
+    limit: int = Query(default=25, ge=1, le=5000),
 ) -> dict:
     project = _require_project_token_context(request)
     resolved_project_id = _resolve_project_scope_id(project_id, project)
