@@ -4,6 +4,8 @@ flowchart TB
     AgentClient[Agent / MCP Client]
     GitRepo[Repository on Disk]
     GitHub[GitHub OAuth]
+    Microsoft[Microsoft Device Code OAuth]
+    AzureDevOps[Azure DevOps REST API]
     FdbBrowser[FalkorDB Browser UI]
 
     subgraph Runtime[ContextGraph Runtime]
@@ -13,6 +15,7 @@ flowchart TB
             AdminSPA[Admin SPA at /admin]
             ViewerStatic[Viewer Static App at /viewer]
             AuthAPI[Auth and Admin API at /api/auth]
+            WorkBriefingAPI[WorkBriefing and Report API]
             ViewerAPI[Viewer API at /api/viewer]
             MCPServer[MCP SSE Server at /mcp]
             AuditMW[Audit Middleware]
@@ -28,11 +31,13 @@ flowchart TB
             QueryCache[Redis Query Cache]
             TraceRecorder[Trace Recorder]
             TraceEvaluator[Trace Evaluator]
+            AdoEnrichment[ADO Ticket Enrichment]
         end
     end
 
     subgraph State[State and Infrastructure]
-        AuthDB[(SQLite Auth and Audit DB)]
+        AuthDB[(PostgreSQL Auth, OAuth, Audit, Ticket Cache)]
+        WorkDB[(PostgreSQL Work Activities)]
         JobStream[(Redis Streams: contextgraph:jobs)]
         TraceStream[(Redis Traces and Cache DB)]
         Falkor[(FalkorDB Project Graphs)]
@@ -42,20 +47,28 @@ flowchart TB
     Browser --> AdminSPA
     Browser --> ViewerStatic
     Browser --> AuthAPI
+    Browser --> WorkBriefingAPI
     AgentClient --> MCPServer
 
     AuthAPI --> AuditMW
+    WorkBriefingAPI --> AuditMW
     ViewerAPI --> AuditMW
     MCPServer --> AuditMW
     MCPServer --> TokenMW
 
     AdminSPA --> AuthAPI
+    AdminSPA --> WorkBriefingAPI
     AdminSPA --> ViewerAPI
     AdminSPA -->|launch browser| FdbBrowser
     ViewerStatic --> ViewerAPI
 
     AuthAPI --> AuthDB
     AuthAPI --> GitHub
+    AuthAPI --> Microsoft
+    WorkBriefingAPI --> WorkDB
+    WorkBriefingAPI --> AdoEnrichment
+    AdoEnrichment --> AuthDB
+    AdoEnrichment --> AzureDevOps
     ViewerAPI --> GraphRegistry
     MCPServer --> QueryStrategy
     MCPServer --> QueryCache

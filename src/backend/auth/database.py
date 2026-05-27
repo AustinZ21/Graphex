@@ -81,6 +81,79 @@ CREATE INDEX IF NOT EXISTS idx_token_hash
     ON project_tokens(token_hash)
     WHERE is_active = 1;
 
+CREATE TABLE IF NOT EXISTS scheduled_tasks (
+    id              BIGSERIAL PRIMARY KEY,
+    name            TEXT    NOT NULL,
+    description     TEXT    NOT NULL DEFAULT '',
+    task_type       TEXT    NOT NULL,
+    project_id      BIGINT  REFERENCES projects(id) ON DELETE SET NULL,
+    agent_id        TEXT    NOT NULL DEFAULT '',
+    target_url      TEXT    NOT NULL DEFAULT '',
+    payload_json    TEXT    NOT NULL DEFAULT '{}',
+    cadence_minutes INTEGER NOT NULL DEFAULT 60,
+    timeout_seconds INTEGER NOT NULL DEFAULT 30,
+    enabled         INTEGER NOT NULL DEFAULT 1,
+    created_at      TEXT    NOT NULL DEFAULT to_char((now() at time zone 'utc'), 'YYYY-MM-DD"T"HH24:MI:SS'),
+    updated_at      TEXT    NOT NULL DEFAULT to_char((now() at time zone 'utc'), 'YYYY-MM-DD"T"HH24:MI:SS'),
+    next_run_at     TEXT    NOT NULL DEFAULT to_char((now() at time zone 'utc'), 'YYYY-MM-DD"T"HH24:MI:SS'),
+    last_run_at     TEXT,
+    last_run_status TEXT    NOT NULL DEFAULT '',
+    last_run_error  TEXT    NOT NULL DEFAULT ''
+);
+
+CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_due
+    ON scheduled_tasks(enabled, next_run_at);
+
+CREATE TABLE IF NOT EXISTS scheduled_task_runs (
+    id            BIGSERIAL PRIMARY KEY,
+    schedule_id   BIGINT  NOT NULL REFERENCES scheduled_tasks(id) ON DELETE CASCADE,
+    started_at    TEXT    NOT NULL,
+    finished_at   TEXT    NOT NULL,
+    status        TEXT    NOT NULL,
+    status_code   INTEGER,
+    duration_ms   INTEGER NOT NULL DEFAULT 0,
+    error         TEXT    NOT NULL DEFAULT '',
+    response_json TEXT    NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_scheduled_task_runs_schedule_started
+    ON scheduled_task_runs(schedule_id, started_at DESC);
+
+CREATE TABLE IF NOT EXISTS oauth_connections (
+    id              BIGSERIAL PRIMARY KEY,
+    user_id         BIGINT  NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider        TEXT    NOT NULL,
+    account_id      TEXT    NOT NULL DEFAULT 'default',
+    display_name    TEXT    NOT NULL DEFAULT '',
+    scope           TEXT    NOT NULL DEFAULT '',
+    token_cache_enc TEXT    NOT NULL,
+    expires_at      TEXT,
+    created_at      TEXT    NOT NULL DEFAULT to_char((now() at time zone 'utc'), 'YYYY-MM-DD"T"HH24:MI:SS'),
+    updated_at      TEXT    NOT NULL DEFAULT to_char((now() at time zone 'utc'), 'YYYY-MM-DD"T"HH24:MI:SS'),
+    is_active       INTEGER NOT NULL DEFAULT 1,
+    UNIQUE(user_id, provider, account_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_oauth_connections_user_provider
+    ON oauth_connections(user_id, provider)
+    WHERE is_active = 1;
+
+CREATE TABLE IF NOT EXISTS external_ticket_cache (
+    cache_key    TEXT PRIMARY KEY,
+    provider     TEXT NOT NULL,
+    item_type    TEXT NOT NULL,
+    organization TEXT NOT NULL DEFAULT '',
+    project      TEXT NOT NULL DEFAULT '',
+    repository   TEXT NOT NULL DEFAULT '',
+    item_id      TEXT NOT NULL,
+    details_json TEXT NOT NULL,
+    fetched_at   TEXT NOT NULL,
+    expires_at   TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_external_ticket_cache_expires
+    ON external_ticket_cache(provider, expires_at);
+
 CREATE TABLE IF NOT EXISTS audit_logs (
     id                BIGSERIAL PRIMARY KEY,
     created_at        TEXT    NOT NULL DEFAULT to_char((now() at time zone 'utc'), 'YYYY-MM-DD"T"HH24:MI:SS'),

@@ -24,7 +24,6 @@ from __future__ import annotations
 import asyncio
 import os
 import time
-from datetime import datetime
 from pathlib import Path
 
 import structlog
@@ -32,7 +31,6 @@ from mcp.server.fastmcp import FastMCP
 
 from backend.auth.context import _current_project_external_id
 from backend.agent.query_strategy import run_cg_first_strategy
-from backend.graph.client import GraphClient
 from backend.graph.registry import GraphRegistry
 from backend.graph import schema as S
 from backend.perf.context_quality import benchmark_context_quality as run_context_quality_benchmark
@@ -1332,4 +1330,12 @@ async def workassist_get_activity_briefing(project_id: str | None = None, limit:
     resolved_project_id = _resolve_project_external_id(project_id)
     safe_limit = max(1, min(int(limit), 100))
     return await service.get_briefing(project_id=resolved_project_id, limit=safe_limit)
+
+
+@mcp.tool()
+async def workassist_cleanup_duplicate_activity(project_id: str | None = None, dry_run: bool = True) -> dict:
+    """Detect and optionally remove exact duplicate activity rows (same project/plugin/source type/content hash)."""
+    service = _require_work_briefing_service()
+    resolved_project_id = _resolve_project_external_id(project_id)
+    return await service.cleanup_exact_duplicates(project_id=resolved_project_id, dry_run=dry_run)
 

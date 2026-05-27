@@ -61,7 +61,8 @@
       box-shadow: 0 0 0 2px var(--accent-soft) !important;
     }
     .briefing-card,
-    .briefing-command-card {
+    .briefing-command-card,
+    .briefing-section[data-briefing-section].is-collapsed {
       background: linear-gradient(180deg, rgba(20,26,38,.92) 0%, rgba(10,14,22,.96) 100%) !important;
       border: 1px solid var(--border) !important;
       box-shadow: 0 1px 0 rgba(255,255,255,.02) inset, 0 8px 24px rgba(0,0,0,.35);
@@ -655,6 +656,29 @@
       outline: none; transition: border-color .15s;
     }
     input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    .login-remember {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
+      margin: -2px 0 12px;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .login-remember input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+      padding: 0;
+      border-radius: 4px;
+      flex: 0 0 auto;
+      accent-color: var(--accent);
+    }
+    .login-remember span {
+      line-height: 1.2;
+      white-space: nowrap;
+    }
 
     /* ── Buttons ── */
     .btn {
@@ -673,6 +697,50 @@
     .btn-accent  { background: rgba(74,227,135,.12); color: var(--accent); border: 1px solid rgba(74,227,135,.3); }
     .btn-ghost   { background: transparent; color: var(--muted); border: 1px solid var(--border); }
     .btn-ghost:hover { color: var(--text); border-color: var(--border-strong); background: var(--panel-elevated); }
+    #pane-report {
+      position: relative;
+    }
+    .wsr-busy-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(3, 6, 10, 0.45);
+      backdrop-filter: blur(2px);
+      z-index: 8;
+      pointer-events: none;
+    }
+    .wsr-busy-overlay[hidden] {
+      display: none !important;
+    }
+    .wsr-busy-card {
+      min-width: 220px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 14px 18px;
+      border-radius: 10px;
+      border: 1px solid var(--border-strong);
+      background: var(--panel-elevated);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .wsr-busy-spinner {
+      width: 14px;
+      height: 14px;
+      border-radius: 999px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-top-color: var(--accent);
+      animation: wsr-spin 0.85s linear infinite;
+      flex: 0 0 auto;
+    }
+    @keyframes wsr-spin {
+      to { transform: rotate(360deg); }
+    }
     .btn-sm { padding: 5px 10px; font-size: 12px; }
     .btn:disabled { opacity: .5; cursor: not-allowed; }
 
@@ -725,6 +793,97 @@
       width: auto;
       min-width: 140px;
     }
+    .schedule-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .schedule-summary-cell {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      min-width: 0;
+    }
+    .schedule-summary-cell span {
+      display: block;
+      color: var(--muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: 5px;
+    }
+    .schedule-summary-cell strong {
+      display: block;
+      color: var(--text);
+      font-size: 18px;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .schedule-editor-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      padding: 0 4px 4px;
+    }
+    .schedule-editor-grid .form-group.wide { grid-column: 1 / -1; }
+    .schedule-editor-grid textarea {
+      min-height: 120px;
+      font-family: ui-monospace, "JetBrains Mono", Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.45;
+      resize: vertical;
+    }
+    .schedule-target-text {
+      max-width: 280px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .schedule-run-error {
+      color: var(--danger);
+      max-width: 360px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    @media (max-width: 1050px) {
+      .schedule-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .schedule-editor-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .schedule-summary-grid { grid-template-columns: 1fr; }
+    }
+    .briefing-activity-controls {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 6px;
+      padding: 6px;
+      border: 1px solid rgba(70,80,104,.38);
+      border-radius: 8px;
+      background: rgba(10,14,22,.52);
+    }
+    .briefing-activity-controls input,
+    .briefing-activity-controls select {
+      min-width: 130px;
+      width: auto;
+      font-size: 12px;
+    }
+    .briefing-activity-controls #briefing-filter-search {
+      flex: 1 1 220px;
+      min-width: 190px;
+    }
+    .briefing-activity-filter-summary {
+      margin-left: auto;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
     .briefing-summary-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -747,7 +906,8 @@
       gap: 8px;
       margin-bottom: 10px;
     }
-    .briefing-command-card {
+    .briefing-command-card,
+    .briefing-section[data-briefing-section].is-collapsed {
       background: linear-gradient(180deg, rgba(53,63,82,.96) 0%, rgba(35,42,56,.98) 100%);
       border: 1px solid var(--border);
       border-radius: var(--radius);
@@ -1047,6 +1207,27 @@
     .briefing-status-dot.is-progress { background: #4aa3e3; }
     .briefing-status-dot.is-open { background: #e3a14a; }
     .briefing-status-dot.is-blocked { background: #e34a4a; }
+    .briefing-status-text {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      max-width: 120px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.04);
+      color: var(--muted);
+      font-size: 10.5px;
+      line-height: 1.2;
+      text-transform: capitalize;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .briefing-status-text.is-done { color: #72f0aa; border-color: rgba(74,227,135,.45); background: rgba(74,227,135,.12); }
+    .briefing-status-text.is-progress { color: #7cc3ff; border-color: rgba(74,163,227,.45); background: rgba(74,163,227,.12); }
+    .briefing-status-text.is-open { color: #f2c27a; border-color: rgba(227,161,74,.45); background: rgba(227,161,74,.12); }
+    .briefing-status-text.is-blocked { color: #ff9f9f; border-color: rgba(227,74,74,.45); background: rgba(227,74,74,.12); }
     .briefing-activity-text {
       display: flex;
       flex-direction: column;
@@ -1059,6 +1240,7 @@
       line-height: 1.35;
       display: -webkit-box;
       -webkit-line-clamp: 1;
+      line-clamp: 1;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
@@ -1068,6 +1250,7 @@
       line-height: 1.4;
       display: -webkit-box;
       -webkit-line-clamp: 2;
+      line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
       word-break: break-word;
@@ -1090,6 +1273,10 @@
     @media (max-width: 1100px) {
       .briefing-command-grid {
         grid-template-columns: 1fr;
+      }
+      .briefing-activity-filter-summary {
+        flex-basis: 100%;
+        margin-left: 0;
       }
     }
 
@@ -1212,6 +1399,7 @@
     .briefing-activity-text .briefing-activity-summary {
       font-size: 11px;
       -webkit-line-clamp: 1;
+      line-clamp: 1;
       line-height: 1.3;
     }
     .briefing-activity-text .briefing-tag-list { margin-top: 1px; }
@@ -1226,6 +1414,7 @@
     .briefing-activity-cell .row2 { font-size: 10.5px; max-width: 120px; }
     .briefing-event-icon { font-size: 13px; }
     .briefing-status-dot { width: 7px; height: 7px; border-width: 1px; }
+    .briefing-status-text { font-size: 9.5px; padding: 1px 5px; max-width: 100px; }
     .briefing-icon-stack { gap: 2px; }
 
     /* Pattern E · Timeline focus list (one row per item) */
@@ -1316,6 +1505,18 @@
     .copy-id-btn.copy-id-btn-sm svg {
       width: 11px;
       height: 11px;
+    }
+    .delegation-copy-token {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-width: 0;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .delegation-copy-token a,
+    .delegation-copy-token strong {
+      min-width: 0;
     }
     .project-id-inline {
       display: inline-flex;
@@ -1701,9 +1902,13 @@
         <label>Password</label>
         <input id="lf-pass" type="password" autocomplete="current-password" required />
       </div>
+      <label class="login-remember">
+        <input id="lf-remember-user" type="checkbox" />
+        <span>Remember me</span>
+      </label>
       <div id="login-err" style="color:var(--danger);font-size:13px;margin-bottom:12px;display:none"></div>
       <button type="submit" class="btn btn-primary" style="width:100%">Sign in</button>
-      <button type="button" class="btn btn-ghost" style="width:100%;margin-top:8px" onclick="loginWithGitHub()">Sign in with GitHub</button>
+      <button id="login-github-btn" type="button" class="btn btn-ghost" style="width:100%;margin-top:8px">Sign in with GitHub</button>
     </form>
   </div>
   <footer class="footer" style="position:absolute;left:0;right:0;bottom:0;">Created by Nate Scott (NASCO)</footer>
@@ -1741,6 +1946,7 @@
       <button class="tab-btn" id="tab-briefing-btn" style="display:none" onclick="switchTab('briefing',this)">Dashboard</button>
       <button class="tab-btn" id="tab-report-btn" style="display:none" onclick="switchTab('report',this)">Report</button>
       <button class="tab-btn active" id="tab-projects-btn" onclick="switchTab('projects',this)">Project</button>
+      <button class="tab-btn" id="tab-schedule-btn" style="display:none" onclick="switchTab('schedule',this)">Schedule</button>
       <button class="tab-btn" id="tab-users-btn" onclick="switchTab('users',this)">User</button>
       <button class="tab-btn" id="tab-audit-btn" onclick="switchTab('audit',this)">Audit</button>
       <button class="tab-btn" id="tab-viewer-btn" style="display:none" onclick="switchTab('viewer',this)">Graph</button>
@@ -1767,7 +1973,10 @@
     <div class="pane active" id="pane-projects">
       <div class="section-header">
         <h2>Project</h2>
-        <button class="btn btn-primary btn-sm" id="new-project-btn" onclick="openNewProject()">+ New Project</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn btn-sm" id="toggle-deleted-projects-btn" onclick="toggleShowDeletedProjects()" title="Show or hide soft-deleted projects">Show deleted</button>
+          <button class="btn btn-primary btn-sm" id="new-project-btn" onclick="openNewProject()">+ New Project</button>
+        </div>
       </div>
       <div class="search-wrap">
         <input id="project-search" placeholder="Search by name, project ID, URL, token, token ID, date..." oninput="onProjectSearchInput(this.value)" />
@@ -1786,6 +1995,143 @@
         </table>
       </div>
       <div class="pagination-wrap" id="projects-pagination"></div>
+    </div>
+
+    <!-- SCHEDULE (admin only) -->
+    <div class="pane" id="pane-schedule">
+      <div class="section-header">
+        <h2>Schedule</h2>
+        <div class="briefing-toolbar">
+          <button class="btn btn-sm" onclick="loadSchedules()">Refresh</button>
+          <button class="btn btn-primary btn-sm" onclick="openScheduleEditor()">+ New Task</button>
+        </div>
+      </div>
+
+      <div class="schedule-summary-grid">
+        <div class="schedule-summary-cell"><span>Total Tasks</span><strong id="schedule-total-count">0</strong></div>
+        <div class="schedule-summary-cell"><span>Enabled</span><strong id="schedule-enabled-count">0</strong></div>
+        <div class="schedule-summary-cell"><span>Due Soon</span><strong id="schedule-due-count">0</strong></div>
+        <div class="schedule-summary-cell"><span>Last Status</span><strong id="schedule-last-status">—</strong></div>
+      </div>
+
+      <section class="briefing-section">
+        <div class="briefing-section-head">
+          <div>
+            <span class="briefing-kicker">Automation</span>
+            <h3>Scheduled tasks</h3>
+          </div>
+          <div class="briefing-toolbar">
+            <select id="schedule-filter-type" onchange="renderSchedules()" title="Filter tasks by type">
+              <option value="">All task types</option>
+              <option value="browseragent_task">BrowserAgent task</option>
+              <option value="agent_activation">Agent activation</option>
+              <option value="http_request">HTTP request</option>
+            </select>
+            <input id="schedule-filter-search" placeholder="Search schedules" oninput="renderSchedules()" />
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Task</th>
+              <th class="center-col-header">Type</th>
+              <th class="center-col-header">Project</th>
+              <th>Target</th>
+              <th class="center-col-header">Cadence</th>
+              <th class="center-col-header">Next Run</th>
+              <th class="center-col-header">Last Run</th>
+              <th class="center-col-header">Status</th>
+              <th class="actions-col-header">Actions</th>
+            </tr></thead>
+            <tbody id="schedule-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="briefing-section" id="schedule-editor" hidden>
+        <div class="briefing-section-head">
+          <div>
+            <span class="briefing-kicker">Task Config</span>
+            <h3 id="schedule-editor-title">New scheduled task</h3>
+          </div>
+          <button type="button" class="btn btn-sm btn-ghost" onclick="closeScheduleEditor()">Close</button>
+        </div>
+        <div class="schedule-editor-grid">
+          <div class="form-group">
+            <label>Name</label>
+            <input id="schedule-name" placeholder="Nightly BrowserAgent smoke" />
+          </div>
+          <div class="form-group">
+            <label>Task Type</label>
+            <select id="schedule-task-type" onchange="applyScheduleTypeDefaults()">
+              <option value="browseragent_task">BrowserAgent task</option>
+              <option value="agent_activation">Agent activation</option>
+              <option value="http_request">HTTP request</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Project</label>
+            <select id="schedule-project-id"></select>
+          </div>
+          <div class="form-group">
+            <label>Agent ID</label>
+            <input id="schedule-agent-id" placeholder="edge-agent-a or browseragent-local" />
+          </div>
+          <div class="form-group">
+            <label>Target URL</label>
+            <input id="schedule-target-url" placeholder="http://localhost:9876/command" />
+          </div>
+          <div class="form-group">
+            <label>Every N Minutes</label>
+            <input id="schedule-cadence" type="number" min="1" max="43200" value="60" />
+          </div>
+          <div class="form-group">
+            <label>Timeout Seconds</label>
+            <input id="schedule-timeout" type="number" min="1" max="600" value="30" />
+          </div>
+          <div class="form-group">
+            <label>Enabled</label>
+            <select id="schedule-enabled">
+              <option value="true">Enabled</option>
+              <option value="false">Disabled</option>
+            </select>
+          </div>
+          <div class="form-group wide">
+            <label>Description</label>
+            <input id="schedule-description" placeholder="Optional notes for admins" />
+          </div>
+          <div class="form-group wide">
+            <label>JSON Payload</label>
+            <textarea id="schedule-payload" spellcheck="false">{"action":"ping","params":{}}</textarea>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+          <button type="button" class="btn btn-ghost" onclick="closeScheduleEditor()">Cancel</button>
+          <button type="button" class="btn btn-primary" id="schedule-save-btn" onclick="saveScheduleTask()">Save Task</button>
+        </div>
+      </section>
+
+      <section class="briefing-section">
+        <div class="briefing-section-head">
+          <div>
+            <span class="briefing-kicker">Runs</span>
+            <h3>Recent executions</h3>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th class="center-col-header">Started</th>
+              <th class="center-col-header">Task ID</th>
+              <th class="center-col-header">Status</th>
+              <th class="center-col-header">HTTP</th>
+              <th class="center-col-header">Duration</th>
+              <th>Error</th>
+            </tr></thead>
+            <tbody id="schedule-runs-body"></tbody>
+          </table>
+        </div>
+      </section>
     </div>
 
     <!-- USERS -->
@@ -1858,9 +2204,7 @@
           />
           <datalist id="briefing-project-options"></datalist>
           <select id="briefing-limit" onchange="loadWorkBriefing()">
-            <option value="25">25 events</option>
-            <option value="50">50 events</option>
-            <option value="100">100 events</option>
+            <option value="25" selected>25 per load</option>
           </select>
           <button class="btn btn-accent btn-sm" onclick="refreshWorkBriefing()">Refresh</button>
         </div>
@@ -1910,6 +2254,30 @@
         </div>
       </section>
 
+      <section class="briefing-section" data-briefing-section="duplicate-signals">
+        <div class="briefing-section-head">
+          <div>
+            <span class="briefing-kicker">Quality</span>
+            <h3>Duplicate signals</h3>
+          </div>
+          <button type="button" class="briefing-collapse-btn" data-briefing-collapse="duplicate-signals" data-briefing-collapse-label="Duplicate signals" aria-expanded="true" aria-controls="briefing-section-duplicate-signals-body" title="Collapse section">&#9660;</button>
+        </div>
+        <div id="briefing-section-duplicate-signals-body" data-briefing-section-content>
+          <div style="padding:0 0 8px;color:var(--muted);font-size:12px" id="briefing-duplicates-summary">No duplicate signals detected.</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th class="center-col-header">Project</th>
+                <th class="center-col-header">Type</th>
+                <th>Activity</th>
+                <th class="center-col-header">When</th>
+              </tr></thead>
+              <tbody id="briefing-duplicates-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <section class="briefing-section" data-briefing-section="activity-log">
         <div class="briefing-section-head">
           <div>
@@ -1917,6 +2285,34 @@
             <h3>Recent work events</h3>
           </div>
           <button type="button" class="briefing-collapse-btn" data-briefing-collapse="activity-log" data-briefing-collapse-label="Recent work events" aria-expanded="true" aria-controls="briefing-section-activity-log-body" title="Collapse section">&#9660;</button>
+        </div>
+        <div class="briefing-activity-controls" data-briefing-section-content>
+          <select id="briefing-filter-project" title="Filter loaded events by project" onchange="onWorkBriefingActivityFiltersChanged()">
+            <option value="">All loaded projects</option>
+          </select>
+          <select id="briefing-filter-type" title="Filter loaded events by type" onchange="onWorkBriefingActivityFiltersChanged()">
+            <option value="">All event types</option>
+          </select>
+          <select id="briefing-filter-status" title="Filter loaded events by status" onchange="onWorkBriefingActivityFiltersChanged()">
+            <option value="">All statuses</option>
+          </select>
+          <input id="briefing-filter-search" placeholder="Search loaded events" title="Search title, summary, project, tags, owner, and status" oninput="onWorkBriefingActivityFiltersChanged()" />
+          <select id="briefing-filter-range" title="Filter loaded events by activity date" onchange="onWorkBriefingActivityFiltersChanged()">
+            <option value="all">All dates</option>
+            <option value="24h">Last 24h</option>
+            <option value="7d">Last 7d</option>
+            <option value="30d">Last 30d</option>
+          </select>
+          <select id="briefing-sort-order" title="Sort loaded events" onchange="onWorkBriefingActivityFiltersChanged()">
+            <option value="occurred_desc">Newest first</option>
+            <option value="occurred_asc">Oldest first</option>
+            <option value="project_asc">Project A-Z</option>
+            <option value="type_asc">Type A-Z</option>
+            <option value="status_asc">Status A-Z</option>
+            <option value="title_asc">Title A-Z</option>
+          </select>
+          <button type="button" class="btn btn-sm btn-ghost" id="briefing-clear-filters-btn" onclick="clearWorkBriefingActivityFilters()">Clear</button>
+          <span class="briefing-activity-filter-summary" id="briefing-activity-filter-summary">Showing loaded events</span>
         </div>
         <div class="table-wrap" id="briefing-section-activity-log-body" data-briefing-section-content>
           <table>
@@ -1928,6 +2324,9 @@
             </tr></thead>
             <tbody id="briefing-activities-body"></tbody>
           </table>
+        </div>
+        <div class="pagination-wrap" id="briefing-activities-pagination" style="justify-content:center;padding:8px 0 0" data-briefing-section-content>
+          <button class="btn btn-sm" id="briefing-load-more-btn" onclick="loadMoreWorkBriefing()" hidden>Load 25 more</button>
         </div>
       </section>
     </div>
@@ -1941,50 +2340,93 @@
             <option value="7" selected>Last 7 days</option>
             <option value="14">Last 14 days</option>
             <option value="30">Last 30 days</option>
+              <option value="60">Last 60 days</option>
+              <option value="90">Last 90 days</option>
+              <option value="180">Last 180 days</option>
+              <option value="365">Last 365 days</option>
           </select>
           <select id="wsr-auto" onchange="updateWsrAutoSchedule()" title="Periodic auto-regeneration">
             <option value="0">Auto: off</option>
             <option value="3600000">Auto: hourly</option>
             <option value="21600000">Auto: every 6h</option>
-            <option value="86400000" selected>Auto: daily</option>
-            <option value="604800000">Auto: weekly</option>
+            <option value="86400000">Auto: daily</option>
+            <option value="604800000" selected>Auto: weekly</option>
           </select>
-          <button class="btn btn-sm" onclick="generateWorkReport()">Generate</button>
-          <button class="btn btn-sm" onclick="copyWorkReport()">Copy Markdown</button>
+          <button id="wsr-generate-btn" class="btn btn-sm" onclick="generateWorkReport()">Generate</button>
           <button class="btn btn-accent btn-sm" onclick="openWsrLoopPage()">Open Loop Page</button>
         </div>
       </div>
 
-      <section class="briefing-command-card briefing-command-card-full">
-        <h3>About this report</h3>
-        <p style="color:var(--muted);font-size:13px;line-height:1.5">
-          Weekly Status Report (WSR) is generated from the Work Dashboard activity feed for the
-          selected window. Use <strong>Copy Markdown</strong> and paste into the linked Microsoft Loop
-          page. Direct publish to Loop requires Microsoft Graph integration and is not yet wired up;
-          auto-regeneration runs locally while this tab is open.
-        </p>
-        <p style="margin-top:6px;font-size:12px;color:var(--muted)">
-          <span id="wsr-status">Idle.</span>
-          <span style="margin-left:10px">Last generated: <span id="wsr-generated-at">—</span></span>
-        </p>
+      <section class="briefing-section">
+        <div class="briefing-section-head">
+          <div>
+            <h3 id="wsr-title">Week —</h3>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <a class="btn btn-sm" href="/admin/settings" onclick="event.preventDefault(); switchTab('settings'); setTimeout(()=>switchSettingsSubtab('report'),0);" title="Edit template in Settings → Report">Edit template</a>
+          </div>
+        </div>
+        <div style="padding:0 4px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div style="position:relative">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <span style="font-size:12px;color:var(--muted)" id="wsr-prev-label">Last week</span>
+                <button onclick="copyWorkReportPrev()" title="Copy last week" aria-label="Copy last week"
+                  style="background:rgba(20,26,40,.85);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:2px 6px;font-size:13px;cursor:pointer">&#128203;</button>
+              </div>
+              <pre id="wsr-preview-prev" style="white-space:pre-wrap;background:#04060a;border:1px solid var(--border);border-radius:8px;padding:14px;font-family:Consolas,Menlo,monospace;font-size:12.5px;line-height:1.55;max-height:60vh;overflow:auto;color:var(--text)">Click Generate to build the report.</pre>
+            </div>
+            <div style="position:relative">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                <span style="font-size:12px;color:var(--muted)" id="wsr-this-label">This week</span>
+                <button onclick="copyWorkReport()" title="Copy this week" aria-label="Copy this week"
+                  style="background:rgba(20,26,40,.85);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:2px 6px;font-size:13px;cursor:pointer">&#128203;</button>
+              </div>
+              <pre id="wsr-preview" style="white-space:pre-wrap;background:#04060a;border:1px solid var(--border);border-radius:8px;padding:14px;font-family:Consolas,Menlo,monospace;font-size:12.5px;line-height:1.55;max-height:60vh;overflow:auto;color:var(--text)">Click Generate to build the report.</pre>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section class="briefing-section">
         <div class="briefing-section-head">
           <div>
-            <span class="briefing-kicker">WSR</span>
-            <h3 id="wsr-title">Weekly Status Report</h3>
+            <h3>History</h3>
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span style="font-size:12px;color:var(--muted)" id="wsr-history-count">0 entries</span>
+            <button class="btn btn-sm" onclick="regenerateAllWorkReports()" title="Rebuild every stored WSR window">Regenerate all</button>
+            <button class="btn btn-sm" onclick="clearWorkReportHistory()" title="Delete all stored WSR snapshots">Clear all</button>
           </div>
         </div>
-        <div style="padding:0 4px">
-          <pre id="wsr-preview" style="white-space:pre-wrap;background:#04060a;border:1px solid var(--border);border-radius:8px;padding:14px;font-family:Consolas,Menlo,monospace;font-size:12.5px;line-height:1.55;max-height:60vh;overflow:auto;color:var(--text)">Click Generate to build the report.</pre>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Week</th>
+              <th class="center-col-header" style="width:200px">Generated</th>
+              <th class="center-col-header" style="width:220px">Window</th>
+              <th class="center-col-header" style="width:140px">Data</th>
+              <th class="actions-col-header" style="width:260px">Actions</th>
+            </tr></thead>
+            <tbody id="wsr-history-body"></tbody>
+          </table>
+        </div>
+        <div class="pagination-wrap" id="wsr-history-pagination" style="justify-content:center;padding:8px 0 0">
+          <button class="btn btn-sm" id="wsr-history-load-more-btn" onclick="loadMoreWorkReportHistory()" hidden>Load 25 more</button>
         </div>
       </section>
+
+      <div id="wsr-busy-overlay" class="wsr-busy-overlay" hidden>
+        <div class="wsr-busy-card" role="status" aria-live="polite">
+          <span class="wsr-busy-spinner" aria-hidden="true"></span>
+          <span id="wsr-busy-text">Generating...</span>
+        </div>
+      </div>
     </div>
 
     <!-- GRAPH VIEWER -->
     <div class="pane" id="pane-viewer">
-      <iframe id="graph-viewer-frame" class="viewer-frame" title="CGA graph viewer" data-src="/viewer/?v=1.30.9"></iframe>
+      <iframe id="graph-viewer-frame" class="viewer-frame" title="CGA graph viewer" data-src="/viewer/?v=1.30.18"></iframe>
     </div>
 
     <!-- SETTINGS (admin only) -->
@@ -1995,8 +2437,10 @@
           <button class="subtab-btn"        data-subtab="graphdb"      onclick="switchSettingsSubtab('graphdb',this)">Graph Database</button>
           <button class="subtab-btn"        data-subtab="indexing"     onclick="switchSettingsSubtab('indexing',this)">Indexing</button>
           <button class="subtab-btn"        data-subtab="integrations" onclick="switchSettingsSubtab('integrations',this)">Integrations</button>
+          <button class="subtab-btn"        data-subtab="delegation"   onclick="switchSettingsSubtab('delegation',this)">Delegation</button>
           <button class="subtab-btn"        data-subtab="security"     onclick="switchSettingsSubtab('security',this)">Security</button>
           <button class="subtab-btn"        data-subtab="backup"       onclick="switchSettingsSubtab('backup',this)">Backup</button>
+          <button class="subtab-btn"        data-subtab="report"       onclick="switchSettingsSubtab('report',this)">Report</button>
         </nav>
         <div class="settings-body">
           <section class="settings-section active" id="settings-section-general">
@@ -2035,6 +2479,25 @@
             <div class="settings-card">
               <div class="settings-row"><label>MCP SSE Endpoint</label><span id="settings-mcp-endpoint" class="settings-value mono">/mcp/sse</span></div>
               <div class="settings-row"><label>Admin API Base</label><span class="settings-value mono">/api</span></div>
+            </div>
+          </section>
+
+          <section class="settings-section" id="settings-section-delegation">
+            <h2>Delegation</h2>
+            <p class="settings-hint">Connect delegated user accounts for report enrichment and other user-scoped automation.</p>
+            <div class="settings-card" id="microsoft-ado-connection-card">
+              <div class="settings-row" style="align-items:flex-start">
+                <label>
+                  <span>Azure DevOps Ticket Lookup</span>
+                  <small style="display:block;margin-top:4px;color:var(--muted);font-weight:400;line-height:1.45">Used by Weekly Status Report generation to resolve PBI and PR details from stored activity references.</small>
+                </label>
+                <span class="settings-value" style="display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:wrap">
+                  <button class="btn btn-sm" id="ms-ado-connect-btn" onclick="connectMicrosoftAdo()">Connect Microsoft</button>
+                  <button class="btn btn-sm btn-danger" id="ms-ado-disconnect-btn" onclick="disconnectMicrosoftAdo()" hidden>Disconnect</button>
+                </span>
+              </div>
+              <div class="settings-row"><label>Status</label><span id="ms-ado-status" class="settings-value">Checking connection...</span></div>
+              <div id="ms-ado-device-message" style="display:none;margin-top:8px;color:var(--muted);font-size:12px;line-height:1.55"></div>
             </div>
           </section>
 
@@ -2079,6 +2542,28 @@
             <div class="settings-card" style="margin-top:12px">
               <h3 style="margin:0 0 8px;font-size:14px;color:var(--text)">Snapshots</h3>
               <div id="backup-snapshots" style="font-size:13px">Loading…</div>
+            </div>
+          </section>
+
+          <section class="settings-section" id="settings-section-report">
+            <h2>Report Template</h2>
+            <p class="settings-hint">Edit the Markdown template used by the <strong>Report</strong> tab to generate the Weekly Status Report. Placeholders are substituted at render time; unknown <code>{{name}}</code> tokens are left as-is.</p>
+            <div class="settings-card">
+              <div style="font-size:12px;color:var(--muted);line-height:1.55;margin-bottom:8px">
+                Available variables:
+                <code>{{title}}</code>, <code>{{window_start}}</code>, <code>{{window_end}}</code>, <code>{{generated_at}}</code>,
+                <code>{{days}}</code>, <code>{{total_events}}</code>, <code>{{active_projects}}</code>, <code>{{total_projects}}</code>,
+                <code>{{project_name}}</code>, <code>{{project_names}}</code>, <code>{{project_tags}}</code>,
+                <code>{{event_types_count}}</code>, <code>{{highlights}}</code>, <code>{{by_project}}</code>,
+                <code>{{by_type}}</code>, <code>{{by_status}}</code>.
+              </div>
+              <textarea id="wsr-template" spellcheck="false"
+                style="width:100%;min-height:320px;background:#04060a;border:1px solid var(--border);border-radius:8px;padding:12px;color:var(--text);font-family:Consolas,Menlo,monospace;font-size:12.5px;line-height:1.55;resize:vertical"></textarea>
+              <p style="margin:8px 0 0;font-size:11.5px;color:var(--muted)" id="wsr-template-status">Template loaded from defaults.</p>
+              <div class="settings-actions" style="margin-top:10px">
+                <button class="btn btn-primary" onclick="saveWsrTemplate()">Save template</button>
+                <button class="btn btn-ghost" onclick="resetWsrTemplate()">Reset to default</button>
+              </div>
             </div>
           </section>
         </div>
@@ -2225,12 +2710,26 @@ let _auditTotal = 0;
 let _falkordbUrl = 'falkor://localhost:6379';
 let _workBriefingLoading = false;
 let _workBriefingSummary = null;
+let _workBriefingRequestedLimit = 25;
+let _workBriefingCurrentProjectId = '';
+let _workBriefingRenderSignature = '';
+const WORK_BRIEFING_BATCH_SIZE = 25;
+const WORK_BRIEFING_DEFAULT_SORT = 'occurred_desc';
+const WORK_BRIEFING_DATE_FILTER_MS = Object.freeze({
+  '24h': 24 * 60 * 60 * 1000,
+  '7d': 7 * 24 * 60 * 60 * 1000,
+  '30d': 30 * 24 * 60 * 60 * 1000,
+});
+const WORK_BRIEFING_COLLATOR = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 const BRIEFING_COLLAPSE_STORAGE_KEY = 'cga_work_dashboard_collapsed_sections';
 let _briefingCollapsedSections = loadBriefingCollapsedSections();
+const LOGIN_REMEMBER_USERNAME_KEY = 'cga_login_remember_username';
+const LOGIN_USERNAME_KEY = 'cga_login_username';
 
 const ADMIN_TAB_ROUTES = Object.freeze({
   projects: '/admin/projects',
+  schedule: '/admin/schedule',
   users: '/admin/users',
   audit: '/admin/audit',
   briefing: '/admin/briefing',
@@ -2242,6 +2741,8 @@ const ADMIN_PATH_TABS = Object.freeze({
   '/admin': 'projects',
   '/admin/projects': 'projects',
   '/admin/project': 'projects',
+  '/admin/schedule': 'schedule',
+  '/admin/schedules': 'schedule',
   '/admin/users': 'users',
   '/admin/user': 'users',
   '/admin/audit': 'audit',
@@ -2530,11 +3031,17 @@ function copyProjectId(projectId) {
   copyText(projectId, 'Project ID');
 }
 
+function renderCopyButton(value, label, extraClass = '') {
+  const text = String(value ?? '');
+  if (!text) return '';
+  const safeLabel = String(label || 'value');
+  const cls = extraClass ? `copy-id-btn ${extraClass}` : 'copy-id-btn';
+  return `<button type="button" class="${cls}" onclick="copyText(${jsArg(text)}, ${jsArg(safeLabel)})" title="Copy ${esc(safeLabel)}" aria-label="Copy ${esc(safeLabel)}"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="8" height="8" rx="1.5" stroke-width="1.5"></rect><path d="M3 10.5V3.5C3 3 3.5 2.5 4 2.5H10.5" stroke-width="1.5" stroke-linecap="round"></path></svg></button>`;
+}
+
 function renderCopyIdButton(projectId, extraClass = '') {
   const value = String(projectId ?? '');
-  if (!value) return '';
-  const cls = extraClass ? `copy-id-btn ${extraClass}` : 'copy-id-btn';
-  return `<button type="button" class="${cls}" onclick="copyProjectId(${jsArg(value)})" title="Copy project ID" aria-label="Copy project ID"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="8" height="8" rx="1.5" stroke-width="1.5"></rect><path d="M3 10.5V3.5C3 3 3.5 2.5 4 2.5H10.5" stroke-width="1.5" stroke-linecap="round"></path></svg></button>`;
+  return renderCopyButton(value, 'Project ID', extraClass);
 }
 
 function renderProjectIdWithCopy(projectId, { placeholder = '—', extraClass = '' } = {}) {
@@ -2545,6 +3052,32 @@ function renderProjectIdWithCopy(projectId, { placeholder = '—', extraClass = 
 
 function loginWithGitHub() {
   window.location.href = '/api/auth/github/start';
+}
+
+function applyRememberedUsername() {
+  const rememberEl = document.getElementById('lf-remember-user');
+  const userEl = document.getElementById('lf-user');
+  if (!rememberEl || !userEl) return;
+  const remember = localStorage.getItem(LOGIN_REMEMBER_USERNAME_KEY) === '1';
+  rememberEl.checked = remember;
+  if (!remember) return;
+  const saved = localStorage.getItem(LOGIN_USERNAME_KEY) || '';
+  if (!saved) return;
+  userEl.value = saved;
+  userEl.focus();
+}
+
+function persistRememberedUsername() {
+  const rememberEl = document.getElementById('lf-remember-user');
+  const userEl = document.getElementById('lf-user');
+  if (!rememberEl || !userEl) return;
+  if (rememberEl.checked) {
+    localStorage.setItem(LOGIN_REMEMBER_USERNAME_KEY, '1');
+    localStorage.setItem(LOGIN_USERNAME_KEY, userEl.value.trim());
+    return;
+  }
+  localStorage.removeItem(LOGIN_REMEMBER_USERNAME_KEY);
+  localStorage.removeItem(LOGIN_USERNAME_KEY);
 }
 
 function showOauthErrorFromQuery() {
@@ -2570,6 +3103,7 @@ document.getElementById('login-form').addEventListener('submit', async e => {
   e.preventDefault();
   const errEl = document.getElementById('login-err');
   errEl.style.display = 'none';
+  persistRememberedUsername();
   try {
     const res = await api('POST', '/auth/login', {
       username: document.getElementById('lf-user').value.trim(),
@@ -2583,6 +3117,16 @@ document.getElementById('login-form').addEventListener('submit', async e => {
     errEl.style.display = 'block';
   }
 });
+
+const githubLoginBtn = document.getElementById('login-github-btn');
+if (githubLoginBtn) {
+  githubLoginBtn.addEventListener('click', loginWithGitHub);
+}
+
+const rememberUsernameCheckbox = document.getElementById('lf-remember-user');
+if (rememberUsernameCheckbox) {
+  rememberUsernameCheckbox.addEventListener('change', persistRememberedUsername);
+}
 
 async function initApp() {
   try { _me = await api('GET', '/auth/me'); } catch { logout(); return; }
@@ -2604,6 +3148,7 @@ async function initApp() {
     } catch {}
     document.getElementById('tab-briefing-btn').style.display = '';
     document.getElementById('tab-report-btn').style.display = '';
+    document.getElementById('tab-schedule-btn').style.display = '';
     document.getElementById('tab-viewer-btn').style.display = '';
     document.getElementById('tab-settings-btn').style.display = '';
   }
@@ -2682,6 +3227,8 @@ function switchSettingsSubtab(name, btn) {
   const activeBtn = btn || document.querySelector(`#settings-subnav .subtab-btn[data-subtab="${name}"]`);
   if (activeBtn) activeBtn.classList.add('active');
   if (name === 'backup') loadBackups();
+  if (name === 'delegation') loadMicrosoftAdoStatus();
+  if (name === 'report') initWsrTemplateEditor();
 }
 
 // ── Backup subtab ─────────────────────────────────────────────────────────
@@ -2876,9 +3423,32 @@ function switchTab(name, btn, options = {}) {
     clearInterval(_auditPollInterval);
     _auditPollInterval = null;
   }
+  if (_briefingPollInterval) {
+    clearInterval(_briefingPollInterval);
+    _briefingPollInterval = null;
+  }
+  if (_schedulePollInterval) {
+    clearInterval(_schedulePollInterval);
+    _schedulePollInterval = null;
+  }
   if (nextName === 'viewer') loadGraphViewerFrame();
   if (nextName === 'users') loadUsers();
-  if (nextName === 'briefing') loadWorkBriefing();
+  if (nextName === 'schedule') {
+    loadSchedules();
+    _schedulePollInterval = setInterval(() => {
+      if (document.getElementById('pane-schedule')?.classList.contains('active')) {
+        loadSchedules({ silent: true });
+      }
+    }, 10000);
+  }
+  if (nextName === 'briefing') {
+    loadWorkBriefing();
+    _briefingPollInterval = setInterval(() => {
+      if (document.getElementById('pane-briefing')?.classList.contains('active')) {
+        loadWorkBriefing({ preserveLimit: true });
+      }
+    }, 5000);
+  }
   if (nextName === 'report') loadWorkReport();
   if (nextName === 'settings') loadSettings();
   if (nextName === 'audit') {
@@ -2895,6 +3465,7 @@ function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
 let _allProjects = [];
+let _showDeletedProjects = false;
 let _tokensCache = {};  // projectId -> tokens[]
 let _indexStatusCache = {};  // projectId -> ProjectIndexStatus
 let _indexStatusPollInterval = null;
@@ -2902,7 +3473,13 @@ let _expandedProjectIds = new Set();
 let _auditRowsCache = [];
 let _projectExternalIdByDbId = {};
 let _projectIdByName = {};
+let _projectNameById = {};
+let _scheduleTasks = [];
+let _scheduleRuns = [];
+let _scheduleEditingId = null;
 let _auditPollInterval = null;
+let _briefingPollInterval = null;
+let _schedulePollInterval = null;
 let _auditLoading = false;
 
 function mergeIndexStatusCache(statuses) {
@@ -2962,6 +3539,9 @@ function renderAuditRows() {
     onPageSize: (nextSize) => {
       _auditPagination.pageSize = nextSize;
       _auditPagination.page = 1;
+        let _workBriefingRequestedLimit = 25;
+        let _workBriefingCurrentProjectId = '';
+        const WORK_BRIEFING_BATCH_SIZE = 25;
       loadAudit();
     },
   });
@@ -2998,8 +3578,10 @@ async function loadProjects() {
   _allProjects.forEach(p => { _projectExternalIdByDbId[p.id] = p.project_id; });
   // Build name -> id lookup for briefing input resolution
   _projectIdByName = {};
+  _projectNameById = {};
   _allProjects.forEach(p => {
     if (p.project_id && p.project_name) _projectIdByName[p.project_name] = p.project_id;
+    if (p.project_id && p.project_name) _projectNameById[p.project_id] = p.project_name;
   });
   const briefingOptions = document.getElementById('briefing-project-options');
   if (briefingOptions) {
@@ -3030,6 +3612,252 @@ async function loadProjects() {
   if (_indexStatusPollInterval) clearInterval(_indexStatusPollInterval);
   _indexStatusPollInterval = setInterval(updateIndexStatus, 5000);  // Poll every 5 seconds
   filterProjects(document.getElementById('project-search')?.value || '');
+}
+
+const SCHEDULE_TYPE_LABELS = Object.freeze({
+  browseragent_task: 'BrowserAgent',
+  agent_activation: 'Agent Activation',
+  http_request: 'HTTP Request',
+});
+
+function scheduleTypeLabel(value) {
+  return SCHEDULE_TYPE_LABELS[value] || value || 'Task';
+}
+
+function defaultSchedulePayload(type) {
+  if (type === 'agent_activation') return { action: 'activate_agent', params: {} };
+  if (type === 'http_request') return { ok: true };
+  return { action: 'ping', params: {} };
+}
+
+function defaultScheduleTarget(type) {
+  if (type === 'browseragent_task') return 'http://localhost:9876/command';
+  if (type === 'agent_activation') return 'http://localhost:3002/activate';
+  return '';
+}
+
+function renderScheduleProjectOptions(selectedId = '') {
+  const select = document.getElementById('schedule-project-id');
+  if (!select) return;
+  const activeProjects = _allProjects.filter(p => p.is_active !== 0 && p.is_active !== false);
+  select.innerHTML = '<option value="">No project binding</option>' + activeProjects
+    .map(p => `<option value="${esc(p.id)}" ${String(p.id) === String(selectedId || '') ? 'selected' : ''}>${esc(p.project_name || p.project_id || p.id)}</option>`)
+    .join('');
+}
+
+function applyScheduleTypeDefaults(force = false) {
+  const type = document.getElementById('schedule-task-type')?.value || 'browseragent_task';
+  const targetEl = document.getElementById('schedule-target-url');
+  const payloadEl = document.getElementById('schedule-payload');
+  const targetDefault = defaultScheduleTarget(type);
+  const knownTargets = ['http://localhost:9876/command', 'http://localhost:3002/activate'];
+  if (targetEl && (force || !targetEl.value.trim() || knownTargets.includes(targetEl.value.trim()))) {
+    targetEl.value = targetDefault;
+  }
+  if (payloadEl && (force || !payloadEl.value.trim())) {
+    payloadEl.value = JSON.stringify(defaultSchedulePayload(type), null, 2);
+  }
+}
+
+function openScheduleEditor(taskId = null) {
+  _scheduleEditingId = taskId;
+  const task = taskId ? _scheduleTasks.find(item => item.id === taskId) : null;
+  renderScheduleProjectOptions(task?.project_id || '');
+  document.getElementById('schedule-editor-title').textContent = task ? 'Edit scheduled task' : 'New scheduled task';
+  document.getElementById('schedule-name').value = task?.name || '';
+  document.getElementById('schedule-description').value = task?.description || '';
+  document.getElementById('schedule-task-type').value = task?.task_type || 'browseragent_task';
+  document.getElementById('schedule-agent-id').value = task?.agent_id || '';
+  document.getElementById('schedule-target-url').value = task?.target_url || '';
+  document.getElementById('schedule-cadence').value = task?.cadence_minutes || 60;
+  document.getElementById('schedule-timeout').value = task?.timeout_seconds || 30;
+  document.getElementById('schedule-enabled').value = String(task ? !!task.enabled : true);
+  document.getElementById('schedule-payload').value = JSON.stringify(task?.payload || defaultSchedulePayload(task?.task_type || 'browseragent_task'), null, 2);
+  applyScheduleTypeDefaults(!task);
+  const editor = document.getElementById('schedule-editor');
+  if (editor) {
+    editor.hidden = false;
+    try { editor.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {}
+  }
+}
+
+function closeScheduleEditor() {
+  _scheduleEditingId = null;
+  const editor = document.getElementById('schedule-editor');
+  if (editor) editor.hidden = true;
+}
+
+function readSchedulePayload() {
+  const raw = document.getElementById('schedule-payload')?.value.trim() || '{}';
+  try {
+    const parsed = raw ? JSON.parse(raw) : {};
+    if (!parsed || Array.isArray(parsed) || typeof parsed !== 'object') throw new Error('Payload must be a JSON object');
+    return parsed;
+  } catch (e) {
+    throw new Error('Invalid JSON payload: ' + (e?.message || e));
+  }
+}
+
+async function saveScheduleTask() {
+  const btn = document.getElementById('schedule-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+  try {
+    const projectValue = document.getElementById('schedule-project-id')?.value || '';
+    const body = {
+      name: document.getElementById('schedule-name')?.value.trim() || '',
+      description: document.getElementById('schedule-description')?.value.trim() || '',
+      task_type: document.getElementById('schedule-task-type')?.value || 'browseragent_task',
+      project_id: projectValue ? Number(projectValue) : null,
+      agent_id: document.getElementById('schedule-agent-id')?.value.trim() || '',
+      target_url: document.getElementById('schedule-target-url')?.value.trim() || '',
+      cadence_minutes: Math.max(1, Number(document.getElementById('schedule-cadence')?.value || 60)),
+      timeout_seconds: Math.max(1, Number(document.getElementById('schedule-timeout')?.value || 30)),
+      enabled: document.getElementById('schedule-enabled')?.value === 'true',
+      payload: readSchedulePayload(),
+    };
+    if (!body.name) throw new Error('Name is required');
+    if (body.enabled && !body.target_url) throw new Error('Target URL is required for enabled tasks');
+    if (_scheduleEditingId) {
+      await api('PATCH', `/admin/schedules/${_scheduleEditingId}`, body);
+      toast('Scheduled task updated');
+    } else {
+      await api('POST', '/admin/schedules', body);
+      toast('Scheduled task created');
+    }
+    closeScheduleEditor();
+    await loadSchedules();
+  } catch (e) {
+    toast(e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Save Task'; }
+  }
+}
+
+async function loadSchedules(options = {}) {
+  if (_me?.role !== 'admin') return;
+  try {
+    const data = await api('GET', '/admin/schedules');
+    _scheduleTasks = data.items || [];
+    _scheduleRuns = data.recent_runs || [];
+    renderSchedules();
+  } catch (e) {
+    if (!options?.silent) toast(e.message, 'error');
+  }
+}
+
+function scheduleStatusClass(status) {
+  if (status === 'success') return 'pill-green';
+  if (status === 'failed') return 'pill-red';
+  if (status === 'running') return 'pill-blue';
+  return 'pill-gray';
+}
+
+function renderSchedules() {
+  const tbody = document.getElementById('schedule-body');
+  const runsBody = document.getElementById('schedule-runs-body');
+  if (!tbody || !runsBody) return;
+
+  const typeFilter = document.getElementById('schedule-filter-type')?.value || '';
+  const query = (document.getElementById('schedule-filter-search')?.value || '').trim().toLowerCase();
+  const now = Date.now();
+  const dueHorizon = now + 60 * 60 * 1000;
+  const enabledCount = _scheduleTasks.filter(task => task.enabled).length;
+  const dueSoon = _scheduleTasks.filter(task => task.enabled && task.next_run_at && new Date(task.next_run_at).getTime() <= dueHorizon).length;
+  const lastStatus = _scheduleRuns[0]?.status || '—';
+  document.getElementById('schedule-total-count').textContent = String(_scheduleTasks.length);
+  document.getElementById('schedule-enabled-count').textContent = String(enabledCount);
+  document.getElementById('schedule-due-count').textContent = String(dueSoon);
+  document.getElementById('schedule-last-status').textContent = lastStatus;
+
+  const rows = _scheduleTasks.filter(task => {
+    if (typeFilter && task.task_type !== typeFilter) return false;
+    if (!query) return true;
+    return [task.name, task.description, task.task_type, task.project_name, task.project_external_id, task.agent_id, task.target_url, task.last_run_status]
+      .join(' ').toLowerCase().includes(query);
+  });
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state">${_scheduleTasks.length ? 'No matching schedules' : 'No scheduled tasks yet'}</div></td></tr>`;
+  } else {
+    tbody.innerHTML = rows.map(task => {
+      const status = task.last_run_status || 'never';
+      const statusCls = task.last_run_status ? scheduleStatusClass(task.last_run_status) : 'pill-gray';
+      const projectText = task.project_name || task.project_external_id || '—';
+      return `
+        <tr>
+          <td>
+            <strong>${esc(task.name)}</strong>
+            ${task.description ? `<div style="color:var(--muted);font-size:12px;margin-top:2px">${esc(task.description)}</div>` : ''}
+          </td>
+          <td style="text-align:center"><span class="pill pill-blue">${esc(scheduleTypeLabel(task.task_type))}</span></td>
+          <td style="text-align:center">${esc(projectText)}</td>
+          <td><div class="mono schedule-target-text" title="${esc(task.target_url || '')}">${esc(task.target_url || '—')}</div></td>
+          <td class="mono" style="text-align:center">${esc(String(task.cadence_minutes || 0))} min</td>
+          <td class="mono" style="text-align:center">${esc(_fmtIso(task.next_run_at))}</td>
+          <td class="mono" style="text-align:center">${esc(_fmtIso(task.last_run_at))}</td>
+          <td style="text-align:center"><span class="pill ${statusCls}">${esc(status)}</span></td>
+          <td>
+            <div class="project-actions">
+              <button class="btn btn-sm btn-accent" onclick="runScheduleTask(${task.id},this)">Run</button>
+              <button class="btn btn-sm btn-ghost" onclick="toggleScheduleTask(${task.id},${task.enabled ? 'false' : 'true'})">${task.enabled ? 'Disable' : 'Enable'}</button>
+              <button class="btn btn-sm" onclick="openScheduleEditor(${task.id})">Edit</button>
+              <button class="btn btn-sm btn-danger" onclick="deleteScheduleTask(${task.id})">Delete</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  if (!_scheduleRuns.length) {
+    runsBody.innerHTML = '<tr><td colspan="6"><div class="empty-state">No scheduled runs recorded yet</div></td></tr>';
+  } else {
+    runsBody.innerHTML = _scheduleRuns.map(run => `
+      <tr>
+        <td class="mono" style="text-align:center">${esc(_fmtIso(run.started_at))}</td>
+        <td class="mono" style="text-align:center">#${esc(run.schedule_id)}</td>
+        <td style="text-align:center"><span class="pill ${scheduleStatusClass(run.status)}">${esc(run.status || '')}</span></td>
+        <td class="mono" style="text-align:center">${run.status_code == null ? '—' : esc(String(run.status_code))}</td>
+        <td class="mono" style="text-align:center">${esc(String(run.duration_ms || 0))} ms</td>
+        <td><div class="schedule-run-error" title="${esc(run.error || '')}">${esc(run.error || '—')}</div></td>
+      </tr>
+    `).join('');
+  }
+}
+
+async function runScheduleTask(taskId, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = 'Running...'; }
+  try {
+    const run = await api('POST', `/admin/schedules/${taskId}/run`);
+    toast(run.status === 'success' ? 'Schedule run completed' : 'Schedule run failed', run.status === 'success' ? 'success' : 'error');
+    await loadSchedules();
+  } catch (e) {
+    toast(e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Run'; }
+  }
+}
+
+async function toggleScheduleTask(taskId, enabled) {
+  try {
+    await api('PATCH', `/admin/schedules/${taskId}`, { enabled });
+    toast(enabled ? 'Scheduled task enabled' : 'Scheduled task disabled');
+    await loadSchedules();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
+}
+
+async function deleteScheduleTask(taskId) {
+  if (!confirm('Delete this scheduled task?')) return;
+  try {
+    await api('DELETE', `/admin/schedules/${taskId}`);
+    toast('Scheduled task deleted');
+    if (_scheduleEditingId === taskId) closeScheduleEditor();
+    await loadSchedules();
+  } catch (e) {
+    toast(e.message, 'error');
+  }
 }
 
 async function updateIndexStatus() {
@@ -3295,17 +4123,31 @@ function renderTrackingHistory(projectId) {
   `;
 }
 
+function toggleShowDeletedProjects() {
+  _showDeletedProjects = !_showDeletedProjects;
+  const btn = document.getElementById('toggle-deleted-projects-btn');
+  if (btn) {
+    btn.textContent = _showDeletedProjects ? 'Hide deleted' : 'Show deleted';
+    btn.classList.toggle('btn-accent', _showDeletedProjects);
+  }
+  _projectsPagination.page = 1;
+  filterProjects(document.getElementById('project-search')?.value || '');
+}
+
 function filterProjects(q) {
   const tbody = document.getElementById('projects-body');
   const kw = q.trim().toLowerCase();
+  const visible = _showDeletedProjects
+    ? _allProjects
+    : _allProjects.filter(p => p.is_active !== 0 && p.is_active !== false);
   const filteredRows = kw
-    ? _allProjects.filter(p => {
+    ? visible.filter(p => {
         const tokens = _tokensCache[p.id] || [];
         const tokenStr = tokens.map(t => `#${t.id} ${t.token_hint} ${t.token_type} ${t.created_at}`).join(' ');
         return [p.project_name, p.project_id, p.upstream_url, p.description, p.created_at, tokenStr]
           .join(' ').toLowerCase().includes(kw);
       })
-    : _allProjects;
+    : visible;
   const rows = _sortRows(filteredRows, _projectsSort);
   const pageData = _slicePage(rows, _projectsPagination);
   const displayRows = pageData.pageRows;
@@ -3670,7 +4512,13 @@ async function loadAudit() {
 }
 
 function refreshWorkBriefing() {
-  loadWorkBriefing();
+  loadWorkBriefing({ preserveLimit: true });
+}
+
+function loadMoreWorkBriefing() {
+  if (_workBriefingLoading) return;
+  _workBriefingRequestedLimit = Math.min(5000, _workBriefingRequestedLimit + WORK_BRIEFING_BATCH_SIZE);
+  loadWorkBriefing({ append: true });
 }
 
 function renderBriefingChips(counts, emptyLabel) {
@@ -3719,15 +4567,216 @@ function renderBriefingEventIcon(eventType) {
   return `<span class="briefing-event-icon" title="${esc(label)}" aria-label="${esc(label)}">${icon}</span>`;
 }
 
+function _briefingStatusClass(key) {
+  if (key === 'done' || key === 'completed' || key === 'closed') return 'is-done';
+  if (key === 'in_progress' || key === 'in-progress' || key === 'active') return 'is-progress';
+  if (key === 'open' || key === 'new' || key === 'pending') return 'is-open';
+  if (key === 'blocked' || key === 'failed' || key === 'error') return 'is-blocked';
+  return '';
+}
+
+function _normalizeBriefingStatuses(status) {
+  const raw = String(status || '').trim();
+  if (!raw) return [];
+  const parts = raw.split(/[|,;/]+/).map(p => p.trim()).filter(Boolean);
+  const seen = new Set();
+  return parts.filter(p => {
+    const key = p.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function renderBriefingStatusDot(status) {
   const key = String(status || '').toLowerCase();
-  let cls = '';
-  if (key === 'done' || key === 'completed' || key === 'closed') cls = 'is-done';
-  else if (key === 'in_progress' || key === 'in-progress' || key === 'active') cls = 'is-progress';
-  else if (key === 'open' || key === 'new' || key === 'pending') cls = 'is-open';
-  else if (key === 'blocked' || key === 'failed' || key === 'error') cls = 'is-blocked';
+  const cls = _briefingStatusClass(key);
   const label = key || 'no status';
   return `<span class="briefing-status-dot ${cls}" title="${esc(label)}" aria-label="status ${esc(label)}"></span>`;
+}
+
+function renderBriefingStatusText(status) {
+  const labels = _normalizeBriefingStatuses(status);
+  if (!labels.length) {
+    return `<span class="briefing-status-text" title="no status" aria-label="status no status">No status</span>`;
+  }
+  return labels.map(label => {
+    const key = label.toLowerCase();
+    const pretty = label.replaceAll('_', ' ');
+    const cls = _briefingStatusClass(key);
+    return `<span class="briefing-status-text ${cls}" title="${esc(pretty)}" aria-label="status ${esc(pretty)}">${esc(pretty)}</span>`;
+  }).join('');
+}
+
+function getWorkBriefingActivityCriteria() {
+  return {
+    projectId: document.getElementById('briefing-filter-project')?.value || '',
+    eventType: document.getElementById('briefing-filter-type')?.value || '',
+    status: document.getElementById('briefing-filter-status')?.value || '',
+    query: (document.getElementById('briefing-filter-search')?.value || '').trim().toLowerCase(),
+    range: document.getElementById('briefing-filter-range')?.value || 'all',
+    sort: document.getElementById('briefing-sort-order')?.value || WORK_BRIEFING_DEFAULT_SORT,
+  };
+}
+
+function onWorkBriefingActivityFiltersChanged() {
+  renderWorkBriefing(_workBriefingSummary, { preserveViewport: true });
+}
+
+function clearWorkBriefingActivityFilters() {
+  const projectSelect = document.getElementById('briefing-filter-project');
+  const typeSelect = document.getElementById('briefing-filter-type');
+  const statusSelect = document.getElementById('briefing-filter-status');
+  const searchInput = document.getElementById('briefing-filter-search');
+  const rangeSelect = document.getElementById('briefing-filter-range');
+  const sortSelect = document.getElementById('briefing-sort-order');
+  if (projectSelect) projectSelect.value = '';
+  if (typeSelect) typeSelect.value = '';
+  if (statusSelect) statusSelect.value = '';
+  if (searchInput) searchInput.value = '';
+  if (rangeSelect) rangeSelect.value = 'all';
+  if (sortSelect) sortSelect.value = WORK_BRIEFING_DEFAULT_SORT;
+  renderWorkBriefing(_workBriefingSummary, { preserveViewport: true });
+}
+
+function _workBriefingCountMapValue(map, value) {
+  const key = String(value || '').trim();
+  if (!key) return;
+  map.set(key, (map.get(key) || 0) + 1);
+}
+
+function _workBriefingHumanizeFilterLabel(value) {
+  return String(value || '')
+    .replaceAll('_', ' ')
+    .replaceAll('-', ' ')
+    .replace(/\s+/g, ' ')
+    .trim() || 'Unknown';
+}
+
+function _workBriefingProjectFilterLabel(projectId) {
+  const id = String(projectId || '').trim();
+  const name = _projectNameById[id] || '';
+  return name ? `${id} - ${name}` : id;
+}
+
+function _workBriefingSortedCountEntries(counts) {
+  return [...counts.entries()]
+    .sort((left, right) => Number(right[1] || 0) - Number(left[1] || 0) || WORK_BRIEFING_COLLATOR.compare(String(left[0]), String(right[0])));
+}
+
+function _workBriefingRenderSelectOptions(selectId, allLabel, entries, selectedValue, labelFn) {
+  const select = document.getElementById(selectId);
+  if (!select) return;
+  const selected = String(selectedValue || '');
+  const items = entries.map(([value, count]) => [String(value), Number(count || 0)]);
+  if (selected && !items.some(([value]) => value === selected)) {
+    items.unshift([selected, 0]);
+  }
+  select.innerHTML = `<option value="">${esc(allLabel)}</option>` + items.map(([value, count]) => {
+    const baseLabel = labelFn ? labelFn(value) : _workBriefingHumanizeFilterLabel(value);
+    const countLabel = count ? ` (${count})` : '';
+    return `<option value="${esc(value)}">${esc(baseLabel + countLabel)}</option>`;
+  }).join('');
+  select.value = selected;
+}
+
+function _workBriefingActivityTimestamp(activity) {
+  const parsed = Date.parse(activity?.occurred_at || activity?.synced_at || '');
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function _workBriefingActivityStatusKeys(activity) {
+  const statuses = _normalizeBriefingStatuses(activity?.status).map(status => status.toLowerCase());
+  return statuses.length ? statuses : ['no status'];
+}
+
+function _workBriefingActivityMatches(activity, criteria, nowMs) {
+  if (criteria.projectId && String(activity?.project_id || '') !== criteria.projectId) return false;
+  if (criteria.eventType && String(activity?.event_type || '') !== criteria.eventType) return false;
+  if (criteria.status && !_workBriefingActivityStatusKeys(activity).includes(criteria.status)) return false;
+
+  const rangeMs = WORK_BRIEFING_DATE_FILTER_MS[criteria.range];
+  if (rangeMs) {
+    const occurredMs = _workBriefingActivityTimestamp(activity);
+    if (!occurredMs || occurredMs < nowMs - rangeMs) return false;
+  }
+
+  if (criteria.query) {
+    const haystack = [
+      activity?.project_id,
+      _projectNameById[String(activity?.project_id || '')],
+      activity?.workspace_name,
+      activity?.event_type,
+      activity?.title,
+      activity?.summary,
+      activity?.body_text,
+      activity?.status,
+      activity?.priority,
+      activity?.owner,
+      ...(Array.isArray(activity?.tags) ? activity.tags : []),
+    ].filter(Boolean).join(' ').toLowerCase();
+    if (!haystack.includes(criteria.query)) return false;
+  }
+
+  return true;
+}
+
+function _workBriefingCompareText(left, right) {
+  return WORK_BRIEFING_COLLATOR.compare(String(left || ''), String(right || ''));
+}
+
+function getFilteredWorkBriefingActivities(activities, criteria) {
+  const nowMs = Date.now();
+  const filtered = activities.filter(activity => _workBriefingActivityMatches(activity, criteria, nowMs));
+  filtered.sort((left, right) => {
+    const leftTime = _workBriefingActivityTimestamp(left);
+    const rightTime = _workBriefingActivityTimestamp(right);
+    if (criteria.sort === 'occurred_asc') return leftTime - rightTime;
+    if (criteria.sort === 'project_asc') return _workBriefingCompareText(left?.project_id, right?.project_id) || rightTime - leftTime;
+    if (criteria.sort === 'type_asc') return _workBriefingCompareText(left?.event_type, right?.event_type) || rightTime - leftTime;
+    if (criteria.sort === 'status_asc') return _workBriefingCompareText(left?.status, right?.status) || rightTime - leftTime;
+    if (criteria.sort === 'title_asc') return _workBriefingCompareText(left?.title, right?.title) || rightTime - leftTime;
+    return rightTime - leftTime;
+  });
+  return filtered;
+}
+
+function renderWorkBriefingActivityControls(activities, visibleCount, totalAvailable, criteria) {
+  const projectCounts = new Map();
+  const typeCounts = new Map();
+  const statusCounts = new Map();
+  activities.forEach(activity => {
+    _workBriefingCountMapValue(projectCounts, activity?.project_id);
+    _workBriefingCountMapValue(typeCounts, activity?.event_type);
+    const statuses = _normalizeBriefingStatuses(activity?.status);
+    if (statuses.length) {
+      statuses.forEach(status => _workBriefingCountMapValue(statusCounts, status.toLowerCase()));
+    } else {
+      _workBriefingCountMapValue(statusCounts, 'no status');
+    }
+  });
+
+  _workBriefingRenderSelectOptions('briefing-filter-project', 'All loaded projects', _workBriefingSortedCountEntries(projectCounts), criteria.projectId, _workBriefingProjectFilterLabel);
+  _workBriefingRenderSelectOptions('briefing-filter-type', 'All event types', _workBriefingSortedCountEntries(typeCounts), criteria.eventType, _workBriefingHumanizeFilterLabel);
+  _workBriefingRenderSelectOptions('briefing-filter-status', 'All statuses', _workBriefingSortedCountEntries(statusCounts), criteria.status, _workBriefingHumanizeFilterLabel);
+
+  const rangeSelect = document.getElementById('briefing-filter-range');
+  if (rangeSelect) rangeSelect.value = criteria.range || 'all';
+  const sortSelect = document.getElementById('briefing-sort-order');
+  if (sortSelect) sortSelect.value = criteria.sort || WORK_BRIEFING_DEFAULT_SORT;
+
+  const filterActive = !!(criteria.projectId || criteria.eventType || criteria.status || criteria.query || (criteria.range && criteria.range !== 'all'));
+  const active = !!(filterActive || (criteria.sort && criteria.sort !== WORK_BRIEFING_DEFAULT_SORT));
+  const clearBtn = document.getElementById('briefing-clear-filters-btn');
+  if (clearBtn) clearBtn.disabled = !active;
+  const summaryEl = document.getElementById('briefing-activity-filter-summary');
+  if (summaryEl) {
+    const loadedCount = activities.length;
+    const totalLabel = totalAvailable > loadedCount ? `, ${totalAvailable} total available` : '';
+    summaryEl.textContent = filterActive
+      ? `Showing ${visibleCount} of ${loadedCount} loaded${totalLabel}`
+      : `Showing ${loadedCount} loaded${totalLabel}`;
+  }
 }
 
 function getWorkBriefingTemplateProjectId(payload) {
@@ -3877,9 +4926,14 @@ function renderWorkBriefingRequestTemplates(payload) {
 }
 
 function renderWorkBriefing(summary = _workBriefingSummary) {
+  const preserveViewport = arguments.length > 1 && !!arguments[1]?.preserveViewport;
   const payload = summary || {
     project_id: null,
     total_events: 0,
+    total_available: 0,
+    has_more: false,
+    duplicate_signal_count: 0,
+    suspected_duplicates: [],
     event_type_counts: {},
     status_counts: {},
     project_counts: {},
@@ -3887,6 +4941,8 @@ function renderWorkBriefing(summary = _workBriefingSummary) {
   };
 
   const activities = Array.isArray(payload.activities) ? payload.activities : [];
+  const activityCriteria = getWorkBriefingActivityCriteria();
+  const filteredActivities = getFilteredWorkBriefingActivities(activities, activityCriteria);
   const projectCounts = payload.project_counts || {};
   const eventEntries = Object.entries(payload.event_type_counts || {})
     .sort((left, right) => Number(right[1] || 0) - Number(left[1] || 0) || String(left[0]).localeCompare(String(right[0])));
@@ -3895,6 +4951,24 @@ function renderWorkBriefing(summary = _workBriefingSummary) {
     .slice(0, 3);
   const commandCenter = document.getElementById('briefing-command-center');
   const workloadShape = document.getElementById('briefing-workload-shape');
+  const tableWrap = document.getElementById('briefing-section-activity-log-body');
+  const duplicateWrap = document.getElementById('briefing-section-duplicate-signals-body');
+  const currentSignature = JSON.stringify({
+    total_events: payload.total_events || 0,
+    total_available: payload.total_available || 0,
+    duplicate_signal_count: payload.duplicate_signal_count || 0,
+    activity_criteria: activityCriteria,
+    activities: activities.map(activity => [activity.activity_id, activity.project_id, activity.event_type, activity.title, activity.summary, activity.occurred_at, activity.synced_at, activity.status, activity.suspected_duplicate ? 1 : 0]),
+    suspected_duplicates: (payload.suspected_duplicates || []).map(group => [group.group_key, group.duplicate_count]),
+  });
+  if (preserveViewport && currentSignature === _workBriefingRenderSignature) {
+    const loadMoreBtn = document.getElementById('briefing-load-more-btn');
+    if (loadMoreBtn) loadMoreBtn.disabled = false;
+    return;
+  }
+  const scrollY = preserveViewport ? window.scrollY : null;
+  const tableScrollTop = preserveViewport && tableWrap ? tableWrap.scrollTop : null;
+  const duplicateScrollTop = preserveViewport && duplicateWrap ? duplicateWrap.scrollTop : null;
 
   if (commandCenter) {
     commandCenter.setAttribute('data-briefing-section', 'command-center');
@@ -3965,6 +5039,7 @@ function renderWorkBriefing(summary = _workBriefingSummary) {
   }
 
   renderWorkBriefingRequestTemplates(payload);
+  renderWorkBriefingDuplicateSignals(payload);
 
   document.getElementById('briefing-total-events').textContent = String(payload.total_events || 0);
   document.getElementById('briefing-selected-project').innerHTML = payload.project_id
@@ -3980,15 +5055,46 @@ function renderWorkBriefing(summary = _workBriefingSummary) {
   applyAllBriefingSectionCollapse();
 
   const tbody = document.getElementById('briefing-activities-body');
+  const loadMoreBtn = document.getElementById('briefing-load-more-btn');
+  const totalAvailable = Math.max(Number(payload.total_available || 0), activities.length);
+  const hasMore = !!payload.has_more || totalAvailable > activities.length;
+  renderWorkBriefingActivityControls(activities, filteredActivities.length, totalAvailable, activityCriteria);
   if (!activities.length) {
     tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">No work activity found for the current scope</div></td></tr>`;
+    if (loadMoreBtn) loadMoreBtn.hidden = true;
+    _workBriefingRenderSignature = currentSignature;
+    if (preserveViewport) {
+      if (tableWrap && tableScrollTop != null) tableWrap.scrollTop = tableScrollTop;
+      if (duplicateWrap && duplicateScrollTop != null) duplicateWrap.scrollTop = duplicateScrollTop;
+      if (scrollY != null) window.scrollTo(0, scrollY);
+    }
+    return;
+  }
+  if (!filteredActivities.length) {
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">No loaded events match the current filters</div></td></tr>`;
+    if (loadMoreBtn) {
+      loadMoreBtn.hidden = !hasMore;
+      loadMoreBtn.disabled = _workBriefingLoading;
+      loadMoreBtn.textContent = hasMore
+        ? `Load ${Math.min(WORK_BRIEFING_BATCH_SIZE, Math.max(0, totalAvailable - activities.length)) || WORK_BRIEFING_BATCH_SIZE} more (${activities.length}/${totalAvailable})`
+        : `All ${activities.length} loaded`;
+    }
+    _workBriefingRenderSignature = currentSignature;
+    if (preserveViewport) {
+      if (tableWrap && tableScrollTop != null) tableWrap.scrollTop = tableScrollTop;
+      if (duplicateWrap && duplicateScrollTop != null) duplicateWrap.scrollTop = duplicateScrollTop;
+      if (scrollY != null) window.scrollTo(0, scrollY);
+    }
     return;
   }
 
-  tbody.innerHTML = activities.map(activity => {
+  tbody.innerHTML = filteredActivities.map(activity => {
     const workspaceLabel = activity.workspace_name || '';
     const summaryText = activity.summary || activity.body_text || '';
     const occurredAt = activity.occurred_at || '';
+    const activityTags = activity.suspected_duplicate
+      ? ['possible-duplicate', ...(Array.isArray(activity.tags) ? activity.tags : [])]
+      : activity.tags;
     const projectCell = activity.project_id
       ? `<div class="briefing-activity-cell">
            <div class="row1">${renderProjectIdWithCopy(activity.project_id, { extraClass: 'copy-id-btn-sm' })}</div>
@@ -3997,18 +5103,18 @@ function renderWorkBriefing(summary = _workBriefingSummary) {
       : '—';
     return `
       <tr class="briefing-activity-row">
-        <td style="text-align:center">${projectCell}</td>
+        <td style="text-align:left">${projectCell}</td>
         <td style="text-align:center">
           <div class="briefing-icon-stack">
             ${renderBriefingEventIcon(activity.event_type)}
-            ${renderBriefingStatusDot(activity.status)}
+            ${renderBriefingStatusText(activity.status)}
           </div>
         </td>
         <td>
           <div class="briefing-activity-text">
             <strong title="${esc(activity.title || '')}">${esc(activity.title || 'Untitled activity')}</strong>
             ${summaryText ? `<div class="briefing-activity-summary" title="${esc(summaryText)}">${esc(summaryText)}</div>` : ''}
-            ${renderBriefingTags(activity.tags)}
+            ${renderBriefingTags(activityTags)}
           </div>
         </td>
         <td class="briefing-when-cell" title="${esc(occurredAt)}">
@@ -4024,13 +5130,132 @@ function renderWorkBriefing(summary = _workBriefingSummary) {
       </tr>
     `;
   }).join('');
+
+  if (loadMoreBtn) {
+    loadMoreBtn.hidden = !hasMore;
+    loadMoreBtn.disabled = _workBriefingLoading;
+    loadMoreBtn.textContent = hasMore
+      ? `Load ${Math.min(WORK_BRIEFING_BATCH_SIZE, Math.max(0, totalAvailable - activities.length)) || WORK_BRIEFING_BATCH_SIZE} more (${activities.length}/${totalAvailable})`
+      : `All ${activities.length} loaded`;
+  }
+  _workBriefingRenderSignature = currentSignature;
+  if (preserveViewport) {
+    if (tableWrap && tableScrollTop != null) tableWrap.scrollTop = tableScrollTop;
+    if (duplicateWrap && duplicateScrollTop != null) duplicateWrap.scrollTop = duplicateScrollTop;
+    if (scrollY != null) window.scrollTo(0, scrollY);
+  }
+}
+
+function renderWorkBriefingDuplicateSignals(payload) {
+  const summaryEl = document.getElementById('briefing-duplicates-summary');
+  const tbody = document.getElementById('briefing-duplicates-body');
+  if (!summaryEl || !tbody) return;
+
+  const groups = Array.isArray(payload?.suspected_duplicates) ? payload.suspected_duplicates : [];
+  if (!groups.length) {
+    summaryEl.textContent = 'No duplicate signals detected in the current dashboard slice.';
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">No duplicate clusters detected.</div></td></tr>`;
+    return;
+  }
+
+  summaryEl.textContent = `${groups.length} duplicate signal ${groups.length === 1 ? 'group' : 'groups'} detected in the current slice.`;
+  tbody.innerHTML = groups.slice(0, 10).map(group => {
+    const projectCell = group.project_id
+      ? renderProjectIdWithCopy(group.project_id, { extraClass: 'copy-id-btn-sm' })
+      : '—';
+    const sourceHint = Array.isArray(group.source_item_ids) && group.source_item_ids.length
+      ? `<div class="briefing-activity-summary" title="${esc(group.source_item_ids.join(', '))}">sources: ${esc(group.source_item_ids.slice(0, 3).join(', '))}${group.source_item_ids.length > 3 ? ' ...' : ''}</div>`
+      : '';
+    const memberDetails = Array.isArray(group.members) && group.members.length
+      ? `
+        <details style="margin-top:6px">
+          <summary style="cursor:pointer;color:var(--muted);font-size:12px">Show member details</summary>
+          <div style="margin-top:6px;display:grid;gap:6px">
+            ${group.members.map(member => `
+              <div style="border:1px solid var(--border);border-radius:6px;padding:6px 8px;background:rgba(10,14,22,.55)">
+                <div style="font-size:11px;color:var(--muted)">source: ${esc(member.source_item_id || '—')}</div>
+                <div style="font-size:11px;color:var(--muted)">hash: ${esc(member.content_hash || '—')}</div>
+                <div style="font-size:11px;color:var(--muted)">occurred: ${esc(member.occurred_at || '—')} · synced: ${esc(member.synced_at || '—')}</div>
+                ${member.summary ? `<div class="briefing-activity-summary" title="${esc(member.summary)}">${esc(member.summary)}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </details>
+      `
+      : '';
+    return `
+      <tr class="briefing-activity-row">
+        <td style="text-align:left">${projectCell}</td>
+        <td style="text-align:center">
+          <div class="briefing-icon-stack">
+            ${renderBriefingEventIcon(group.event_type)}
+            <span class="briefing-status-dot is-open" title="duplicate signal" aria-label="duplicate signal"></span>
+          </div>
+        </td>
+        <td>
+          <div class="briefing-activity-text">
+            <strong title="${esc(group.title || '')}">${esc(group.title || 'Duplicate signal')}</strong>
+            <div class="briefing-activity-summary">${esc(group.reason || 'Possible duplicate activity cluster')} (${esc(String(group.duplicate_count || 0))} records)</div>
+            ${sourceHint}
+            ${memberDetails}
+          </div>
+        </td>
+        <td class="briefing-when-cell" title="${esc(group.occurred_on || '')}">
+          <div>${esc(group.occurred_on || '—')}</div>
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 // ===== Weekly Status Report (WSR) =====
 const WSR_LOOP_URL = 'https://loop.cloud.microsoft/p/eyJ3Ijp7InUiOiJodHRwczovL21pY3Jvc29mdC5zaGFyZXBvaW50LmNvbS8%2FbmF2PWN6MGxNa1ltWkQxaUlVcERhbVJNVEdkVFRsVnhXV1JRZVRkc2EwbEJNVWM0WDBOdFRqaFhNVUpPWjJJeU1scHVSVXRNWVRGdlJXOXdZblJOYkhsVVMxSlBZVWRhUTNGc05UVW1aajB3TVVSQlZWQk9WVkpHTlVkQ05rOWFNMFUzUWtSSlJrdGFTRmRCUlVoVlVETk5KbU05Sm1ac2RXbGtQVEUlM0QiLCJyIjpmYWxzZX0sInAiOnsidSI6Imh0dHBzOi8vbWljcm9zb2Z0LnNoYXJlcG9pbnQuY29tL2NvbnRlbnRzdG9yYWdlL0NTUF8yY2RkMjgyNC0xMmI4LTRhMzUtOTg3NC1mY2JiOTY0MjAwZDQvRG9jdW1lbnQlMjBMaWJyYXJ5L0xvb3BBcHBEYXRhL01pY2FoJTIwUmlja3MlMjAxLmxvb3A%2FbmF2PWN6MGxNa1pqYjI1MFpXNTBjM1J2Y21GblpTVXlSa05UVUY4eVkyUmtNamd5TkMweE1tSTRMVFJoTXpVdE9UZzNOQzFtWTJKaU9UWTBNakF3WkRRbVpEMWlJVXBEYW1STVRHZFRUbFZ4V1dSUWVUZHNhMGxCTVVjNFgwTnRUamhYTVVKT1oySXlNbHB1UlV0TVlURnZSVzl3WW5STmJIbFVTMUpQWVVkYVEzRnNOVFVtWmowd01VUkJWVkJPVlZNMVJWb3pWVFJQUjAweVVrRkpTVkpEVWs5TVRVMU5RMVUxSm1NOUpUSkdKbVpzZFdsa1BURSUzRCIsInIiOmZhbHNlfSwiaSI6eyJpIjoiZDcxMTU2MGItMmViNy00NGZiLWJlYjYtMWZmZDBlZmIzNGM2In19';
 const WSR_STORAGE_KEY = 'cga_wsr_last';
+const WSR_HISTORY_KEY = 'cga_wsr_history';
+const WSR_HISTORY_MAX = 104;
+const WSR_HISTORY_BATCH_SIZE = 25;
+const WSR_TEMPLATE_STORAGE_KEY = 'cga_wsr_template';
+const WSR_DEFAULT_TEMPLATE = [
+  '# {{title}}',
+  '',
+  '**Window:** {{window_start}} → {{window_end}}  ',
+  '**Generated:** {{generated_at}}  ',
+  '**Source:** ContextGraph Admin (Work Dashboard)',
+  '',
+  '## Summary',
+  '- Events in window: **{{total_events}}**',
+  '- Projects active: **{{active_projects}}** (of {{total_projects}} total)',
+  '- Project names: **{{project_names}}**',
+  '- Project tags: {{project_tags}}',
+  '- Distinct event types: **{{event_types_count}}**',
+  '',
+  '## Highlights',
+  '{{highlights}}',
+  '',
+  '## By Project',
+  '{{by_project}}',
+  '',
+  '## By Event Type',
+  '{{by_type}}',
+  '',
+  '## By Status',
+  '{{by_status}}',
+  '',
+  '---',
+  '_Paste into the linked Microsoft Loop page._',
+].join('\n');
 let _wsrAutoTimer = null;
 let _wsrLastMarkdown = '';
+let _wsrLastMarkdownPrev = '';
+let _wsrHistoryVisibleCount = WSR_HISTORY_BATCH_SIZE;
+let _wsrGenerating = false;
+let _wsrBusyDepth = 0;
+let _wsrBusyWatchdog = null;
+let _wsrAutoGeneratedOnce = false;
+let _wsrWindowEventCounts = new Map();
+let _wsrHistoryStatusRefreshedAt = 0;
+let _msAdoPollTimer = null;
+let _msAdoPollId = '';
 
 function openWsrLoopPage() {
   window.open(WSR_LOOP_URL, '_blank', 'noopener');
@@ -4041,21 +5266,223 @@ function setWsrStatus(msg) {
   if (el) el.textContent = msg;
 }
 
+function setMicrosoftAdoStatus(message, tone = 'neutral') {
+  const el = document.getElementById('ms-ado-status');
+  if (!el) return;
+  el.textContent = message;
+  el.style.color = tone === 'ok' ? 'var(--accent)' : tone === 'error' ? 'var(--danger)' : 'var(--text)';
+}
+
+function setMicrosoftAdoDeviceMessage(html) {
+  const el = document.getElementById('ms-ado-device-message');
+  if (!el) return;
+  el.innerHTML = html || '';
+  el.style.display = html ? 'block' : 'none';
+}
+
+function renderMicrosoftAdoButtons(connected) {
+  const connectBtn = document.getElementById('ms-ado-connect-btn');
+  const disconnectBtn = document.getElementById('ms-ado-disconnect-btn');
+  if (connectBtn) connectBtn.hidden = !!connected;
+  if (disconnectBtn) disconnectBtn.hidden = !connected;
+}
+
+async function loadMicrosoftAdoStatus() {
+  try {
+    const status = await api('GET', '/auth/microsoft/status');
+    if (!status.configured) {
+      setMicrosoftAdoStatus('Microsoft OAuth is not configured.', 'error');
+      renderMicrosoftAdoButtons(false);
+      return status;
+    }
+    if (status.connected) {
+      const exp = status.expires_at ? ` · token expires ${relativeTimeLabel(status.expires_at)}` : '';
+      setMicrosoftAdoStatus(`Connected as ${status.display_name || status.account_id || 'Microsoft account'}${exp}`, 'ok');
+      renderMicrosoftAdoButtons(true);
+    } else {
+      setMicrosoftAdoStatus('Not connected. Reports will use stored activity metadata until Microsoft is connected.');
+      renderMicrosoftAdoButtons(false);
+    }
+    return status;
+  } catch (e) {
+    setMicrosoftAdoStatus('Connection status failed: ' + (e?.message || e), 'error');
+    renderMicrosoftAdoButtons(false);
+    return null;
+  }
+}
+
+async function connectMicrosoftAdo() {
+  const btn = document.getElementById('ms-ado-connect-btn');
+  if (btn) btn.disabled = true;
+  try {
+    const start = await api('POST', '/auth/microsoft/device/start', {});
+    _msAdoPollId = start.poll_id || '';
+    const verifyUrl = start.verification_uri_complete || start.verification_uri || 'https://microsoft.com/devicelogin';
+    const linkCopy = renderCopyButton(verifyUrl, 'Sign-in link', 'copy-id-btn-sm');
+    const link = `<span class="delegation-copy-token"><a href="${esc(verifyUrl)}" target="_blank" rel="noopener">${esc(verifyUrl)}</a>${linkCopy}</span>`;
+    const code = start.user_code
+      ? `<span class="delegation-copy-token"><strong style="color:var(--text);font-family:monospace">${esc(start.user_code)}</strong>${renderCopyButton(start.user_code, 'Device code', 'copy-id-btn-sm')}</span>`
+      : '';
+    setMicrosoftAdoStatus('Waiting for Microsoft sign-in...');
+    setMicrosoftAdoDeviceMessage(`<strong style="color:var(--warn)">MSFTVPN MANUL must be enabled before sign-in.</strong> Open ${link}${code ? ` and enter ${code}` : ''}.`);
+    pollMicrosoftAdoDevice(start.interval || 5);
+  } catch (e) {
+    setMicrosoftAdoStatus('Connect failed: ' + (e?.message || e), 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+function pollMicrosoftAdoDevice(intervalSeconds = 5) {
+  if (_msAdoPollTimer) clearTimeout(_msAdoPollTimer);
+  if (!_msAdoPollId) return;
+  _msAdoPollTimer = setTimeout(async () => {
+    try {
+      const result = await api('POST', '/auth/microsoft/device/poll', { poll_id: _msAdoPollId });
+      if (result.status === 'pending') {
+        pollMicrosoftAdoDevice(result.interval || intervalSeconds);
+        return;
+      }
+      _msAdoPollId = '';
+      setMicrosoftAdoDeviceMessage('');
+      await loadMicrosoftAdoStatus();
+      toast('Microsoft account connected');
+      generateWorkReport();
+    } catch (e) {
+      _msAdoPollId = '';
+      setMicrosoftAdoStatus('Connect failed: ' + (e?.message || e), 'error');
+    }
+  }, Math.max(2, Number(intervalSeconds || 5)) * 1000);
+}
+
+async function disconnectMicrosoftAdo() {
+  if (!confirm('Disconnect the Microsoft account used for Azure DevOps ticket lookup?')) return;
+  try {
+    await api('DELETE', '/auth/microsoft');
+    if (_msAdoPollTimer) clearTimeout(_msAdoPollTimer);
+    _msAdoPollId = '';
+    setMicrosoftAdoDeviceMessage('');
+    await loadMicrosoftAdoStatus();
+    toast('Microsoft account disconnected');
+  } catch (e) {
+    setMicrosoftAdoStatus('Disconnect failed: ' + (e?.message || e), 'error');
+  }
+}
+
+function _wsrSetGenerateButtonBusy(isBusy) {
+  const btn = document.getElementById('wsr-generate-btn');
+  if (!btn) return;
+  btn.disabled = !!isBusy;
+  btn.textContent = isBusy ? 'Generating...' : 'Generate';
+}
+
+function showWsrBusy(message = 'Generating...') {
+  _wsrBusyDepth += 1;
+  const overlay = document.getElementById('wsr-busy-overlay');
+  const textEl = document.getElementById('wsr-busy-text');
+  if (textEl) textEl.textContent = message;
+  if (overlay) overlay.hidden = false;
+  _wsrSetGenerateButtonBusy(true);
+  if (_wsrBusyWatchdog) clearTimeout(_wsrBusyWatchdog);
+  _wsrBusyWatchdog = setTimeout(() => {
+    _wsrBusyDepth = 0;
+    const ov = document.getElementById('wsr-busy-overlay');
+    if (ov) ov.hidden = true;
+    _wsrSetGenerateButtonBusy(false);
+    _wsrSetBusyMessage('Generating...');
+    if (_wsrGenerating) {
+      _wsrGenerating = false;
+      setWsrStatus('Failed: Generate timed out, please retry.');
+    }
+  }, 45000);
+}
+
+function _wsrSetBusyMessage(message) {
+  const textEl = document.getElementById('wsr-busy-text');
+  if (textEl) textEl.textContent = message;
+}
+
+function _wsrWithTimeout(promise, timeoutMs, message) {
+  let timer = null;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error(message || 'Request timed out')), Math.max(1000, Number(timeoutMs || 25000)));
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
+async function _wsrFetchSummary(limit) {
+  const safeLimit = Math.min(5000, Math.max(500, Number(limit || 500)));
+  const params = new URLSearchParams({ limit: String(safeLimit), include_external: 'true' });
+  return _wsrWithTimeout(
+    api('GET', '/admin/work-briefing?' + params.toString()),
+    25000,
+    'Generate timed out after 25s'
+  );
+}
+
+function hideWsrBusy(force = false) {
+  if (force) _wsrBusyDepth = 1;
+  _wsrBusyDepth = Math.max(0, _wsrBusyDepth - 1);
+  if (_wsrBusyDepth > 0) return;
+  if (_wsrBusyWatchdog) {
+    clearTimeout(_wsrBusyWatchdog);
+    _wsrBusyWatchdog = null;
+  }
+  const overlay = document.getElementById('wsr-busy-overlay');
+  if (overlay) overlay.hidden = true;
+  _wsrSetGenerateButtonBusy(false);
+  _wsrSetBusyMessage('Generating...');
+}
+
 function _wsrFormatDate(d) {
   return d.toISOString().slice(0, 10);
 }
 
-function _wsrSummarizeEvents(events, days) {
-  const since = Date.now() - days * 24 * 3600 * 1000;
+function _wsrFormatWindowEndInclusive(endExclusive) {
+  const t = new Date(endExclusive);
+  if (!Number.isFinite(t.getTime())) return _wsrFormatDate(new Date());
+  return _wsrFormatDate(new Date(t.getTime() - 86400000));
+}
+
+function _wsrStartOfDay(d) {
+  const t = new Date(d);
+  t.setHours(0, 0, 0, 0);
+  return t;
+}
+
+function _wsrStartOfThuWeek(d) {
+  const t = _wsrStartOfDay(d);
+  const day = t.getDay(); // 0=Sun ... 4=Thu
+  const delta = (day - 4 + 7) % 7;
+  t.setDate(t.getDate() - delta);
+  return t;
+}
+
+function _wsrGetReportWeekWindow(anchor) {
+  const weekStart = _wsrStartOfThuWeek(anchor || new Date()); // Thu 00:00
+  const weekEnd = new Date(weekStart.getTime() + 7 * 86400000); // Next Thu 00:00, displayed as Wed
+  return { weekStart, weekEnd };
+}
+
+function _wsrGetEventTimeValue(event) {
+  return event?.occurred_at || event?.created_at || event?.timestamp || event?.ts || event?.synced_at || 0;
+}
+
+function _wsrSummarizeEvents(events, startMs, endMs) {
   const filtered = (Array.isArray(events) ? events : []).filter(e => {
-    const t = Date.parse(e?.created_at || e?.timestamp || e?.ts || 0);
-    return Number.isFinite(t) ? t >= since : true;
+    const t = Date.parse(_wsrGetEventTimeValue(e));
+    if (!Number.isFinite(t)) return false;
+    return t >= startMs && t < endMs;
   });
   const byProject = new Map();
   const byType = new Map();
   const byStatus = new Map();
   filtered.forEach(e => {
-    const proj = e.project_name || e.project_external_id || e.project_id || 'unscoped';
+    const proj = _wsrProjectDisplayName(e);
     const type = e.event_type || e.kind || 'event';
     const status = e.status || e.state || '';
     byProject.set(proj, (byProject.get(proj) || 0) + 1);
@@ -4065,71 +5492,714 @@ function _wsrSummarizeEvents(events, days) {
   return { filtered, byProject, byType, byStatus };
 }
 
+async function _wsrEnsureProjectNameMap() {
+  if (Object.keys(_projectNameById).length) return;
+  try {
+    const projects = _allProjects.length ? _allProjects : await api('GET', '/auth/projects');
+    if (!_allProjects.length) _allProjects = projects;
+    _projectNameById = {};
+    _projectIdByName = {};
+    projects.forEach(p => {
+      if (p.project_id && p.project_name) {
+        _projectNameById[p.project_id] = p.project_name;
+        _projectIdByName[p.project_name] = p.project_id;
+      }
+    });
+  } catch {}
+}
+
+function _wsrProjectDisplayName(event) {
+  const projectId = event?.project_id || event?.project_external_id || '';
+  return _projectNameById[projectId]
+    || event?.workspace_name
+    || event?.project_name
+    || projectId
+    || 'unscoped';
+}
+
 function _wsrMapToBullets(map) {
   const entries = [...map.entries()].sort((a, b) => b[1] - a[1]);
   if (!entries.length) return '- _(none)_';
   return entries.map(([k, v]) => `- **${k}** — ${v}`).join('\n');
 }
 
-function buildWsrMarkdown(summary, days) {
-  const now = new Date();
-  const start = new Date(now.getTime() - days * 24 * 3600 * 1000);
-  const events = summary?.activities || summary?.recent_events || summary?.events || [];
-  const { filtered, byProject, byType, byStatus } = _wsrSummarizeEvents(events, days);
-  const projTotal = summary?.project_total ?? byProject.size;
-  const highlights = filtered.slice(0, 10).map(e => {
-    const proj = e.project_name || e.project_external_id || e.project_id || 'unscoped';
-    const title = e.title || e.summary || e.description || e.event_type || 'activity';
-    const when = e.created_at || e.timestamp || '';
-    return `- [${proj}] ${title}${when ? ` _(${when})_` : ''}`;
-  }).join('\n') || '- _(no activity in window)_';
+function _wsrProjectEntries(map) {
+  return [...map.entries()].sort((a, b) => (b[1] - a[1]) || String(a[0]).localeCompare(String(b[0])));
+}
 
-  return [
-    `# Weekly Status Report`,
-    ``,
-    `**Window:** ${_wsrFormatDate(start)} → ${_wsrFormatDate(now)}  `,
-    `**Generated:** ${now.toISOString()}  `,
-    `**Source:** ContextGraph Admin (Work Dashboard)`,
-    ``,
-    `## Summary`,
-    `- Events in window: **${filtered.length}**`,
-    `- Projects active: **${byProject.size}** (of ${projTotal} total)`,
-    `- Distinct event types: **${byType.size}**`,
-    ``,
-    `## Highlights`,
+function _wsrProjectNamesText(map) {
+  const names = _wsrProjectEntries(map).map(([name]) => String(name || '').trim()).filter(Boolean);
+  return names.length ? names.join(', ') : '(none)';
+}
+
+function _wsrProjectTagsText(map) {
+  const tags = _wsrProjectEntries(map).map(([name]) => {
+    const slug = String(name || 'unscoped')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return `#${slug || 'unscoped'}`;
+  });
+  return tags.length ? tags.join(' ') : '(none)';
+}
+
+function _wsrMetadata(activity) {
+  const raw = activity?.raw_metadata || activity?.metadata || {};
+  if (raw && typeof raw === 'object') return raw;
+  try { return JSON.parse(String(raw || '{}')); } catch { return {}; }
+}
+
+function _wsrExternalRefs(activity) {
+  const metadata = _wsrMetadata(activity);
+  if (Array.isArray(activity?.external_refs)) return activity.external_refs;
+  if (Array.isArray(metadata.external_refs)) return metadata.external_refs;
+  return [];
+}
+
+function _wsrCompactText(value, maxLen = 260) {
+  const text = String(value || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return '';
+  return text.length > maxLen ? `${text.slice(0, Math.max(0, maxLen - 3)).trimEnd()}...` : text;
+}
+
+function _wsrNormalizeText(value) {
+  return _wsrCompactText(value, 1000).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function _wsrIsSimilarText(a, b) {
+  const left = _wsrNormalizeText(a);
+  const right = _wsrNormalizeText(b);
+  if (!left || !right) return false;
+  return left === right || left.includes(right) || right.includes(left);
+}
+
+function _wsrAddDetailLine(lines, seen, label, value, maxLen = 260) {
+  const text = _wsrCompactText(value, maxLen);
+  if (!text) return;
+  const key = _wsrNormalizeText(text);
+  if (!key || seen.has(key)) return;
+  seen.add(key);
+  lines.push(`${label}: ${text}`);
+}
+
+function _wsrWorkRefLabel(activity) {
+  const metadata = _wsrMetadata(activity);
+  if (_wsrExternalRefs(activity).length) return true;
+  const text = [
+    activity?.event_type,
+    activity?.title,
+    activity?.summary,
+    activity?.body_text,
+    activity?.source_item_id,
+    activity?.source_url,
+    JSON.stringify(metadata),
+  ].join(' ');
+  return /\b(ado|pbi|pr|pull request|work item|workitems|_workitems)\b/i.test(text) || /\b\d{7,}\b/.test(text);
+}
+
+function _wsrAdoDetailLine(activity) {
+  const metadata = _wsrMetadata(activity);
+  const resolved = _wsrExternalRefs(activity).find(ref => ref?.provider === 'azure_devops' && ref?.type === 'work_item' && ref?.status === 'ok');
+  if (resolved) {
+    const pieces = [];
+    const label = `${resolved.work_item_type || 'ADO item'} ${resolved.id || ''}`.trim();
+    if (label) pieces.push(label);
+    if (resolved.title) pieces.push(_wsrCompactText(resolved.title, 180));
+    if (resolved.state) pieces.push(`state ${resolved.state}`);
+    if (resolved.assigned_to) pieces.push(`owner ${resolved.assigned_to}`);
+    if (resolved.iteration_path) pieces.push(`iteration ${resolved.iteration_path}`);
+    return pieces.join('; ');
+  }
+  const ado = metadata.ado && typeof metadata.ado === 'object' ? metadata.ado : metadata;
+  const adoId = ado.ado_id || ado.pbi_id || metadata.ado_id || metadata.pbi_id || '';
+  const adoType = ado.ado_type || ado.work_item_type || metadata.ado_type || metadata.work_item_type || '';
+  const adoState = ado.ado_state || ado.state || metadata.ado_state || metadata.state || '';
+  const pieces = [];
+  if (adoType || adoId) pieces.push(`${adoType || 'ADO item'}${adoId ? ` ${adoId}` : ''}`);
+  if (adoState) pieces.push(`state ${adoState}`);
+  if (ado.ado_iteration_path || metadata.ado_iteration_path) pieces.push(`iteration ${ado.ado_iteration_path || metadata.ado_iteration_path}`);
+  if (ado.ado_area_path || metadata.ado_area_path) pieces.push(`area ${ado.ado_area_path || metadata.ado_area_path}`);
+  if (ado.ado_changed_date || metadata.ado_changed_date) pieces.push(`changed ${ado.ado_changed_date || metadata.ado_changed_date}`);
+  return pieces.join('; ');
+}
+
+function _wsrPrDetailLines(activity) {
+  const metadata = _wsrMetadata(activity);
+  const lines = [];
+  _wsrExternalRefs(activity)
+    .filter(ref => ref?.provider === 'azure_devops' && ref?.type === 'pull_request')
+    .slice(0, 3)
+    .forEach(ref => {
+      const id = ref.id || '';
+      const title = _wsrCompactText(ref.title || '', 180);
+      const status = ref.state ? ` (${ref.state})` : '';
+      const detail = ref.status === 'ok'
+        ? `ADO PR${id ? ` ${id}` : ''}${status}${title ? `: ${title}` : ''}`
+        : `ADO PR${id ? ` ${id}` : ''}: ${ref.status || 'not resolved'}`;
+      lines.push(detail);
+    });
+  const pullRequests = Array.isArray(metadata.pull_requests) ? metadata.pull_requests : [];
+  pullRequests.slice(0, 3).forEach(pr => {
+    const id = pr.id || pr.number || pr.pullRequestId || '';
+    const title = _wsrCompactText(pr.title || pr.name || '', 180);
+    const status = pr.status ? ` (${pr.status})` : '';
+    if (id || title) lines.push(`ADO PR${id ? ` ${id}` : ''}${status}${title ? `: ${title}` : ''}`);
+  });
+  if (metadata.pr && typeof metadata.pr === 'object') {
+    const pr = metadata.pr;
+    const id = pr.number || pr.id || pr.pullRequestId || '';
+    const branch = pr.branch ? ` branch ${pr.branch}` : '';
+    const commit = pr.commit ? ` commit ${pr.commit}` : '';
+    if (id || branch || commit) lines.push(`PR${id ? ` #${id}` : ''}:${branch}${commit}`.replace(/:\s*$/, ''));
+  }
+  if (Array.isArray(metadata.prs) && metadata.prs.length) {
+    lines.push(`Related PRs: ${metadata.prs.slice(0, 8).map(pr => `#${pr}`).join(', ')}`);
+  }
+  if (Array.isArray(metadata.inferred_pbis) && metadata.inferred_pbis.length) {
+    lines.push(`Related PBIs: ${metadata.inferred_pbis.slice(0, 8).join(', ')}`);
+  }
+  if (metadata.pbi_id) lines.push(`PBI: ${metadata.pbi_id}`);
+  return lines;
+}
+
+function _wsrActivityDetailLines(activity, title) {
+  const lines = [];
+  const seen = new Set();
+  const summary = _wsrCompactText(activity?.summary, 320);
+  const bodyText = _wsrCompactText(activity?.body_text || activity?.description, 360);
+  if (summary && !_wsrIsSimilarText(summary, title)) _wsrAddDetailLine(lines, seen, 'Details', summary, 320);
+  if (bodyText && !_wsrIsSimilarText(bodyText, title) && !_wsrIsSimilarText(bodyText, summary)) _wsrAddDetailLine(lines, seen, 'Evidence', bodyText, 360);
+  const adoDetail = _wsrAdoDetailLine(activity);
+  _wsrAddDetailLine(lines, seen, 'ADO', adoDetail, 320);
+  _wsrPrDetailLines(activity).forEach(line => _wsrAddDetailLine(lines, seen, 'Linkage', line, 260));
+  if (activity?.source_url) _wsrAddDetailLine(lines, seen, 'Source', activity.source_url, 260);
+  return lines;
+}
+
+function _wsrFormatHighlight(activity) {
+  const proj = _wsrProjectDisplayName(activity);
+  const title = _wsrCompactText(activity?.title || activity?.summary || activity?.event_type || 'activity', 220);
+  const lines = [`- [${proj}] ${title}`];
+  if (_wsrWorkRefLabel(activity)) {
+    _wsrActivityDetailLines(activity, title).forEach(line => lines.push(`  - ${line}`));
+  }
+  return lines.join('\n');
+}
+
+function getWsrTemplate() {
+  try {
+    const stored = localStorage.getItem(WSR_TEMPLATE_STORAGE_KEY);
+    if (stored && stored.trim()) return stored;
+  } catch {}
+  return WSR_DEFAULT_TEMPLATE;
+}
+
+function initWsrTemplateEditor() {
+  const ta = document.getElementById('wsr-template');
+  if (!ta) return;
+  if (ta.value) return;
+  ta.value = getWsrTemplate();
+  const status = document.getElementById('wsr-template-status');
+  if (status) {
+    const usingCustom = !!localStorage.getItem(WSR_TEMPLATE_STORAGE_KEY);
+    status.textContent = usingCustom ? 'Loaded custom template from local storage.' : 'Template loaded from defaults.';
+  }
+}
+
+function saveWsrTemplate() {
+  const ta = document.getElementById('wsr-template');
+  if (!ta) return;
+  try {
+    localStorage.setItem(WSR_TEMPLATE_STORAGE_KEY, ta.value);
+    const status = document.getElementById('wsr-template-status');
+    if (status) status.textContent = 'Template saved at ' + new Date().toISOString();
+    toast('Template saved');
+    generateWorkReport();
+  } catch (e) {
+    toast('Save failed: ' + (e?.message || e), 'error');
+  }
+}
+
+function resetWsrTemplate() {
+  try { localStorage.removeItem(WSR_TEMPLATE_STORAGE_KEY); } catch {}
+  const ta = document.getElementById('wsr-template');
+  if (ta) ta.value = WSR_DEFAULT_TEMPLATE;
+  const status = document.getElementById('wsr-template-status');
+  if (status) status.textContent = 'Template reset to defaults.';
+  toast('Template reset');
+  generateWorkReport();
+}
+
+function renderWsrTemplate(tpl, ctx) {
+  return String(tpl || '').replace(/\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g, (m, key) => {
+    return Object.prototype.hasOwnProperty.call(ctx, key) ? String(ctx[key]) : m;
+  });
+}
+
+function buildWsrMarkdown(summary, opts) {
+  // opts: { days, windowStart?: Date, windowEnd?: Date, weekRef?: Date, titleOverride?: string }
+  if (typeof opts === 'number') opts = { days: opts };
+  opts = opts || {};
+  const end = opts.windowEnd ? new Date(opts.windowEnd) : new Date();
+  const days = Math.max(1, Number(opts.days || 7));
+  const start = opts.windowStart ? new Date(opts.windowStart) : new Date(end.getTime() - days * 24 * 3600 * 1000);
+  const events = summary?.activities || summary?.recent_events || summary?.events || [];
+  const { filtered, byProject, byType, byStatus } = _wsrSummarizeEvents(events, start.getTime(), end.getTime());
+  const projTotal = summary?.project_total ?? byProject.size;
+  const projectEntries = _wsrProjectEntries(byProject);
+  const primaryProjectName = projectEntries.length ? String(projectEntries[0][0]) : '(none)';
+  const projectNames = _wsrProjectNamesText(byProject);
+  const projectTags = _wsrProjectTagsText(byProject);
+  const highlights = filtered.slice(0, 10).map(e => _wsrFormatHighlight(e)).join('\n') || '- _(no activity in window)_';
+
+  const wkRef = opts.weekRef ? new Date(opts.weekRef) : end;
+  const wk = _wsrIsoWeek(wkRef);
+  const title = opts.titleOverride || `Week ${wk.week}, ${wk.year}`;
+  const ctx = {
+    title,
+    week: String(wk.week),
+    week_year: String(wk.year),
+    week_label: `Week ${wk.week}, ${wk.year}`,
+    window_start: _wsrFormatDate(start),
+    window_end: _wsrFormatWindowEndInclusive(end),
+    generated_at: new Date().toISOString(),
+    days: String(days),
+    total_events: String(filtered.length),
+    active_projects: String(byProject.size),
+    total_projects: String(projTotal),
+    project_name: primaryProjectName,
+    project_names: projectNames,
+    project_tags: projectTags,
+    project_name_tags: projectTags,
+    event_types_count: String(byType.size),
     highlights,
-    ``,
-    `## By Project`,
-    _wsrMapToBullets(byProject),
-    ``,
-    `## By Event Type`,
-    _wsrMapToBullets(byType),
-    ``,
-    `## By Status`,
-    _wsrMapToBullets(byStatus),
-    ``,
-    `---`,
-    `_Paste into the linked Microsoft Loop page._`,
-  ].join('\n');
+    by_project: _wsrMapToBullets(byProject),
+    by_type: _wsrMapToBullets(byType),
+    by_status: _wsrMapToBullets(byStatus),
+  };
+  const tpl = (document.getElementById('wsr-template')?.value) || getWsrTemplate();
+  return renderWsrTemplate(tpl, ctx);
+}
+
+function _wsrIsoWeek(d) {
+  // ISO 8601 week number (week starts Monday; week 1 contains the first Thursday).
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((t - yearStart) / 86400000 + 1) / 7);
+  return { year: t.getUTCFullYear(), week };
+}
+
+function _wsrSetTitle(d) {
+  const el = document.getElementById('wsr-title');
+  if (!el) return;
+  const wk = _wsrIsoWeek(new Date((d || new Date()).getTime() - 1));
+  el.textContent = `Week ${wk.week}, ${wk.year}`;
+}
+
+function _wsrBuildWeeklyHistoryEntries(summary, rangeDays, anchorEnd, stamp) {
+  const dayMs = 86400000;
+  const weekMs = 7 * dayMs;
+  const end = anchorEnd ? _wsrStartOfDay(anchorEnd) : _wsrStartOfThuWeek(new Date());
+  const rangeStart = new Date(end.getTime() - Math.max(1, Number(rangeDays || 7)) * dayMs);
+  const events = summary?.activities || summary?.recent_events || summary?.events || [];
+  const entries = [];
+  let windowEnd = new Date(end);
+
+  while (windowEnd > rangeStart) {
+    const windowStart = new Date(Math.max(rangeStart.getTime(), windowEnd.getTime() - weekMs));
+    const prevEnd = new Date(windowStart);
+    const prevStart = new Date(prevEnd.getTime() - weekMs);
+    const actualDays = Math.max(1, Math.ceil((windowEnd.getTime() - windowStart.getTime()) / dayMs));
+    const weekRef = new Date(windowEnd.getTime() - 1);
+    const totalEvents = _wsrSummarizeEvents(events, windowStart.getTime(), windowEnd.getTime()).filtered.length;
+
+    entries.push({
+      md: buildWsrMarkdown(summary, { days: actualDays, windowStart, windowEnd, weekRef }),
+      mdPrev: buildWsrMarkdown(summary, {
+        days: 7,
+        windowStart: prevStart,
+        windowEnd: prevEnd,
+        weekRef: new Date(prevEnd.getTime() - 1),
+      }),
+      stamp,
+      days: actualDays,
+      totalEvents,
+      dataStatusVersion: 2,
+      title: `Week ${_wsrIsoWeek(weekRef).week}, ${_wsrIsoWeek(weekRef).year}`,
+      windowStart: _wsrFormatDate(windowStart),
+      windowEnd: _wsrFormatDate(windowEnd),
+    });
+
+    windowEnd = windowStart;
+  }
+
+  return entries;
 }
 
 async function generateWorkReport() {
+  if (_wsrGenerating) {
+    setWsrStatus('Generating…');
+    return;
+  }
+  _wsrGenerating = true;
+  showWsrBusy('Loading data...');
   const rangeEl = document.getElementById('wsr-range');
   const days = Math.max(1, Number(rangeEl?.value || 7));
-  setWsrStatus('Generating…');
+  setWsrStatus('Loading data…');
   try {
-    const params = new URLSearchParams({ limit: '100' });
-    const summary = await api('GET', '/admin/work-briefing?' + params.toString());
-    const md = buildWsrMarkdown(summary, days);
+    await _wsrEnsureProjectNameMap();
+    const summary = await _wsrFetchSummary(days * 25);
+    _wsrSetBusyMessage('Building report...');
+    setWsrStatus('Building report…');
+    const now = new Date();
+    const reportWindow = _wsrGetReportWeekWindow(now);
+    const thisStart = reportWindow.weekStart;
+    const thisEnd = reportWindow.weekEnd;
+    const prevEnd = thisStart;
+    const prevStart = new Date(prevEnd.getTime() - 7 * 86400000);
+    const md = buildWsrMarkdown(summary, { days: 7, windowStart: thisStart, windowEnd: thisEnd });
+    const mdPrev = buildWsrMarkdown(summary, { days: 7, windowStart: prevStart, windowEnd: prevEnd, weekRef: new Date(prevEnd.getTime() - 1) });
     _wsrLastMarkdown = md;
+    _wsrLastMarkdownPrev = mdPrev;
+    _wsrSetTitle(thisEnd);
     const pre = document.getElementById('wsr-preview');
     if (pre) pre.textContent = md;
-    const stamp = new Date().toISOString();
-    document.getElementById('wsr-generated-at').textContent = stamp;
-    try { localStorage.setItem(WSR_STORAGE_KEY, JSON.stringify({ md, stamp, days })); } catch {}
+    const preP = document.getElementById('wsr-preview-prev');
+    if (preP) preP.textContent = mdPrev;
+    const prevLabel = document.getElementById('wsr-prev-label');
+    if (prevLabel) {
+      const wkP = _wsrIsoWeek(new Date(prevEnd.getTime() - 1));
+      prevLabel.textContent = `Last week (Week ${wkP.week}, ${wkP.year})`;
+    }
+    const thisLabel = document.getElementById('wsr-this-label');
+    if (thisLabel) {
+      const wkT = _wsrIsoWeek(new Date(thisEnd.getTime() - 1));
+      thisLabel.textContent = `This week (Week ${wkT.week}, ${wkT.year})`;
+    }
+    const stamp = now.toISOString();
+    const genEl = document.getElementById('wsr-generated-at');
+    if (genEl) genEl.textContent = stamp;
+    _wsrSetBusyMessage('Saving history...');
+    setWsrStatus('Saving history…');
+    try { localStorage.setItem(WSR_STORAGE_KEY, JSON.stringify({ md, mdPrev, stamp, days, dataStatusVersion: 2 })); } catch {}
+    appendWorkReportToHistory(_wsrBuildWeeklyHistoryEntries(summary, days, thisEnd, stamp));
     setWsrStatus('Ready.');
   } catch (e) {
     setWsrStatus('Failed: ' + (e?.message || e));
+  } finally {
+    _wsrGenerating = false;
+    hideWsrBusy(true);
+  }
+}
+
+function readWorkReportHistory() {
+  try {
+    const raw = localStorage.getItem(WSR_HISTORY_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+
+function writeWorkReportHistory(list) {
+  try { localStorage.setItem(WSR_HISTORY_KEY, JSON.stringify(list.slice(0, WSR_HISTORY_MAX))); } catch {}
+}
+
+function _wsrHistoryKey(entry) {
+  if (entry?.windowStart && entry?.windowEnd) return `${entry.windowStart}|${entry.windowEnd}`;
+  return `${entry?.stamp || ''}|${entry?.days || ''}|${entry?.title || ''}`;
+}
+
+function _wsrFirstHeading(md) {
+  const m = String(md || '').match(/^#\s+(.+)$/m);
+  return m ? m[1].trim() : '(untitled)';
+}
+
+function appendWorkReportToHistory(entry) {
+  const incoming = (Array.isArray(entry) ? entry : [entry]).filter(e => e?.md);
+  if (!incoming.length) return;
+  const merged = new Map();
+  readWorkReportHistory().forEach(e => merged.set(_wsrHistoryKey(e), e));
+  incoming.forEach(e => {
+    const wk = _wsrIsoWeek(e.stamp ? new Date(e.windowEnd || e.stamp) : new Date());
+    const normalized = {
+      ...e,
+      title: e.title || `Week ${wk.week}, ${wk.year}`,
+    };
+    merged.set(_wsrHistoryKey(normalized), normalized);
+  });
+  const list = [...merged.values()].sort((a, b) => {
+    const at = Date.parse(a?.windowEnd || a?.stamp || 0);
+    const bt = Date.parse(b?.windowEnd || b?.stamp || 0);
+    return bt - at;
+  });
+  writeWorkReportHistory(list);
+  renderWorkReportHistory();
+}
+
+function _wsrHistoryWindowLabel(entry) {
+  if (entry?.windowStart && entry?.windowEnd) {
+    const end = new Date(entry.windowEnd);
+    const endInclusive = Number.isFinite(end.getTime()) ? _wsrFormatWindowEndInclusive(end) : entry.windowEnd;
+    return `${entry.windowStart} -> ${endInclusive}`;
+  }
+  return `${entry?.days ?? '—'}d`;
+}
+
+function _wsrWindowKey(windowStart, windowEnd) {
+  return `${windowStart || ''}|${windowEnd || ''}`;
+}
+
+async function _wsrRefreshHistoryDataStatusFromApi(force = false) {
+  const now = Date.now();
+  if (!force && (now - _wsrHistoryStatusRefreshedAt) < 300000) return;
+  const list = readWorkReportHistory();
+  if (!list.length) return;
+  try {
+    const summary = await _wsrFetchSummary(5000);
+    const events = summary?.activities || summary?.recent_events || summary?.events || [];
+    const next = new Map();
+    const refreshedList = list.map((e) => {
+      if (!e?.windowStart || !e?.windowEnd) return e;
+      const windowStart = new Date(e.windowStart);
+      const windowEnd = new Date(e.windowEnd);
+      const totalEvents = _wsrSummarizeEvents(events, windowStart.getTime(), windowEnd.getTime()).filtered.length;
+      next.set(_wsrWindowKey(e.windowStart, e.windowEnd), totalEvents);
+      return { ...e, totalEvents, dataStatusVersion: 2 };
+    });
+    writeWorkReportHistory(refreshedList);
+    _wsrWindowEventCounts = next;
+    _wsrHistoryStatusRefreshedAt = now;
+    renderWorkReportHistory();
+  } catch {}
+}
+
+function _wsrGetEntryTotalEvents(entry) {
+  const key = _wsrWindowKey(entry?.windowStart, entry?.windowEnd);
+  if (_wsrWindowEventCounts.has(key)) return _wsrWindowEventCounts.get(key);
+  const direct = Number(entry?.totalEvents);
+  if (Number.isFinite(direct) && direct >= 0 && Number(entry?.dataStatusVersion || 0) >= 2) return direct;
+  return null;
+}
+
+function _wsrDataStatus(entry) {
+  const totalEvents = _wsrGetEntryTotalEvents(entry);
+  if (totalEvents === null) {
+    return { label: 'Refresh needed', cls: 'pill pill-amber', title: 'This cached snapshot has not been checked against current CGA activity data yet.' };
+  }
+  if (totalEvents === 0) {
+    return { label: 'Missing data', cls: 'pill pill-red', title: 'No activity events were found in this window.' };
+  }
+  return { label: `${totalEvents} events`, cls: 'pill pill-green', title: 'Activity exists for this window.' };
+}
+
+function _wsrSetPreviewLabels(currentEnd, prevEnd) {
+  const prevLabel = document.getElementById('wsr-prev-label');
+  if (prevLabel) {
+    const wkP = _wsrIsoWeek(new Date(prevEnd.getTime() - 1));
+    prevLabel.textContent = `Last week (Week ${wkP.week}, ${wkP.year})`;
+  }
+  const thisLabel = document.getElementById('wsr-this-label');
+  if (thisLabel) {
+    const wkT = _wsrIsoWeek(new Date(currentEnd.getTime() - 1));
+    thisLabel.textContent = `This week (Week ${wkT.week}, ${wkT.year})`;
+  }
+}
+
+function _wsrResetHistoryPagination() {
+  _wsrHistoryVisibleCount = WSR_HISTORY_BATCH_SIZE;
+}
+
+function loadMoreWorkReportHistory() {
+  const total = readWorkReportHistory().length;
+  _wsrHistoryVisibleCount = Math.min(total, _wsrHistoryVisibleCount + WSR_HISTORY_BATCH_SIZE);
+  renderWorkReportHistory();
+}
+
+function renderWorkReportHistory() {
+  const tbody = document.getElementById('wsr-history-body');
+  const countEl = document.getElementById('wsr-history-count');
+  const loadMoreBtn = document.getElementById('wsr-history-load-more-btn');
+  if (!tbody) return;
+  const list = readWorkReportHistory();
+  const visible = list.slice(0, Math.max(0, _wsrHistoryVisibleCount));
+  if (countEl) countEl.textContent = `${list.length} entr${list.length === 1 ? 'y' : 'ies'}`;
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">No reports stored yet.</div></td></tr>`;
+    if (loadMoreBtn) loadMoreBtn.hidden = true;
+    return;
+  }
+  tbody.innerHTML = visible.map((e, idx) => {
+    const stamp = esc(e.stamp || '');
+    const wk = e.windowEnd ? _wsrIsoWeek(new Date(e.windowEnd)) : (e.stamp ? _wsrIsoWeek(new Date(e.stamp)) : null);
+    const weekLabel = wk ? `Week ${wk.week}, ${wk.year}` : (e.title || _wsrFirstHeading(e.md));
+    const title = esc(weekLabel);
+    const windowLabel = esc(_wsrHistoryWindowLabel(e));
+    const dataStatus = _wsrDataStatus(e);
+    return `<tr>
+      <td>${title}</td>
+      <td class="mono" style="text-align:center">${stamp}</td>
+      <td class="mono" style="text-align:center">${windowLabel}</td>
+      <td style="text-align:center"><span class="${dataStatus.cls}" title="${esc(dataStatus.title)}">${esc(dataStatus.label)}</span></td>
+      <td class="actions-col">
+        <button class="btn btn-sm" onclick="viewWorkReportFromHistory(${idx})">View</button>
+        <button class="btn btn-sm" onclick="regenerateWorkReportFromHistory(${idx})" title="Re-run WSR for the same window length">Regenerate</button>
+        <button class="btn btn-sm" onclick="copyWorkReportFromHistory(${idx})">Copy</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteWorkReportFromHistory(${idx})">Delete</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  if (loadMoreBtn) {
+    const remaining = Math.max(0, list.length - visible.length);
+    const loadNext = Math.min(WSR_HISTORY_BATCH_SIZE, remaining);
+    loadMoreBtn.hidden = remaining <= 0;
+    loadMoreBtn.disabled = remaining <= 0;
+    loadMoreBtn.textContent = remaining > 0
+      ? `Load ${loadNext} more (${visible.length}/${list.length})`
+      : `All ${list.length} loaded`;
+  }
+}
+
+function viewWorkReportFromHistory(idx) {
+  const list = readWorkReportHistory();
+  const e = list[idx];
+  if (!e) return;
+  _wsrLastMarkdown = e.md;
+  _wsrLastMarkdownPrev = e.mdPrev || '';
+  if (e.windowEnd) _wsrSetTitle(new Date(e.windowEnd));
+  const pre = document.getElementById('wsr-preview');
+  if (pre) pre.textContent = e.md;
+  const preP = document.getElementById('wsr-preview-prev');
+  if (preP) preP.textContent = e.mdPrev || '_(no previous-week snapshot stored)_';
+  if (e.windowEnd) {
+    const currentEnd = new Date(e.windowEnd);
+    const prevEnd = e.windowStart ? new Date(e.windowStart) : new Date(currentEnd.getTime() - 7 * 86400000);
+    _wsrSetPreviewLabels(currentEnd, prevEnd);
+  }
+  const stampEl = document.getElementById('wsr-generated-at');
+  if (stampEl) stampEl.textContent = e.stamp || '—';
+  setWsrStatus('Viewing snapshot from ' + (e.stamp || 'history') + '.');
+  try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch {}
+}
+
+async function copyWorkReportFromHistory(idx) {
+  const list = readWorkReportHistory();
+  const e = list[idx];
+  if (!e?.md) return;
+  try {
+    await navigator.clipboard.writeText(e.md);
+    toast('WSR snapshot copied');
+  } catch (err) {
+    toast('Copy failed: ' + (err?.message || err), 'error');
+  }
+}
+
+async function regenerateWorkReportFromHistory(idx) {
+  const list = readWorkReportHistory();
+  const e = list[idx];
+  if (!e) return;
+  if (!e.windowStart || !e.windowEnd) {
+    await generateWorkReport();
+    return;
+  }
+  showWsrBusy('Regenerating...');
+  setWsrStatus('Generating…');
+  try {
+    await _wsrEnsureProjectNameMap();
+    const days = Math.max(1, Number(e.days || 7));
+    const summary = await _wsrFetchSummary(days * 25);
+    const windowStart = new Date(e.windowStart);
+    const windowEnd = new Date(e.windowEnd);
+    const totalEvents = _wsrSummarizeEvents(summary?.activities || summary?.recent_events || summary?.events || [], windowStart.getTime(), windowEnd.getTime()).filtered.length;
+    const prevEnd = new Date(windowStart);
+    const prevStart = new Date(prevEnd.getTime() - 7 * 86400000);
+    const refreshed = {
+      ...e,
+      md: buildWsrMarkdown(summary, { days, windowStart, windowEnd, weekRef: new Date(windowEnd.getTime() - 1) }),
+      mdPrev: buildWsrMarkdown(summary, { days: 7, windowStart: prevStart, windowEnd: prevEnd, weekRef: new Date(prevEnd.getTime() - 1) }),
+      stamp: new Date().toISOString(),
+      totalEvents,
+      dataStatusVersion: 2,
+    };
+    appendWorkReportToHistory(refreshed);
+    viewWorkReportFromHistory(readWorkReportHistory().findIndex(item => _wsrHistoryKey(item) === _wsrHistoryKey(refreshed)));
+    setWsrStatus('Ready.');
+  } catch (err) {
+    setWsrStatus('Failed: ' + (err?.message || err));
+  } finally {
+    hideWsrBusy(true);
+  }
+}
+
+function deleteWorkReportFromHistory(idx) {
+  const list = readWorkReportHistory();
+  if (!list[idx]) return;
+  if (!confirm('Delete this WSR snapshot?')) return;
+  list.splice(idx, 1);
+  writeWorkReportHistory(list);
+  renderWorkReportHistory();
+}
+
+function clearWorkReportHistory() {
+  if (!confirm('Delete ALL stored WSR snapshots? This cannot be undone.')) return;
+  try { localStorage.removeItem(WSR_HISTORY_KEY); } catch {}
+  _wsrResetHistoryPagination();
+  renderWorkReportHistory();
+}
+
+async function regenerateAllWorkReports() {
+  const list = readWorkReportHistory();
+  if (!list.length) {
+    toast('No history to regenerate');
+    return;
+  }
+  if (!confirm(`Regenerate all ${list.length} stored WSR snapshots?`)) return;
+  showWsrBusy('Regenerating all...');
+  setWsrStatus('Regenerating all snapshots…');
+  try {
+    await _wsrEnsureProjectNameMap();
+    const summary = await _wsrFetchSummary(5000);
+    const events = summary?.activities || summary?.recent_events || summary?.events || [];
+    const refreshedList = list.map((e) => {
+      if (!e?.windowStart || !e?.windowEnd) return e;
+      const windowStart = new Date(e.windowStart);
+      const windowEnd = new Date(e.windowEnd);
+      const days = Math.max(1, Number(e.days || Math.ceil((windowEnd.getTime() - windowStart.getTime()) / 86400000) || 7));
+      const totalEvents = _wsrSummarizeEvents(events, windowStart.getTime(), windowEnd.getTime()).filtered.length;
+      const prevEnd = new Date(windowStart);
+      const prevStart = new Date(prevEnd.getTime() - 7 * 86400000);
+      return {
+        ...e,
+        days,
+        md: buildWsrMarkdown(summary, { days, windowStart, windowEnd, weekRef: new Date(windowEnd.getTime() - 1) }),
+        mdPrev: buildWsrMarkdown(summary, { days: 7, windowStart: prevStart, windowEnd: prevEnd, weekRef: new Date(prevEnd.getTime() - 1) }),
+        stamp: new Date().toISOString(),
+        totalEvents,
+        dataStatusVersion: 2,
+      };
+    });
+    writeWorkReportHistory(refreshedList);
+    _wsrResetHistoryPagination();
+    renderWorkReportHistory();
+    viewWorkReportFromHistory(0);
+    setWsrStatus('Ready.');
+    toast(`Regenerated ${refreshedList.length} snapshots`);
+  } catch (err) {
+    setWsrStatus('Failed: ' + (err?.message || err));
+    toast('Regenerate all failed: ' + (err?.message || err), 'error');
+  } finally {
+    hideWsrBusy(true);
   }
 }
 
@@ -4137,7 +6207,17 @@ async function copyWorkReport() {
   if (!_wsrLastMarkdown) { await generateWorkReport(); }
   try {
     await navigator.clipboard.writeText(_wsrLastMarkdown || '');
-    toast('WSR markdown copied');
+    toast('This week WSR copied');
+  } catch (e) {
+    toast('Copy failed: ' + (e?.message || e), 'error');
+  }
+}
+
+async function copyWorkReportPrev() {
+  if (!_wsrLastMarkdownPrev) { await generateWorkReport(); }
+  try {
+    await navigator.clipboard.writeText(_wsrLastMarkdownPrev || '');
+    toast('Last week WSR copied');
   } catch (e) {
     toast('Copy failed: ' + (e?.message || e), 'error');
   }
@@ -4153,6 +6233,14 @@ function updateWsrAutoSchedule() {
 }
 
 function loadWorkReport() {
+  if (!_wsrGenerating) hideWsrBusy(true);
+  // Populate the template textarea (from storage or default) on every entry.
+  initWsrTemplateEditor();
+  const reportWindow = _wsrGetReportWeekWindow(new Date());
+  _wsrSetTitle(reportWindow.weekEnd);
+  _wsrSetPreviewLabels(reportWindow.weekEnd, reportWindow.weekStart);
+  _wsrResetHistoryPagination();
+  renderWorkReportHistory();
   // Restore last cached report so the tab is not blank.
   if (!_wsrLastMarkdown) {
     try {
@@ -4161,8 +6249,11 @@ function loadWorkReport() {
         const cached = JSON.parse(raw);
         if (cached?.md) {
           _wsrLastMarkdown = cached.md;
+          _wsrLastMarkdownPrev = cached.mdPrev || '';
           const pre = document.getElementById('wsr-preview');
           if (pre) pre.textContent = cached.md;
+          const preP = document.getElementById('wsr-preview-prev');
+          if (preP && cached.mdPrev) preP.textContent = cached.mdPrev;
           const stampEl = document.getElementById('wsr-generated-at');
           if (stampEl) stampEl.textContent = cached.stamp || '—';
         }
@@ -4170,26 +6261,44 @@ function loadWorkReport() {
     } catch {}
   }
   updateWsrAutoSchedule();
-  generateWorkReport();
+  _wsrRefreshHistoryDataStatusFromApi();
+  if (!_wsrAutoGeneratedOnce && !_wsrLastMarkdown) {
+    _wsrAutoGeneratedOnce = true;
+    generateWorkReport();
+  }
 }
 
-async function loadWorkBriefing() {
+async function loadWorkBriefing(options = {}) {
+  const append = !!options?.append;
+  const preserveLimit = !!options?.preserveLimit;
   if (_workBriefingLoading) return;
   _workBriefingLoading = true;
   const tbody = document.getElementById('briefing-activities-body');
-  if (tbody) {
-    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">Loading dashboard…</div></td></tr>`;
+  const loadMoreBtn = document.getElementById('briefing-load-more-btn');
+  if (tbody && !append) {
+    if (!preserveLimit) {
+      tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">Loading dashboard…</div></td></tr>`;
+    }
+  }
+  if (loadMoreBtn) {
+    loadMoreBtn.disabled = true;
+    if (append) loadMoreBtn.textContent = 'Loading…';
   }
 
   try {
     const rawProjectInput = document.getElementById('briefing-project-id')?.value.trim() || '';
     // Input value may be a project name (highlighted in datalist) — resolve to project_id.
     const projectId = _projectIdByName[rawProjectInput] || rawProjectInput;
-    const limit = Math.max(1, Math.min(Number(document.getElementById('briefing-limit')?.value || 25), 100));
+    const configuredBatch = Math.max(1, Math.min(Number(document.getElementById('briefing-limit')?.value || WORK_BRIEFING_BATCH_SIZE), WORK_BRIEFING_BATCH_SIZE));
+    if ((!append && !preserveLimit) || projectId !== _workBriefingCurrentProjectId) {
+      _workBriefingRequestedLimit = configuredBatch;
+      _workBriefingCurrentProjectId = projectId;
+    }
+    const limit = Math.max(1, Math.min(_workBriefingRequestedLimit, 5000));
     const params = new URLSearchParams({ limit: String(limit) });
     if (projectId) params.set('project_id', projectId);
     _workBriefingSummary = await api('GET', '/admin/work-briefing?' + params.toString());
-    renderWorkBriefing(_workBriefingSummary);
+    renderWorkBriefing(_workBriefingSummary, { preserveViewport: preserveLimit });
   } catch (e) {
     toast(e.message, 'error');
     renderWorkBriefing();
@@ -4261,6 +6370,7 @@ function esc(s) {
 }
 
 initLoginBackground();
+applyRememberedUsername();
 if (_jwt) initApp();
 showOauthErrorFromQuery();
 </script>

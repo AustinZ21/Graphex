@@ -29,6 +29,22 @@ class ActivityStore(Protocol):
     async def list_recent(self, project_id: str | None = None, limit: int = 25) -> list[WorkActivity]:
         ...
 
+    async def count_recent(self, project_id: str | None = None) -> int:
+        ...
+
+    async def find_by_content_hash(
+        self,
+        *,
+        plugin_id: str,
+        project_id: str,
+        source_type: str,
+        content_hash: str,
+    ) -> WorkActivity | None:
+        ...
+
+    async def cleanup_exact_duplicates(self, project_id: str | None = None, dry_run: bool = True) -> dict[str, Any]:
+        ...
+
 
 def resolve_dsn(dsn: str | None = None) -> str:
     if dsn:
@@ -272,7 +288,7 @@ class PgVectorActivityStore:
     ) -> list[WorkActivity]:
         await self.ensure_schema()
         pool = await self._get_pool()
-        safe_limit = max(1, min(limit, 100))
+        safe_limit = max(1, min(limit, 5000))
 
         base_sql = f"""
         SELECT
@@ -311,6 +327,114 @@ class PgVectorActivityStore:
             rows = await conn.fetch(sql, *params)
 
         return [self._activity_from_row(row) for row in rows]
+
+    async def count_recent(self, project_id: str | None = None) -> int:
+        await self.ensure_schema()
+        pool = await self._get_pool()
+
+        if project_id:
+            sql = f"SELECT COUNT(*) FROM {self._qualified('work_activities')} WHERE project_id = $1"
+            params: tuple[Any, ...] = (project_id,)
+        else:
+            sql = f"SELECT COUNT(*) FROM {self._qualified('work_activities')}"
+            params = ()
+
+        async with pool.acquire() as conn:
+            value = await conn.fetchval(sql, *params)
+
+        return int(value or 0)
+
+    async def find_by_content_hash(
+        self,
+        *,
+        plugin_id: str,
+        project_id: str,
+        source_type: str,
+        content_hash: str,
+    ) -> WorkActivity | None:
+        await self.ensure_schema()
+        pool = await self._get_pool()
+        sql = f"""
+        SELECT
+            activity_id,
+            plugin_id,
+            source_system,
+            source_type,
+            source_item_id,
+            project_id,
+            workspace_name,
+            event_type,
+            title,
+            summary,
+            body_text,
+            status,
+            priority,
+            owner,
+            source_url,
+            tags,
+            occurred_at,
+            synced_at,
+            content_hash,
+            raw_metadata,
+            embedding_text
+        FROM {self._qualified("work_activities")}
+        WHERE plugin_id = $1 AND project_id = $2 AND source_type = $3 AND content_hash = $4
+        ORDER BY synced_at DESC, occurred_at DESC
+        LIMIT 1
+        """
+
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(sql, plugin_id, project_id, source_type, content_hash)
+
+        if not row:
+            return None
+        return self._activity_from_row(row)
+
+    async def cleanup_exact_duplicates(self, project_id: str | None = None, dry_run: bool = True) -> dict[str, Any]:
+        await self.ensure_schema()
+        pool = await self._get_pool()
+        base_where = "WHERE project_id = $1" if project_id else ""
+        params: tuple[Any, ...] = (project_id,) if project_id else ()
+        duplicate_sql = f"""
+        WITH ranked AS (
+            SELECT
+                activity_id,
+                project_id,
+                content_hash,
+                source_item_id,
+                occurred_at,
+                synced_at,
+                ROW_NUMBER() OVER (
+                    PARTITION BY plugin_id, project_id, source_type, content_hash
+                    ORDER BY synced_at DESC, occurred_at DESC, activity_id DESC
+                ) AS rn,
+                COUNT(*) OVER (
+                    PARTITION BY plugin_id, project_id, source_type, content_hash
+                ) AS grp_count
+            FROM {self._qualified("work_activities")}
+            {base_where}
+        )
+        SELECT activity_id, project_id, content_hash, source_item_id, occurred_at, synced_at, grp_count
+        FROM ranked
+        WHERE grp_count > 1 AND rn > 1
+        ORDER BY synced_at DESC, occurred_at DESC
+        """
+
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(duplicate_sql, *params)
+            deleted_ids = [str(row["activity_id"]) for row in rows]
+            if deleted_ids and not dry_run:
+                await conn.execute(
+                    f'DELETE FROM {self._qualified("work_activities")} WHERE activity_id = ANY($1::text[])',
+                    deleted_ids,
+                )
+
+        return {
+            "project_id": project_id,
+            "dry_run": dry_run,
+            "duplicate_count": len(deleted_ids),
+            "deleted_activity_ids": deleted_ids,
+        }
 
     @staticmethod
     def _activity_from_row(row: asyncpg.Record) -> WorkActivity:
