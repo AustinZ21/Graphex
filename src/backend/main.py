@@ -42,6 +42,7 @@ from backend.auth.dependencies import require_admin
 from backend.auth.middleware import ProjectTokenMiddleware
 from backend.auth.router import router as auth_router
 from backend.auth.security import decode_access_token, hash_token
+from backend.backup import BackupError, BackupService
 from backend.graph.registry import GraphRegistry
 from backend.indexer.consumer import IndexerConsumer
 from backend.tools.producer import MCPProducer
@@ -50,11 +51,11 @@ from backend.perf.context_quality import benchmark_context_quality, ContextQuali
 from backend.perf.token_efficiency import benchmark_token_efficiency, TokenBenchmarkInputError
 from backend.viewer.router import router as viewer_router
 from backend.workbriefing.service import WorkActivityValidationError, WorkBriefingService
-from backend.workbriefing.store import SqliteActivityStore
+from backend.workbriefing.store import PgVectorActivityStore, resolve_dsn
 
 log = structlog.get_logger()
 
-APP_VERSION = "1.29.93"
+APP_VERSION = "1.30.7"
 
 FALKORDB_HOST = os.getenv("FALKORDB_HOST", "localhost")
 FALKORDB_PORT = int(os.getenv("FALKORDB_PORT", "6379"))
@@ -71,6 +72,7 @@ QUEUE_REDIS_URL = os.getenv("QUEUE_REDIS_URL", "redis://localhost:6380/1")
 CACHE_REDIS_URL = os.getenv("CACHE_REDIS_URL", "redis://localhost:6380")  # db=2 set in QueryCache
 TRACE_ENABLED = os.getenv("TRACE_ENABLED", "true").lower() == "true"
 REPO_ROOT = Path(os.getenv("CONTEXTGRAPH_REPO_ROOT", ".")).resolve()
+BACKUP_DIR = os.getenv("BACKUP_DIR") or "/app/data/backups"
 
 
 class NoStoreStaticFiles(StaticFiles):
@@ -86,15 +88,38 @@ _producer = MCPProducer(redis_url=QUEUE_REDIS_URL)
 _consumer: IndexerConsumer | None = None
 _consumer_task: asyncio.Task | None = None
 _trace_evaluator = None
-_work_briefing_service = WorkBriefingService(store=SqliteActivityStore(db_path=DB_PATH))
+_work_briefing_pg_dsn = resolve_dsn(os.getenv("WORKBRIEFING_POSTGRES_DSN"))
+_work_briefing_service = WorkBriefingService(store=PgVectorActivityStore(dsn=_work_briefing_pg_dsn))
+_backup_service = BackupService(dsn=DB_PATH, backup_dir=BACKUP_DIR)
+
+
+def _redact_dsn(dsn: str) -> str:
+    try:
+        parsed = urlparse(dsn)
+        if parsed.password:
+            netloc = f"{parsed.username}:***@{parsed.hostname}"
+            if parsed.port:
+                netloc += f":{parsed.port}"
+            return parsed._replace(netloc=netloc).geturl()
+    except Exception:
+        pass
+    return dsn
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _consumer, _consumer_task, _trace_evaluator
 
-    # Startup: auth DB
+    # Startup: auth DB (PostgreSQL via asyncpg shim)
     await init_db()
+    log.info("auth.pg.ready", dsn=_redact_dsn(DB_PATH))
+
+    # WorkBriefing pgvector storage
+    try:
+        await _work_briefing_service._store.ensure_schema()
+        log.info("workbriefing.pgvector.ready", dsn=_redact_dsn(_work_briefing_pg_dsn))
+    except Exception as exc:
+        log.warning("workbriefing.pgvector.unavailable", reason=str(exc), dsn=_redact_dsn(_work_briefing_pg_dsn))
 
     # Registry connects graphs lazily per project on first use
     await _producer.connect()
@@ -134,12 +159,15 @@ async def lifespan(app: FastAPI):
     # Make consumer available via app state for API endpoints
     app.state.consumer = _consumer
     app.state.registry = _registry
-    
+
+    await _backup_service.start()
+
     log.info("cga.started", falkordb=f"{FALKORDB_HOST}:{FALKORDB_PORT}")
 
     yield
 
     # Shutdown
+    await _backup_service.stop()
     if _consumer:
         await _consumer.stop()
     if _consumer_task:
@@ -156,10 +184,19 @@ async def lifespan(app: FastAPI):
         cache.close()
     await _producer.close()
     _registry.close_all()
+    try:
+        await _work_briefing_service._store.close()
+    except Exception as exc:
+        log.warning("workbriefing.pgvector.close_failed", reason=str(exc))
+    try:
+        from backend.auth.pgshim import close_pool as _close_auth_pool
+        await _close_auth_pool()
+    except Exception as exc:
+        log.warning("auth.pg.close_failed", reason=str(exc))
     log.info("cga.stopped")
 
 
-app = FastAPI(title="CGA (ContextGraphAdmin)", version="1.29.93", lifespan=lifespan)
+app = FastAPI(title="CGA (ContextGraphAdmin)", version="1.30.7", lifespan=lifespan)
 
 # ── Auth middleware (validates Bearer token on /mcp routes) ────────────────
 app.add_middleware(ProjectTokenMiddleware)
@@ -321,10 +358,9 @@ async def audit_request_middleware(request: Request, call_next):
                 actor_name = claims.get("sub")
                 actor_type = "user"
                 if actor_name:
-                    import aiosqlite
+                    from backend.auth import pgshim as _pgshim
 
-                    async with aiosqlite.connect(DB_PATH) as db:
-                        db.row_factory = aiosqlite.Row
+                    async with _pgshim.get_pool().acquire() as db:
                         async with db.execute(
                             "SELECT id FROM users WHERE username = ?",
                             (actor_name,),
@@ -335,11 +371,10 @@ async def audit_request_middleware(request: Request, call_next):
                 actor_type = "anonymous"
         elif path.startswith("/mcp"):
             try:
-                import aiosqlite
+                from backend.auth import pgshim as _pgshim
 
                 digest = hash_token(bearer_token)
-                async with aiosqlite.connect(DB_PATH) as db:
-                    db.row_factory = aiosqlite.Row
+                async with _pgshim.get_pool().acquire() as db:
                     async with db.execute(
                         """
                         SELECT pt.id AS token_id, pt.project_id, p.project_name
@@ -505,6 +540,64 @@ async def api_admin_runtime_config(_: dict = Depends(require_admin)) -> dict:
     return {
         "falkordb_url": FALKORDB_URL,
     }
+
+
+@app.get("/api/admin/backups")
+async def api_admin_backups_list(_: dict = Depends(require_admin)) -> dict:
+    return {
+        "status": _backup_service.status(),
+        "snapshots": _backup_service.list_snapshots(),
+    }
+
+
+@app.post("/api/admin/backups/run")
+async def api_admin_backups_run(_: dict = Depends(require_admin)) -> dict:
+    try:
+        result = await _backup_service.run_backup(reason="manual")
+    except BackupError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, "snapshot": result}
+
+
+@app.post("/api/admin/backups/restore")
+async def api_admin_backups_restore(payload: dict, _: dict = Depends(require_admin)) -> dict:
+    name = (payload or {}).get("name")
+    if not isinstance(name, str) or not name:
+        raise HTTPException(status_code=400, detail="missing snapshot name")
+    try:
+        result = await _backup_service.restore(name)
+    except BackupError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, **result}
+
+
+@app.delete("/api/admin/backups/{name}")
+async def api_admin_backups_delete(name: str, _: dict = Depends(require_admin)) -> dict:
+    try:
+        await _backup_service.delete(name)
+    except BackupError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True}
+
+
+@app.get("/api/admin/backups/download/{name}")
+async def api_admin_backups_download(name: str, _: dict = Depends(require_admin)):
+    try:
+        path = _backup_service.snapshot_path(name)
+    except BackupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return FileResponse(
+        path,
+        media_type="application/octet-stream",
+        filename=path.name,
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@app.patch("/api/admin/backups/config")
+async def api_admin_backups_update_config(payload: dict, _: dict = Depends(require_admin)) -> dict:
+    cfg = _backup_service.update_config(payload or {})
+    return {"ok": True, "config": cfg.to_dict()}
 
 
 @app.get("/api/admin/work-briefing")

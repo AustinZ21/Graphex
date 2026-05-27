@@ -28,7 +28,7 @@ This project **MUST** integrate with the ContextGraph ecosystem:
 - **CGA MCP Server Profile Standard**: `.adc/contextgraph-edge-agent/mcp/mcp-servers.json` MUST include a `cga-mcp-server` entry so ADC-based projects can auto-load CGA MCP wiring.
 - **Initial ContextGraph Indexing**: Immediately after ContextGraph Edge Agent + CGA MCP Server integration, run full-project indexing once so retrieval/review tools can access the entire repository context.
 
-Both ContextGraph services are implemented locally within this project and must be started during bootstrap.
+ContextGraph MCP access is endpoint-first by default. A local MCP implementation is optional and repository-specific.
 
 ## Environment Requirements
 Refer to `bootstrap.md` for exact start-up commands.

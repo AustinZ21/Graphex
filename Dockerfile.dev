@@ -2,10 +2,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install tools required by healthcheck and git-aware indexing
+# Install tools required by healthcheck, git-aware indexing and PG backups
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     git \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies — exclude heavy ML packages not needed for dev API
@@ -14,7 +15,7 @@ RUN pip install --no-cache-dir \
     fastapi \
     "uvicorn[standard]" \
     pydantic \
-    aiosqlite \
+    asyncpg \
     "bcrypt>=4.0,<5.0" \
     "python-jose[cryptography]" \
     "redis[hiredis]" \

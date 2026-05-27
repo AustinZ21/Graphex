@@ -9,7 +9,7 @@ import pytest
 from backend.auth.context import _current_project_external_id
 import backend.tools.server as mcp_srv
 from backend.workbriefing.service import WorkBriefingService
-from backend.workbriefing.store import SqliteActivityStore
+from backend.workbriefing.store import PgVectorActivityStore
 
 
 @pytest.fixture(autouse=True)
@@ -263,8 +263,8 @@ async def test_index_incremental_uses_explicit_project_name_override():
 
 
 @pytest.mark.asyncio
-async def test_workassist_record_activity_uses_authenticated_project_context(tmp_path):
-    mcp_srv._work_briefing_service = WorkBriefingService(store=SqliteActivityStore(db_path=str(tmp_path / "briefing.db")))
+async def test_workassist_record_activity_uses_authenticated_project_context(pg_activity_store):
+    mcp_srv._work_briefing_service = WorkBriefingService(store=pg_activity_store)
     token = _current_project_external_id.set("CGA123")
     try:
         result = await mcp_srv.workassist_record_activity(
@@ -303,8 +303,8 @@ def test_workassist_tools_are_registered_in_existing_cga_mcp_server():
 
 
 @pytest.mark.asyncio
-async def test_workassist_record_activity_rejects_project_spoof(tmp_path):
-    mcp_srv._work_briefing_service = WorkBriefingService(store=SqliteActivityStore(db_path=str(tmp_path / "briefing.db")))
+async def test_workassist_record_activity_rejects_project_spoof(pg_activity_store):
+    mcp_srv._work_briefing_service = WorkBriefingService(store=pg_activity_store)
     token = _current_project_external_id.set("CGA123")
     try:
         with pytest.raises(Exception, match="project_id must match"):
@@ -317,8 +317,8 @@ async def test_workassist_record_activity_rejects_project_spoof(tmp_path):
         _current_project_external_id.reset(token)
 
 
-async def _seed_workassist_activity_service(tmp_path):
-    service = WorkBriefingService(store=SqliteActivityStore(db_path=str(tmp_path / "briefing.db")))
+async def _seed_workassist_activity_service(pg_activity_store):
+    service = WorkBriefingService(store=pg_activity_store)
     await service.record_activity(
         {
             "project_id": "CGA123",
@@ -356,8 +356,8 @@ async def _seed_workassist_activity_service(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_workassist_list_recent_activity_uses_authenticated_project_context(tmp_path):
-    mcp_srv._work_briefing_service = await _seed_workassist_activity_service(tmp_path)
+async def test_workassist_list_recent_activity_uses_authenticated_project_context(pg_activity_store):
+    mcp_srv._work_briefing_service = await _seed_workassist_activity_service(pg_activity_store)
     token = _current_project_external_id.set("CGA123")
     try:
         result = await mcp_srv.workassist_list_recent_activity(limit=10)
@@ -371,8 +371,8 @@ async def test_workassist_list_recent_activity_uses_authenticated_project_contex
 
 
 @pytest.mark.asyncio
-async def test_workassist_list_recent_activity_rejects_project_spoof(tmp_path):
-    mcp_srv._work_briefing_service = await _seed_workassist_activity_service(tmp_path)
+async def test_workassist_list_recent_activity_rejects_project_spoof(pg_activity_store):
+    mcp_srv._work_briefing_service = await _seed_workassist_activity_service(pg_activity_store)
     token = _current_project_external_id.set("CGA123")
     try:
         with pytest.raises(Exception, match="project_id must match"):
@@ -382,8 +382,8 @@ async def test_workassist_list_recent_activity_rejects_project_spoof(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_workassist_get_activity_briefing_uses_authenticated_project_context(tmp_path):
-    mcp_srv._work_briefing_service = await _seed_workassist_activity_service(tmp_path)
+async def test_workassist_get_activity_briefing_uses_authenticated_project_context(pg_activity_store):
+    mcp_srv._work_briefing_service = await _seed_workassist_activity_service(pg_activity_store)
     token = _current_project_external_id.set("CGA123")
     try:
         result = await mcp_srv.workassist_get_activity_briefing(limit=10)

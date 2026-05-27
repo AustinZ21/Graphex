@@ -8,11 +8,10 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-import aiosqlite
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from backend.auth.context import _current_project_db_id, _current_project_external_id
-from backend.auth.database import DB_PATH
+from backend.auth import pgshim
 from backend.auth.security import hash_token
 
 if TYPE_CHECKING:
@@ -105,9 +104,8 @@ class ProjectTokenMiddleware:
 
         # Validate token against DB
         try:
-            async with aiosqlite.connect(DB_PATH) as db:
-                db.row_factory = aiosqlite.Row
-                digest = hash_token(token)
+            digest = hash_token(token)
+            async with pgshim.get_pool().acquire() as db:
                 async with db.execute(
                     """
                     SELECT pt.id, pt.project_id, pt.token_type,

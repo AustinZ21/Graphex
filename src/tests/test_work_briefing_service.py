@@ -1,21 +1,13 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
-from backend.auth import database as auth_database
 from backend.workbriefing.service import WorkActivityValidationError, WorkBriefingService
-from backend.workbriefing.store import SqliteActivityStore
 
 
 @pytest.mark.asyncio
-async def test_record_activity_persists_and_updates_by_external_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    db_path = tmp_path / "work-briefing.db"
-    monkeypatch.setattr(auth_database, "DB_PATH", str(db_path))
-    await auth_database.init_db()
-
-    service = WorkBriefingService(store=SqliteActivityStore(db_path=str(db_path)))
+async def test_record_activity_persists_and_updates_by_external_id(pg_activity_store) -> None:
+    service = WorkBriefingService(store=pg_activity_store)
 
     created = await service.record_activity(
         {
@@ -53,12 +45,8 @@ async def test_record_activity_persists_and_updates_by_external_id(tmp_path: Pat
 
 
 @pytest.mark.asyncio
-async def test_get_briefing_aggregates_projects_and_statuses(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    db_path = tmp_path / "work-briefing.db"
-    monkeypatch.setattr(auth_database, "DB_PATH", str(db_path))
-    await auth_database.init_db()
-
-    service = WorkBriefingService(store=SqliteActivityStore(db_path=str(db_path)))
+async def test_get_briefing_aggregates_projects_and_statuses(pg_activity_store) -> None:
+    service = WorkBriefingService(store=pg_activity_store)
 
     await service.record_activity(
         {
@@ -86,12 +74,8 @@ async def test_get_briefing_aggregates_projects_and_statuses(tmp_path: Path, mon
 
 
 @pytest.mark.asyncio
-async def test_record_activity_rejects_missing_required_fields(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    db_path = tmp_path / "work-briefing.db"
-    monkeypatch.setattr(auth_database, "DB_PATH", str(db_path))
-    await auth_database.init_db()
-
-    service = WorkBriefingService(store=SqliteActivityStore(db_path=str(db_path)))
+async def test_record_activity_rejects_missing_required_fields(pg_activity_store) -> None:
+    service = WorkBriefingService(store=pg_activity_store)
 
     with pytest.raises(WorkActivityValidationError):
         await service.record_activity({"project_id": "CGA123", "event_type": "sync"})

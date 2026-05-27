@@ -21,18 +21,25 @@ services:
       - FALKORDB_BROWSER_PUBLIC_URL=http://localhost:${CGA_DESKTOP_BROWSER_PORT:-13001}
       - QUEUE_REDIS_URL=redis://redis:6379/1
       - CACHE_REDIS_URL=redis://redis:6379/2
-      - AUTH_DB_PATH=/app/data/auth.db
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-local-jwt-secret-key-32chars}
       - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
       - PYTHONPATH=/app/src
+      - CGA_POSTGRES_DSN=postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@postgres:5432/${POSTGRES_DB:-appdb}
+      - WORKBRIEFING_POSTGRES_DSN=postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@postgres:5432/${POSTGRES_DB:-appdb}
+      # Auth backups go into the same host folder the backup sidecar writes
+      # to, so the admin UI lists exactly the snapshots the scheduler
+      # produces.  Structure: <host>/cga-desktop/auth/auth-<ts>.sql.gz
+      - BACKUP_DIR=/backups/cga-desktop/auth
     volumes:
-      - auth_db_data:/app/data
+      - ${CGA_BACKUP_DIR:-./data/backups}:/backups
       - ${CGA_REPOS_MOUNT:-.}:/repos:ro
     depends_on:
       falkordb:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      postgres:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -70,30 +77,53 @@ services:
       timeout: 3s
       retries: 3
 
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: cga-desktop-postgres
+    restart: unless-stopped
+    ports:
+      - "${CGA_DESKTOP_POSTGRES_PORT:-15432}:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-appdb}
+      - POSTGRES_USER=${POSTGRES_USER:-app}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-app}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-appdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   backup:
-    image: alpine:3.20
+    # Use the official Postgres client image so ``pg_dump`` is available.
+    image: postgres:16-alpine
     container_name: cga-desktop-backup
     restart: unless-stopped
     environment:
       - BACKUP_STACK_NAME=cga-desktop
       - BACKUP_ROOT=/backups
-      - AUTH_DB_PATH=/authdb/auth.db
+      - PGHOST=postgres
+      - PGPORT=5432
+      - PGUSER=${POSTGRES_USER:-app}
+      - PGDATABASE=${POSTGRES_DB:-appdb}
+      - PGPASSWORD=${POSTGRES_PASSWORD:-app}
       - FALKORDB_DATA_DIR=/falkordb-data
       - BACKUP_INTERVAL_SECONDS=${CGA_BACKUP_INTERVAL_SECONDS:-3600}
       - BACKUP_KEEP_COUNT=${CGA_BACKUP_KEEP_COUNT:-168}
     volumes:
-      - auth_db_data:/authdb:ro
       - falkordb_data:/falkordb-data:ro
       - ${CGA_BACKUP_DIR:-./data/backups}:/backups
       - ./src/scripts/backup-runtime-data.sh:/usr/local/bin/backup-runtime-data.sh:ro
-    command: ["/bin/sh", "/usr/local/bin/backup-runtime-data.sh"]
+    entrypoint: ["/bin/sh", "/usr/local/bin/backup-runtime-data.sh"]
     depends_on:
-      cga:
+      postgres:
         condition: service_healthy
       falkordb:
         condition: service_healthy
 
 volumes:
-  auth_db_data:
   falkordb_data:
   redis_data:
+  postgres_data:

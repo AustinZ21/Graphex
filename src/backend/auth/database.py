@@ -1,47 +1,79 @@
-"""SQLite database setup and connection management for auth."""
+"""PostgreSQL-backed auth database (asyncpg via the aiosqlite-shim).
+
+History
+-------
+This module previously used aiosqlite against ``/app/data/auth.db``.
+It has been migrated to PostgreSQL.  The schema deliberately mirrors
+the original SQLite layout — ``BIGSERIAL`` for autoincrement ids,
+``INTEGER`` for boolean flags, ``TEXT`` for ISO-8601 timestamps — so
+that the SQL emitted by :mod:`backend.auth.router` and friends
+continues to work unchanged.
+
+Public surface
+--------------
+* :data:`DB_PATH` — kept for backward compatibility but now holds the
+  active PostgreSQL DSN string (logged at startup, used by tests).
+* :func:`init_db` — create tables if missing.
+* :func:`get_db` — FastAPI dependency yielding a shimmed connection.
+* :func:`insert_audit_log` — write a single audit row.
+"""
 from __future__ import annotations
 
-import os
-from pathlib import Path
-from typing import AsyncGenerator
 import json
 from datetime import datetime, timezone
+from typing import AsyncGenerator
 
-import aiosqlite
+from backend.auth.pgshim import (
+    Connection,
+    get_pool,
+    init_pool,
+    resolve_auth_dsn,
+)
 
-DB_PATH = os.getenv("AUTH_DB_PATH", "/app/data/auth.db")
+# ``DB_PATH`` historically held a filesystem path; we keep the name so
+# existing imports (middleware, main, scripts) continue to work but it
+# now stores the active Postgres DSN.  Callers that only need a label
+# can use this verbatim; callers that mutate or open files based on it
+# have been updated.
+DB_PATH = resolve_auth_dsn()
+
 
 _CREATE_TABLES = """
 CREATE TABLE IF NOT EXISTS users (
-    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    id            BIGSERIAL PRIMARY KEY,
     username      TEXT    UNIQUE NOT NULL,
     password_hash TEXT    NOT NULL,
+    email         TEXT    NOT NULL DEFAULT '',
     auth_provider TEXT    NOT NULL DEFAULT 'local',
     github_id     TEXT    UNIQUE,
     role          TEXT    NOT NULL DEFAULT 'developer',
-    created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+    created_at    TEXT    NOT NULL DEFAULT to_char((now() at time zone 'utc'), 'YYYY-MM-DD"T"HH24:MI:SS'),
     is_active     INTEGER NOT NULL DEFAULT 1
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_github_id
+    ON users(github_id)
+    WHERE github_id IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS projects (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    id           BIGSERIAL PRIMARY KEY,
     project_name TEXT    UNIQUE NOT NULL,
     project_id   TEXT    UNIQUE NOT NULL,
     upstream_url TEXT    NOT NULL DEFAULT '',
     description  TEXT    NOT NULL DEFAULT '',
     repo_path    TEXT    NOT NULL DEFAULT '',
-    created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+    created_at   TEXT    NOT NULL DEFAULT to_char((now() at time zone 'utc'), 'YYYY-MM-DD"T"HH24:MI:SS'),
     is_active    INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS project_tokens (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    project_id  INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    id          BIGSERIAL PRIMARY KEY,
+    project_id  BIGINT  NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     token_type  TEXT    NOT NULL,
     token_hash  TEXT    UNIQUE NOT NULL,
     token_hint  TEXT    NOT NULL,
     version     INTEGER NOT NULL DEFAULT 1,
-    created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+    created_at  TEXT    NOT NULL DEFAULT to_char((now() at time zone 'utc'), 'YYYY-MM-DD"T"HH24:MI:SS'),
     is_active   INTEGER NOT NULL DEFAULT 1
 );
 
@@ -50,137 +82,51 @@ CREATE INDEX IF NOT EXISTS idx_token_hash
     WHERE is_active = 1;
 
 CREATE TABLE IF NOT EXISTS audit_logs (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_at      TEXT    NOT NULL DEFAULT (datetime('now')),
-    scope           TEXT    NOT NULL,
-    method          TEXT    NOT NULL,
-    path            TEXT    NOT NULL,
-    status_code     INTEGER NOT NULL,
-    duration_ms     INTEGER NOT NULL,
-    actor_type      TEXT    NOT NULL DEFAULT 'anonymous',
-    actor_id        INTEGER,
-    actor_name      TEXT,
-    project_id      INTEGER,
-    project_name    TEXT,
-    token_id        INTEGER,
-    client_ip       TEXT,
-    user_agent      TEXT,
-    query_string    TEXT,
-    request_body    TEXT,
-    response_error  TEXT,
-    details_json    TEXT,
-    token_usage_total INTEGER
+    id                BIGSERIAL PRIMARY KEY,
+    created_at        TEXT    NOT NULL DEFAULT to_char((now() at time zone 'utc'), 'YYYY-MM-DD"T"HH24:MI:SS'),
+    scope             TEXT    NOT NULL,
+    method            TEXT    NOT NULL,
+    path              TEXT    NOT NULL,
+    status_code       INTEGER NOT NULL,
+    duration_ms       INTEGER NOT NULL,
+    actor_type        TEXT    NOT NULL DEFAULT 'anonymous',
+    actor_id          BIGINT,
+    actor_name        TEXT,
+    project_id        BIGINT,
+    project_name      TEXT,
+    token_id          BIGINT,
+    client_ip         TEXT,
+    user_agent        TEXT,
+    query_string      TEXT,
+    request_body      TEXT,
+    response_error    TEXT,
+    details_json      TEXT,
+    token_usage_total BIGINT
 );
 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_scope ON audit_logs(scope);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_project_id ON audit_logs(project_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_name ON audit_logs(actor_name);
-
-CREATE TABLE IF NOT EXISTS work_activities (
-    activity_id       TEXT PRIMARY KEY,
-    plugin_id         TEXT NOT NULL,
-    source_system     TEXT NOT NULL,
-    source_type       TEXT NOT NULL,
-    source_item_id    TEXT NOT NULL,
-    project_id        TEXT NOT NULL,
-    workspace_name    TEXT,
-    event_type        TEXT NOT NULL,
-    title             TEXT NOT NULL,
-    summary           TEXT NOT NULL DEFAULT '',
-    body_text         TEXT NOT NULL DEFAULT '',
-    status            TEXT,
-    priority          TEXT,
-    owner             TEXT,
-    source_url        TEXT,
-    tags_json         TEXT NOT NULL DEFAULT '[]',
-    occurred_at       TEXT NOT NULL,
-    synced_at         TEXT NOT NULL,
-    content_hash      TEXT NOT NULL,
-    raw_metadata_json TEXT NOT NULL DEFAULT '{}',
-    embedding_text    TEXT NOT NULL DEFAULT ''
-);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_work_activities_identity
-    ON work_activities(plugin_id, project_id, source_type, source_item_id);
-
-CREATE INDEX IF NOT EXISTS idx_work_activities_project_time
-    ON work_activities(project_id, occurred_at DESC, synced_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_work_activities_time
-    ON work_activities(occurred_at DESC, synced_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_scope       ON audit_logs(scope);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_project_id  ON audit_logs(project_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_name  ON audit_logs(actor_name);
 """
 
 
-async def init_db(db_path: str | None = None) -> None:
-    """Create tables if they do not exist."""
-    target_db_path = db_path or DB_PATH
-    Path(target_db_path).parent.mkdir(parents=True, exist_ok=True)
-    async with aiosqlite.connect(target_db_path) as db:
+async def init_db(dsn: str | None = None) -> None:
+    """Ensure tables exist.  Idempotent and safe to call on every startup."""
+    pool = await init_pool(dsn)
+    async with pool.acquire() as db:
         await db.executescript(_CREATE_TABLES)
-        # Migrations: add columns that may not exist in older DBs
-        try:
-            await db.execute("ALTER TABLE project_tokens ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
-            await db.commit()
-        except Exception:
-            pass  # column already exists
-        # audit token usage column
-        try:
-            await db.execute("ALTER TABLE audit_logs ADD COLUMN token_usage_total INTEGER")
-            await db.commit()
-        except Exception:
-            pass  # column already exists
-        # email column
-        try:
-            await db.execute("ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT ''")
-            await db.commit()
-        except Exception:
-            pass  # column already exists
-        # oauth provider columns
-        try:
-            await db.execute("ALTER TABLE users ADD COLUMN auth_provider TEXT NOT NULL DEFAULT 'local'")
-            await db.commit()
-        except Exception:
-            pass  # column already exists
-        try:
-            await db.execute("ALTER TABLE users ADD COLUMN github_id TEXT")
-            await db.commit()
-        except Exception:
-            pass  # column already exists
-        try:
-            await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id) WHERE github_id IS NOT NULL")
-            await db.commit()
-        except Exception:
-            pass  # index creation best-effort
-        try:
-            await db.execute("ALTER TABLE projects RENAME COLUMN project_key TO project_name")
-            await db.commit()
-        except Exception:
-            pass  # column already renamed or missing
-        # repo_path column for explicit repository path (decouples indexing from project_name)
-        try:
-            await db.execute("ALTER TABLE projects ADD COLUMN repo_path TEXT NOT NULL DEFAULT ''")
-            await db.commit()
-        except Exception:
-            pass  # column already exists
-        try:
-            await db.execute("ALTER TABLE audit_logs RENAME COLUMN project_key TO project_name")
-            await db.commit()
-        except Exception:
-            pass  # column already renamed or missing
-        # role rename: viewer -> developer
+        # Best-effort legacy role rename.
         try:
             await db.execute("UPDATE users SET role = 'developer' WHERE role = 'viewer'")
-            await db.commit()
         except Exception:
-            pass  # best-effort migration
+            pass
 
 
-async def get_db() -> AsyncGenerator[aiosqlite.Connection, None]:
-    """Yield a connected aiosqlite connection with Row factory."""
-    Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
+async def get_db() -> AsyncGenerator[Connection, None]:
+    """FastAPI dependency yielding a shimmed connection from the pool."""
+    pool = get_pool()
+    async with pool.acquire() as db:
         yield db
 
 
@@ -213,10 +159,10 @@ async def insert_audit_log(
     token_usage_total: int | None = None,
 ) -> None:
     """Write a normalized audit row for admin troubleshooting and compliance."""
-    Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
     created_at = datetime.now(timezone.utc).isoformat()
     details_json = json.dumps(details, ensure_ascii=True) if details else None
-    async with aiosqlite.connect(DB_PATH) as db:
+    pool = get_pool()
+    async with pool.acquire() as db:
         await db.execute(
             """
             INSERT INTO audit_logs(
@@ -248,4 +194,3 @@ async def insert_audit_log(
                 int(token_usage_total) if token_usage_total is not None else None,
             ),
         )
-        await db.commit()

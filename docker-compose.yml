@@ -12,6 +12,8 @@
 # │  16379     │ 6379           │ FalkorDB (Redis proto)   │ dev + prod     │
 # │  13000     │ 3000           │ FalkorDB Browser UI      │ dev + prod     │
 # │  6380      │ 6379           │ Redis (dev)              │ dev            │
+# │  15433     │ 5432           │ Postgres (pgvector, dev) │ dev            │
+# │  15432     │ 5432           │ Postgres (pgvector, desktop) │ desktop    │
 # └──────────────────────────────────────────────────────────────────────────┘
 #
 # Dev profile (fully Dockerised):
@@ -62,7 +64,6 @@ services:
       - FALKORDB_URL_HOST=redis://cga-falkordb-dev:6379
       - QUEUE_REDIS_URL=redis://cga-redis-dev:6379/1
       - CACHE_REDIS_URL=redis://cga-redis-dev:6379/2
-      - AUTH_DB_PATH=/app/data/auth.db
       - 'JWT_SECRET_KEY=${JWT_SECRET_KEY:-dev-local-jwt-secret-key}'
       - 'ADMIN_USERNAME=${ADMIN_USERNAME:-admin}'
       - 'ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}'
@@ -75,13 +76,20 @@ services:
       - 'GITHUB_OAUTH_ALLOWED_ORGS=${GITHUB_OAUTH_ALLOWED_ORGS:-}'
       - 'GITHUB_OAUTH_STATE_SECRET=${GITHUB_OAUTH_STATE_SECRET:-dev-local-oauth-state-secret}'
       - PYTHONPATH=/app/src
+      - 'CGA_POSTGRES_DSN=postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@cga-postgres-dev:5432/${POSTGRES_DB:-appdb}'
+      - 'WORKBRIEFING_POSTGRES_DSN=postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@cga-postgres-dev:5432/${POSTGRES_DB:-appdb}'
+      # Auth backups land in the same host folder the dev backup sidecar
+      # writes to so the admin UI lists exactly those snapshots.
+      - BACKUP_DIR=/backups/cga-dev/auth
     volumes:
-      - auth_db_dev_data:/app/data
+      - ${CGA_BACKUP_DIR:-./data/backups}:/backups
       - ${CGA_REPOS_MOUNT:-.}:/repos:ro
     depends_on:
       falkordb-dev:
         condition: service_healthy
       redis-dev:
+        condition: service_healthy
+      postgres-dev:
         condition: service_healthy
     healthcheck:
       test: [CMD, curl, '-f', 'http://localhost:8000/health']
@@ -106,26 +114,51 @@ services:
       timeout: 3s
       retries: 3
 
+  postgres-dev:
+    image: 'pgvector/pgvector:pg16'
+    container_name: cga-postgres-dev
+    profiles: [dev]
+    restart: unless-stopped
+    ports:
+      - '${CGA_DEV_POSTGRES_PORT:-15433}:5432'
+    environment:
+      - 'POSTGRES_DB=${POSTGRES_DB:-appdb}'
+      - 'POSTGRES_USER=${POSTGRES_USER:-app}'
+      - 'POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-app}'
+    volumes:
+      - 'postgres_dev_data:/var/lib/postgresql/data'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-appdb}'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   backup-dev:
-    image: 'alpine:3.20'
+    image: 'postgres:16-alpine'
     container_name: cga-backup-dev
     profiles: [dev]
     restart: unless-stopped
     environment:
       - BACKUP_STACK_NAME=cga-dev
       - BACKUP_ROOT=/backups
-      - AUTH_DB_PATH=/authdb/auth.db
+      - PGHOST=cga-postgres-dev
+      - PGPORT=5432
+      - 'PGUSER=${POSTGRES_USER:-app}'
+      - 'PGDATABASE=${POSTGRES_DB:-appdb}'
+      - 'PGPASSWORD=${POSTGRES_PASSWORD:-app}'
       - FALKORDB_DATA_DIR=/falkordb-data
-      - BACKUP_INTERVAL_SECONDS=${CGA_BACKUP_INTERVAL_SECONDS:-3600}
-      - BACKUP_KEEP_COUNT=${CGA_BACKUP_KEEP_COUNT:-168}
+      - 'BACKUP_INTERVAL_SECONDS=${CGA_BACKUP_INTERVAL_SECONDS:-3600}'
+      - 'BACKUP_KEEP_COUNT=${CGA_BACKUP_KEEP_COUNT:-168}'
     volumes:
-      - auth_db_dev_data:/authdb:ro
       - falkordb_dev_data:/falkordb-data:ro
       - ${CGA_BACKUP_DIR:-./data/backups}:/backups
       - ./src/scripts/backup-runtime-data.sh:/usr/local/bin/backup-runtime-data.sh:ro
-    command: ['/bin/sh', '/usr/local/bin/backup-runtime-data.sh']
+    entrypoint: ['/bin/sh', '/usr/local/bin/backup-runtime-data.sh']
     depends_on:
-      api-dev:
+      postgres-dev:
         condition: service_healthy
       falkordb-dev:
         condition: service_healthy
@@ -199,7 +232,6 @@ services:
       - FALKORDB_HOST=falkordb
       - FALKORDB_PORT=6379
       - 'QUEUE_REDIS_URL=redis://redis:6379/1'
-      - AUTH_DB_PATH=/app/data/auth.db
       - 'JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-jwt-secret-key-32chars!!}'
       - 'ADMIN_USERNAME=${ADMIN_USERNAME:-admin}'
       - 'ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}'
@@ -212,8 +244,11 @@ services:
       - 'GITHUB_OAUTH_ALLOWED_ORGS=${GITHUB_OAUTH_ALLOWED_ORGS:-}'
       - 'GITHUB_OAUTH_STATE_SECRET=${GITHUB_OAUTH_STATE_SECRET:-change-me-oauth-state-secret}'
       - 'MCP_ACCESS_TOKEN=${MCP_ACCESS_TOKEN:-}'
+      - 'CGA_POSTGRES_DSN=postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@postgres:5432/${POSTGRES_DB:-appdb}'
+      # Prod has no backup sidecar; the in-process scheduler owns auth backups.
+      - BACKUP_DIR=/backups/cga/auth
     volumes:
-      - auth_db_data:/app/data
+      - backup_prod_data:/backups
     depends_on:
       redis:
         condition: service_healthy
@@ -346,9 +381,9 @@ volumes:
     driver: local
   redis_dev_data:
     driver: local
-  auth_db_data:
+  postgres_dev_data:
     driver: local
-  auth_db_dev_data:
+  backup_prod_data:
     driver: local
 networks:
   your-app-network:

@@ -5,9 +5,9 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from backend.auth.database import get_db
+from backend.auth.pgshim import Connection
 from backend.auth.security import decode_access_token
 
-import aiosqlite
 from jose import JWTError
 
 _bearer = HTTPBearer(auto_error=False)
@@ -15,7 +15,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 async def get_current_user(
     creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    db: aiosqlite.Connection = Depends(get_db),
+    db: Connection = Depends(get_db),
 ) -> dict:
     exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

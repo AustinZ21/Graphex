@@ -5,8 +5,15 @@ BACKUP_ROOT=${BACKUP_ROOT:-/backups}
 BACKUP_STACK_NAME=${BACKUP_STACK_NAME:-cga}
 BACKUP_INTERVAL_SECONDS=${BACKUP_INTERVAL_SECONDS:-3600}
 BACKUP_KEEP_COUNT=${BACKUP_KEEP_COUNT:-168}
-AUTH_DB_PATH=${AUTH_DB_PATH:-/authdb/auth.db}
+# PostgreSQL connection — sidecar must have pg_dump available.
+PGHOST=${PGHOST:-postgres}
+PGPORT=${PGPORT:-5432}
+PGUSER=${PGUSER:-app}
+PGDATABASE=${PGDATABASE:-appdb}
+# PGPASSWORD is expected to be passed in via env from the compose file.
 FALKORDB_DATA_DIR=${FALKORDB_DATA_DIR:-/falkordb-data}
+
+export PGHOST PGPORT PGUSER PGDATABASE PGPASSWORD
 
 AUTH_BACKUP_DIR="$BACKUP_ROOT/$BACKUP_STACK_NAME/auth"
 FALKOR_BACKUP_DIR="$BACKUP_ROOT/$BACKUP_STACK_NAME/falkordb"
@@ -28,17 +35,23 @@ prune_backups() {
 }
 
 backup_auth_db() {
-  if [ ! -f "$AUTH_DB_PATH" ]; then
-    echo "[backup] auth database not found at $AUTH_DB_PATH"
+  if ! command -v pg_dump >/dev/null 2>&1; then
+    echo "[backup] pg_dump not installed; skipping auth backup"
     return 0
   fi
 
   timestamp=$(date -u +%Y%m%dT%H%M%SZ)
-  snapshot="$AUTH_BACKUP_DIR/auth-$timestamp.db"
-  cp "$AUTH_DB_PATH" "$snapshot"
-  cp "$snapshot" "$AUTH_BACKUP_DIR/auth-latest.db"
-  echo "[backup] auth snapshot -> $snapshot"
-  prune_backups "$AUTH_BACKUP_DIR" 'auth-*.db' "$BACKUP_KEEP_COUNT"
+  snapshot="$AUTH_BACKUP_DIR/auth-$timestamp.sql.gz"
+  tmp="$snapshot.tmp"
+  if pg_dump --no-owner --no-privileges --clean --if-exists --format=plain 2>/dev/null | gzip -c > "$tmp"; then
+    mv "$tmp" "$snapshot"
+    cp "$snapshot" "$AUTH_BACKUP_DIR/auth-latest.sql.gz"
+    echo "[backup] auth snapshot -> $snapshot"
+    prune_backups "$AUTH_BACKUP_DIR" 'auth-*.sql.gz' "$BACKUP_KEEP_COUNT"
+  else
+    rm -f "$tmp"
+    echo "[backup] pg_dump failed"
+  fi
 }
 
 backup_falkordb() {

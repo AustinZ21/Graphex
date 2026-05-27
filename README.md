@@ -1,9 +1,9 @@
 # CGA (ContextGraphAdmin)
 
-**Version:** 1.29.93
+**Version:** 1.30.7
 **Status:** Published
 **Author:** Nate Scott
-**Date:** 2026-05-26 (CGA MCP server naming standardized as cga-mcp-server and ADC guidance aligned)
+**Date:** 2026-05-26 (Backup: unified UI + sidecar mount, dropped SQLite cruft, pg_dump in API image)
 
 CGA, aka ContextGraphAdmin, is a local-first graph context service for AI-assisted development. It indexes repository structure, symbols, calls, imports, and lightweight data flow into FalkorDB, then exposes retrieval and analysis tools through an MCP-compatible API.
 
@@ -27,22 +27,12 @@ Recorded activity is stored in the local SQLite auth database under the `work_ac
 
 ## Runtime Persistence And Backup
 
-- CGA runtime state is persisted in Docker volumes for the auth database and FalkorDB graph data.
-- The repo-root desktop stack and the dev-profile stack do not share the same Docker volume names by default, so switching stacks without migration can make the UI appear empty even when the older data still exists in another volume.
-- A backup sidecar now snapshots both `auth.db` and FalkorDB runtime data into `data/backups/` every hour by default.
+- CGA runtime state lives in a PostgreSQL database (`postgres` service, volume `postgres_data`) for users / projects / tokens / audit logs, and in FalkorDB for graph data.
+- A backup sidecar dumps the auth PG database (`pg_dump --format=plain | gzip`) and FalkorDB runtime data into `data/backups/<stack>/` every hour by default.
+- The admin UI's **System Settings → Backup** panel reads and writes the same folder, so manual "Back Up Now" / restore / delete actions are visible to both the UI and the sidecar.
 - Override the backup destination with `CGA_BACKUP_DIR` and the schedule with `CGA_BACKUP_INTERVAL_SECONDS` / `CGA_BACKUP_KEEP_COUNT`.
-- The latest snapshots are always written as `auth-latest.db` and `falkordb-latest.tgz` under the stack-specific backup folder.
-- Use `src/scripts/manage-runtime-data.ps1` to inspect, back up, restore, or migrate runtime data across `desktop`, `dev-legacy`, and `dev` volume presets.
-- `restore` and `migrate` now emit JSON operation reports under `tmp/runtime-data-reports/`, including backup validation, safety-backup location, and pre/post stack summaries.
-
-Examples:
-
-```powershell
-./src/scripts/manage-runtime-data.ps1 inspect -SourceStack desktop -TargetStack dev-legacy
-./src/scripts/manage-runtime-data.ps1 backup -SourceStack desktop
-./src/scripts/manage-runtime-data.ps1 restore -TargetStack desktop -BackupPath .\data\backups\cga-desktop -Force
-./src/scripts/manage-runtime-data.ps1 migrate -SourceStack dev-legacy -TargetStack desktop -Force
-```
+- The latest snapshots are always written as `auth-latest.sql.gz` and `falkordb-latest.tgz` under the stack-specific backup folder.
+- Restoring an auth snapshot uses `psql --single-transaction` and takes a pre-restore safety snapshot first.
 
 ## Public Quick Start
 

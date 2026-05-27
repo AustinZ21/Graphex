@@ -8,9 +8,11 @@
     :root {
       --bg: #06080d;
       --panel: #0d1118;
+      --panel-2: #11161f;
       --panel-elevated: #11161f;
       --text: #e6ecf5;
       --muted: #7a8699;
+      --muted-2: #5f6779;
       --accent: #4ade80;
       --accent-soft: rgba(74,222,128,.10);
       --accent-glow: rgba(74,222,128,.35);
@@ -18,11 +20,16 @@
       --border-strong: #2a3142;
       --danger: #ef5a5a;
       --danger-soft: rgba(239,90,90,.10);
+      --warn: #f0b429;
+      --warn-soft: rgba(240,180,41,.12);
+      --info: #60a5fa;
+      --info-soft: rgba(96,165,250,.12);
       --input-bg: #0a0d14;
       --scrollbar-thumb: #1d2230;
       --scrollbar-thumb-hover: #2a3142;
       --scrollbar-track: #06080d;
       --radius: 8px;
+      --radius-sm: 4px;
     }
     /* ── Compact dark theme overrides ── */
     html { font-size: 13px; }
@@ -421,9 +428,9 @@
     /* ── Tables ── */
     .section-header {
       display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 16px;
+      margin-bottom: 10px;
     }
-    .section-header h2 { font-size: 16px; }
+    .section-header h2 { font-size: 15px; }
     .audit-filters {
       display: flex;
       gap: 8px;
@@ -438,10 +445,10 @@
       flex: 0 0 auto;
       width: auto;
     }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
     thead th {
-      text-align: left; padding: 10px 12px;
-      color: var(--muted); font-weight: 600; font-size: 11px;
+      text-align: left; padding: 6px 8px;
+      color: var(--muted); font-weight: 600; font-size: 10.5px;
       text-transform: uppercase; letter-spacing: .06em;
       border-bottom: 1px solid var(--border);
       background: var(--panel);
@@ -450,7 +457,8 @@
     thead th.sortable:hover { color: var(--text); }
     tbody tr { border-bottom: 1px solid rgba(70,80,104,.4); }
     tbody tr:last-child { border-bottom: none; }
-    tbody td { padding: 10px 12px; }
+    tbody td { padding: 6px 8px; vertical-align: middle; line-height: 1.35; }
+    thead th { vertical-align: middle; }
     .table-wrap {
       background: var(--panel); border: 1px solid var(--border);
       border-radius: var(--radius); overflow-x: auto;
@@ -586,9 +594,56 @@
       .token-actions { justify-content: center; }
     }
 
-    /* ── Status badges ── */
-    .badge-active { color: var(--accent); }
-    .badge-inactive { color: var(--danger); }
+    /* ── Status badges (legacy → pill-styled) ── */
+    .badge-active,
+    .badge-inactive {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: var(--radius-sm);
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      line-height: 1.5;
+      border: 1px solid transparent;
+    }
+    .badge-active   { color: var(--accent); background: var(--accent-soft); border-color: rgba(74,222,128,.30); }
+    .badge-inactive { color: var(--danger); background: var(--danger-soft); border-color: rgba(239,90,90,.30); }
+
+    /* ── Site-wide pill utilities (Pattern D / status pills) ── */
+    .pill {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: var(--radius-sm);
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      line-height: 1.5;
+      border: 1px solid transparent;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .pill-green { color: var(--accent); background: var(--accent-soft); border-color: rgba(74,222,128,.30); }
+    .pill-red   { color: var(--danger); background: var(--danger-soft); border-color: rgba(239,90,90,.30); }
+    .pill-amber { color: var(--warn);   background: var(--warn-soft);   border-color: rgba(240,180,41,.30); }
+    .pill-blue  { color: var(--info);   background: var(--info-soft);   border-color: rgba(96,165,250,.30); }
+    .pill-gray  { color: var(--muted);  background: rgba(138,147,166,.10); border-color: rgba(138,147,166,.25); }
+
+    /* HTTP method pills */
+    .pill-method { padding: 1px 6px; font-size: 10px; }
+    .pill-method-get    { color: var(--info);   background: var(--info-soft);   border-color: rgba(96,165,250,.30); }
+    .pill-method-post   { color: var(--accent); background: var(--accent-soft); border-color: rgba(74,222,128,.30); }
+    .pill-method-put    { color: var(--warn);   background: var(--warn-soft);   border-color: rgba(240,180,41,.30); }
+    .pill-method-patch  { color: var(--warn);   background: var(--warn-soft);   border-color: rgba(240,180,41,.30); }
+    .pill-method-delete { color: var(--danger); background: var(--danger-soft); border-color: rgba(239,90,90,.30); }
+
+    /* Monospace utility for IDs, timestamps, paths */
+    .mono {
+      font-family: ui-monospace, "JetBrains Mono", Consolas, monospace;
+      font-size: 11.5px;
+      color: var(--muted);
+    }
 
     /* ── Forms ── */
     .form-group { margin-bottom: 16px; }
@@ -603,16 +658,23 @@
 
     /* ── Buttons ── */
     .btn {
-      padding: 8px 16px; border: none; border-radius: 8px;
+      padding: 8px 16px;
+      background: var(--panel-elevated);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
       cursor: pointer; font-size: 13px; font-weight: 500;
-      transition: opacity .15s;
+      transition: background-color .15s, border-color .15s, color .15s, opacity .15s;
     }
-    .btn:hover { opacity: .88; }
-    .btn-primary { background: var(--accent); color: #0e1a14; }
+    .btn:hover { background: var(--panel-2); border-color: var(--border-strong); opacity: 1; }
+    .btn-primary { background: var(--accent); color: #0e1a14; border-color: var(--accent); }
+    .btn-primary:hover { background: var(--accent); border-color: var(--accent); filter: brightness(1.05); }
     .btn-danger  { background: var(--danger-soft); color: var(--danger); border: 1px solid rgba(227,90,90,.3); }
     .btn-accent  { background: rgba(74,227,135,.12); color: var(--accent); border: 1px solid rgba(74,227,135,.3); }
     .btn-ghost   { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { color: var(--text); border-color: var(--border-strong); background: var(--panel-elevated); }
     .btn-sm { padding: 5px 10px; font-size: 12px; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
 
     /* ── Modal ── */
     .overlay {
@@ -665,72 +727,72 @@
     }
     .briefing-summary-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 12px;
-      margin-bottom: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
     }
     .briefing-card {
       background: var(--panel);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 16px;
+      padding: 10px 12px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      min-height: 132px;
+      gap: 6px;
+      min-height: 0;
     }
     .briefing-command-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1.15fr) minmax(280px, .95fr);
-      gap: 12px;
-      margin-bottom: 16px;
+      grid-template-columns: minmax(0, 1.15fr) minmax(260px, .95fr);
+      gap: 8px;
+      margin-bottom: 10px;
     }
     .briefing-command-card {
       background: linear-gradient(180deg, rgba(53,63,82,.96) 0%, rgba(35,42,56,.98) 100%);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 18px;
+      padding: 10px 12px;
       min-width: 0;
     }
     .briefing-command-card + .briefing-command-card-full {
-      margin-top: 16px;
+      margin-top: 8px;
     }
     .briefing-command-card-full + .briefing-summary-grid {
-      margin-top: 16px;
+      margin-top: 8px;
     }
     .briefing-command-card-full + .briefing-section {
-      margin-top: 16px;
+      margin-top: 8px;
     }
     .briefing-command-card h3 {
-      font-size: 15px;
-      margin-bottom: 8px;
+      font-size: 14px;
+      margin-bottom: 4px;
     }
     .briefing-command-card p {
       color: var(--muted);
-      font-size: 13px;
-      line-height: 1.5;
+      font-size: 12.5px;
+      line-height: 1.4;
     }
     .briefing-collapsible-head,
     .briefing-section-head {
       display: flex;
-      align-items: flex-start;
+      align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 10px;
     }
     .briefing-collapsible-head {
-      margin-bottom: 12px;
+      margin-bottom: 6px;
     }
     .briefing-section-head {
-      margin-bottom: 10px;
+      margin-bottom: 6px;
     }
     .briefing-collapsible-head h3,
     .briefing-section-head h3 {
-      font-size: 15px;
-      margin: 2px 0 0;
+      font-size: 14px;
+      margin: 0;
     }
     .briefing-collapse-btn {
-      width: 30px;
-      height: 30px;
+      width: 22px;
+      height: 22px;
       flex: 0 0 auto;
       display: inline-flex;
       align-items: center;
@@ -757,7 +819,7 @@
     }
     .briefing-section {
       min-width: 0;
-      margin-bottom: 16px;
+      margin-bottom: 8px;
     }
     .briefing-section .briefing-summary-grid,
     .briefing-section .table-wrap {
@@ -885,32 +947,32 @@
       color: var(--muted);
     }
     .briefing-metric {
-      font-size: 28px;
+      font-size: 22px;
       font-weight: 700;
       color: var(--text);
       line-height: 1;
     }
     .briefing-subtle {
       color: var(--muted);
-      font-size: 12px;
+      font-size: 11.5px;
     }
     .briefing-chip-list,
     .briefing-tag-list {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 4px;
     }
     .briefing-chip,
     .briefing-tag {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 4px 10px;
+      gap: 4px;
+      padding: 2px 7px;
       border-radius: 999px;
       border: 1px solid rgba(115,129,156,.22);
       background: rgba(21,28,43,.78);
       color: var(--text);
-      font-size: 12px;
+      font-size: 11.5px;
     }
     .briefing-chip strong {
       color: var(--accent);
@@ -919,7 +981,7 @@
     .briefing-title-cell {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 3px;
       min-width: 0;
     }
     .briefing-title-cell small {
@@ -935,10 +997,281 @@
       font-size: 12px;
       text-align: center;
     }
+    .briefing-activity-row td { vertical-align: middle; padding: 8px 10px !important; }
+    .briefing-activity-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .briefing-activity-cell .row1 {
+      font-family: monospace;
+      font-size: 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      justify-content: center;
+    }
+    .briefing-activity-cell .row2 {
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.3;
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .briefing-icon-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .briefing-event-icon, .briefing-status-dot {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      cursor: help;
+    }
+    .briefing-event-icon { font-size: 16px; }
+    .briefing-status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--muted);
+      border: 1px solid rgba(255,255,255,.15);
+    }
+    .briefing-status-dot.is-done { background: #4ae387; }
+    .briefing-status-dot.is-progress { background: #4aa3e3; }
+    .briefing-status-dot.is-open { background: #e3a14a; }
+    .briefing-status-dot.is-blocked { background: #e34a4a; }
+    .briefing-activity-text {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      min-width: 0;
+      max-width: 560px;
+    }
+    .briefing-activity-text strong {
+      font-size: 13px;
+      line-height: 1.35;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .briefing-activity-text .briefing-activity-summary {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      word-break: break-word;
+    }
+    .briefing-activity-text .briefing-tag-list { margin-top: 2px; }
+    .briefing-when-cell {
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+      white-space: nowrap;
+      cursor: help;
+    }
+    .briefing-when-cell .briefing-when-stamp {
+      font-family: monospace;
+      font-size: 11px;
+      color: var(--muted);
+      opacity: .85;
+      margin-top: 2px;
+    }
     @media (max-width: 1100px) {
       .briefing-command-grid {
         grid-template-columns: 1fr;
       }
+    }
+
+    /* ============================================================
+       Dense Dashboard Patterns (A–F) — applied to Work Dashboard
+       ============================================================ */
+
+    /* Pattern A · KPI ribbon (Tabler-style) */
+    .kpi-strip {
+      display: grid;
+      grid-template-columns: 130px 110px minmax(0,1.2fr) minmax(0,1.4fr) minmax(0,1fr);
+      gap: 4px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 4px;
+    }
+    .kpi {
+      padding: 6px 10px;
+      border-radius: 4px;
+      background: rgba(21,28,43,.55);
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .kpi-label {
+      font-size: 10px;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .kpi-value {
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 1.05;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+    .kpi-delta {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.3;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .kpi-chips-cell { align-self: stretch; }
+    .kpi-chips-cell .kpi-chips {
+      margin-top: 3px;
+      max-height: none;
+      overflow: visible;
+      gap: 3px;
+    }
+    .kpi-chips-cell .briefing-chip {
+      padding: 1px 6px;
+      font-size: 11px;
+    }
+    @media (max-width: 1280px) {
+      .kpi-strip { grid-template-columns: 1fr 1fr 1fr; }
+    }
+    @media (max-width: 760px) {
+      .kpi-strip { grid-template-columns: 1fr 1fr; }
+    }
+
+    /* Pattern B · Tighten 2-col command/workload + pills */
+    .briefing-command-pill-row {
+      gap: 4px;
+      margin-top: 6px;
+    }
+    .briefing-command-pill {
+      padding: 2px 7px;
+      gap: 4px;
+      font-size: 11.5px;
+      border-radius: 4px;
+    }
+    .briefing-shape-list {
+      gap: 4px;
+      margin-top: 6px;
+    }
+    .briefing-shape-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        "label value"
+        "track track";
+      column-gap: 8px;
+      row-gap: 2px;
+      align-items: center;
+      font-size: 11.5px;
+      padding: 2px 0;
+    }
+    .briefing-shape-row label {
+      grid-area: label;
+      margin: 0;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 11px;
+    }
+    .briefing-shape-row .briefing-shape-track {
+      grid-area: track;
+    }
+    .briefing-shape-row .briefing-shape-value {
+      grid-area: value;
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+    }
+    .briefing-shape-track { height: 6px; border-radius: 4px; }
+
+    /* Pattern D · Dense activity table */
+    .briefing-activity-row td { padding: 4px 8px !important; }
+    .briefing-activity-text { gap: 2px; }
+    .briefing-activity-text strong {
+      font-size: 12px;
+      line-height: 1.3;
+    }
+    .briefing-activity-text .briefing-activity-summary {
+      font-size: 11px;
+      -webkit-line-clamp: 1;
+      line-height: 1.3;
+    }
+    .briefing-activity-text .briefing-tag-list { margin-top: 1px; }
+    .briefing-when-cell { font-size: 11px; }
+    .briefing-when-cell > div:first-child { font-size: 11.5px; color: var(--text); }
+    .briefing-when-cell .briefing-when-stamp {
+      font-size: 10px;
+      margin-top: 0;
+      line-height: 1.25;
+    }
+    .briefing-activity-cell .row1 { font-size: 11.5px; }
+    .briefing-activity-cell .row2 { font-size: 10.5px; max-width: 120px; }
+    .briefing-event-icon { font-size: 13px; }
+    .briefing-status-dot { width: 7px; height: 7px; border-width: 1px; }
+    .briefing-icon-stack { gap: 2px; }
+
+    /* Pattern E · Timeline focus list (one row per item) */
+    .briefing-focus-list {
+      display: block;
+      gap: 0;
+      margin-top: 6px;
+    }
+    .briefing-focus-item {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      padding: 3px 0;
+      border: none;
+      border-bottom: 1px dotted var(--border);
+      border-radius: 0;
+      background: transparent;
+    }
+    .briefing-focus-item:last-child { border-bottom: none; }
+    .briefing-focus-item::before {
+      content: "";
+      flex: 0 0 auto;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      transform: translateY(-1px);
+    }
+    .briefing-focus-item strong {
+      font-size: 12px;
+      line-height: 1.3;
+      flex: 0 0 auto;
+      max-width: 38%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .briefing-focus-item span {
+      font-size: 11.5px;
+      color: var(--muted);
+      line-height: 1.3;
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .expand-btn { background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px; padding:0 4px; }
     .project-id-cell {
@@ -974,6 +1307,22 @@
       height: 13px;
       stroke: currentColor;
       fill: none;
+    }
+    .copy-id-btn.copy-id-btn-sm {
+      width: 18px;
+      height: 18px;
+      border-radius: 5px;
+    }
+    .copy-id-btn.copy-id-btn-sm svg {
+      width: 11px;
+      height: 11px;
+    }
+    .project-id-inline {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-family: monospace;
+      white-space: nowrap;
     }
 
     /* ── Index Tracker ── */
@@ -1363,7 +1712,7 @@
 <!-- APP -->
 <div id="app">
   <div class="topbar">
-    <a class="logo" onclick="goHome(event)" href="/admin/projects">
+    <a class="logo" onclick="goHome(event)" href="/admin/briefing">
       <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
         <!-- outer ring -->
         <circle cx="14" cy="14" r="13" stroke="#4ae387" stroke-width="1.5" opacity="0.35"/>
@@ -1390,6 +1739,7 @@
     <div style="flex:1"></div>
     <div class="topbar-nav">
       <button class="tab-btn" id="tab-briefing-btn" style="display:none" onclick="switchTab('briefing',this)">Dashboard</button>
+      <button class="tab-btn" id="tab-report-btn" style="display:none" onclick="switchTab('report',this)">Report</button>
       <button class="tab-btn active" id="tab-projects-btn" onclick="switchTab('projects',this)">Project</button>
       <button class="tab-btn" id="tab-users-btn" onclick="switchTab('users',this)">User</button>
       <button class="tab-btn" id="tab-audit-btn" onclick="switchTab('audit',this)">Audit</button>
@@ -1531,24 +1881,31 @@
           </div>
           <button type="button" class="briefing-collapse-btn" data-briefing-collapse="metrics" data-briefing-collapse-label="Metrics" aria-expanded="true" aria-controls="briefing-section-metrics-body" title="Collapse section">&#9660;</button>
         </div>
-        <div class="briefing-summary-grid" id="briefing-section-metrics-body" data-briefing-section-content>
-          <div class="briefing-card">
-            <span class="briefing-kicker">Recent Events</span>
-            <div class="briefing-metric" id="briefing-total-events">0</div>
-            <div class="briefing-subtle">Scope: <span id="briefing-selected-project">all projects</span></div>
-          </div>
-          <div class="briefing-card">
-            <span class="briefing-kicker">Projects Represented</span>
-            <div class="briefing-metric" id="briefing-project-total">0</div>
-            <div class="briefing-chip-list" id="briefing-project-counts"></div>
-          </div>
-          <div class="briefing-card">
-            <span class="briefing-kicker">Event Types</span>
-            <div class="briefing-chip-list" id="briefing-event-types"></div>
-          </div>
-          <div class="briefing-card">
-            <span class="briefing-kicker">Statuses</span>
-            <div class="briefing-chip-list" id="briefing-status-counts"></div>
+        <div id="briefing-section-metrics-body" data-briefing-section-content>
+          <!-- Pattern A · KPI ribbon -->
+          <div class="kpi-strip">
+            <div class="kpi">
+              <span class="kpi-label">Recent Events</span>
+              <span class="kpi-value" id="briefing-total-events">0</span>
+              <span class="kpi-delta">Scope: <span id="briefing-selected-project">all projects</span></span>
+            </div>
+            <div class="kpi">
+              <span class="kpi-label">Projects</span>
+              <span class="kpi-value" id="briefing-project-total">0</span>
+              <span class="kpi-delta">represented</span>
+            </div>
+            <div class="kpi kpi-chips-cell">
+              <span class="kpi-label">Top Projects</span>
+              <div class="briefing-chip-list kpi-chips" id="briefing-project-counts"></div>
+            </div>
+            <div class="kpi kpi-chips-cell">
+              <span class="kpi-label">Event Types</span>
+              <div class="briefing-chip-list kpi-chips" id="briefing-event-types"></div>
+            </div>
+            <div class="kpi kpi-chips-cell">
+              <span class="kpi-label">Statuses</span>
+              <div class="briefing-chip-list kpi-chips" id="briefing-status-counts"></div>
+            </div>
           </div>
         </div>
       </section>
@@ -1564,13 +1921,10 @@
         <div class="table-wrap" id="briefing-section-activity-log-body" data-briefing-section-content>
           <table>
             <thead><tr>
-              <th class="center-col-header">Project ID</th>
-              <th class="center-col-header">Project Name</th>
-              <th class="center-col-header">Event</th>
-              <th>Title</th>
-              <th class="center-col-header">Status</th>
-              <th class="center-col-header">Occurred</th>
-              <th>Summary</th>
+              <th class="center-col-header">Project</th>
+              <th class="center-col-header" title="Event type / status">Type</th>
+              <th>Activity</th>
+              <th class="center-col-header">When</th>
             </tr></thead>
             <tbody id="briefing-activities-body"></tbody>
           </table>
@@ -1580,7 +1934,7 @@
 
     <!-- GRAPH VIEWER -->
     <div class="pane" id="pane-viewer">
-      <iframe id="graph-viewer-frame" class="viewer-frame" title="CGA graph viewer" data-src="/viewer/?v=1.29.93"></iframe>
+      <iframe id="graph-viewer-frame" class="viewer-frame" title="CGA graph viewer" data-src="/viewer/?v=1.30.7"></iframe>
     </div>
 
     <!-- SETTINGS (admin only) -->
@@ -1592,6 +1946,7 @@
           <button class="subtab-btn"        data-subtab="indexing"     onclick="switchSettingsSubtab('indexing',this)">Indexing</button>
           <button class="subtab-btn"        data-subtab="integrations" onclick="switchSettingsSubtab('integrations',this)">Integrations</button>
           <button class="subtab-btn"        data-subtab="security"     onclick="switchSettingsSubtab('security',this)">Security</button>
+          <button class="subtab-btn"        data-subtab="backup"       onclick="switchSettingsSubtab('backup',this)">Backup</button>
         </nav>
         <div class="settings-body">
           <section class="settings-section active" id="settings-section-general">
@@ -1639,6 +1994,41 @@
             <div class="settings-card">
               <div class="settings-row"><label>Authentication</label><span class="settings-value">JWT (local auth DB)</span></div>
               <div class="settings-row"><label>Admin-only Pages</label><span class="settings-value">Dashboard, User, Audit, Graph, Settings</span></div>
+            </div>
+          </section>
+
+          <section class="settings-section" id="settings-section-backup">
+            <h2>Backup</h2>
+            <p class="settings-hint">Snapshot and restore the CGA auth PostgreSQL database (users, projects, audit logs) via <code>pg_dump</code> / <code>psql</code>. FalkorDB graph data is regenerated by re-indexing. Snapshots are stored under the host backup folder shown below and are shared with the scheduled backup sidecar.</p>
+
+            <div class="settings-card">
+              <div class="settings-row"><label>Database</label><span id="backup-db-path" class="settings-value mono">…</span></div>
+              <div class="settings-row"><label>Backup Folder</label><span id="backup-dir" class="settings-value mono">…</span></div>
+              <div class="settings-row"><label>Scheduler</label><span id="backup-scheduler" class="settings-value">…</span></div>
+              <div class="settings-row"><label>Last Run</label><span id="backup-last-run" class="settings-value">—</span></div>
+            </div>
+
+            <div class="settings-card" style="margin-top:12px">
+              <h3 style="margin:0 0 8px;font-size:14px;color:var(--text)">Automatic Backup</h3>
+              <div class="settings-row"><label>Enabled</label><span class="settings-value"><input type="checkbox" id="backup-cfg-enabled" /></span></div>
+              <div class="settings-row"><label>Interval (minutes)</label><span class="settings-value"><input type="number" id="backup-cfg-interval" min="1" style="width:90px" /></span></div>
+              <div class="settings-row"><label>Keep Last N</label><span class="settings-value"><input type="number" id="backup-cfg-keep" min="1" style="width:90px" /></span></div>
+              <div class="settings-actions">
+                <button class="btn btn-primary" onclick="saveBackupConfig()">Save Settings</button>
+              </div>
+            </div>
+
+            <div class="settings-card" style="margin-top:12px">
+              <h3 style="margin:0 0 8px;font-size:14px;color:var(--text)">Manual Backup</h3>
+              <div class="settings-actions">
+                <button class="btn btn-primary" id="backup-run-btn" onclick="runBackupNow()">Back Up Now</button>
+                <button class="btn btn-ghost" onclick="loadBackups()">Refresh</button>
+              </div>
+            </div>
+
+            <div class="settings-card" style="margin-top:12px">
+              <h3 style="margin:0 0 8px;font-size:14px;color:var(--text)">Snapshots</h3>
+              <div id="backup-snapshots" style="font-size:13px">Loading…</div>
             </div>
           </section>
         </div>
@@ -1794,6 +2184,7 @@ const ADMIN_TAB_ROUTES = Object.freeze({
   users: '/admin/users',
   audit: '/admin/audit',
   briefing: '/admin/briefing',
+  report: '/admin/report',
   viewer: '/admin/graph',
   settings: '/admin/settings',
 });
@@ -1805,6 +2196,7 @@ const ADMIN_PATH_TABS = Object.freeze({
   '/admin/user': 'users',
   '/admin/audit': 'audit',
   '/admin/briefing': 'briefing',
+  '/admin/report': 'report',
   '/admin/graph': 'viewer',
   '/admin/viewer': 'viewer',
   '/admin/settings': 'settings',
@@ -1816,7 +2208,10 @@ function normalizedAdminPath(pathname) {
 }
 
 function adminTabFromLocation() {
-  return ADMIN_PATH_TABS[normalizedAdminPath(window.location.pathname).toLowerCase()] || 'projects';
+  const mapped = ADMIN_PATH_TABS[normalizedAdminPath(window.location.pathname).toLowerCase()];
+  if (mapped) return mapped;
+  // Default landing tab: Dashboard for admins, Project for non-admins
+  return _me?.role === 'admin' ? 'briefing' : 'projects';
 }
 
 function adminRouteForTab(name) {
@@ -2085,6 +2480,19 @@ function copyProjectId(projectId) {
   copyText(projectId, 'Project ID');
 }
 
+function renderCopyIdButton(projectId, extraClass = '') {
+  const value = String(projectId ?? '');
+  if (!value) return '';
+  const cls = extraClass ? `copy-id-btn ${extraClass}` : 'copy-id-btn';
+  return `<button type="button" class="${cls}" onclick="copyProjectId(${jsArg(value)})" title="Copy project ID" aria-label="Copy project ID"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5" y="5" width="8" height="8" rx="1.5" stroke-width="1.5"></rect><path d="M3 10.5V3.5C3 3 3.5 2.5 4 2.5H10.5" stroke-width="1.5" stroke-linecap="round"></path></svg></button>`;
+}
+
+function renderProjectIdWithCopy(projectId, { placeholder = '—', extraClass = '' } = {}) {
+  const value = String(projectId ?? '').trim();
+  if (!value) return esc(placeholder);
+  return `<span class="project-id-inline">${esc(value)}${renderCopyIdButton(value, extraClass)}</span>`;
+}
+
 function loginWithGitHub() {
   window.location.href = '/api/auth/github/start';
 }
@@ -2145,6 +2553,7 @@ async function initApp() {
       if (cfg?.falkordb_url) _falkordbUrl = cfg.falkordb_url;
     } catch {}
     document.getElementById('tab-briefing-btn').style.display = '';
+    document.getElementById('tab-report-btn').style.display = '';
     document.getElementById('tab-viewer-btn').style.display = '';
     document.getElementById('tab-settings-btn').style.display = '';
   }
@@ -2187,7 +2596,8 @@ async function openFdbBrowser() {
 
 function goHome(event) {
   event?.preventDefault();
-  switchTab('projects');
+  const target = _me?.role === 'admin' ? 'briefing' : 'projects';
+  switchTab(target);
 }
 
 function loadGraphViewerFrame() {
@@ -2221,6 +2631,128 @@ function switchSettingsSubtab(name, btn) {
   if (section) section.classList.add('active');
   const activeBtn = btn || document.querySelector(`#settings-subnav .subtab-btn[data-subtab="${name}"]`);
   if (activeBtn) activeBtn.classList.add('active');
+  if (name === 'backup') loadBackups();
+}
+
+// ── Backup subtab ─────────────────────────────────────────────────────────
+function _fmtBytes(n) {
+  if (n == null) return '—';
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+  return (n / (1024 * 1024)).toFixed(2) + ' MB';
+}
+function _fmtIso(iso) {
+  if (!iso) return '—';
+  try { return new Date(iso).toLocaleString(); } catch { return iso; }
+}
+
+async function loadBackups() {
+  const listEl = document.getElementById('backup-snapshots');
+  if (!listEl) return;
+  listEl.textContent = 'Loading…';
+  try {
+    const data = await api('GET', '/admin/backups');
+    const s = data.status || {};
+    const cfg = s.config || {};
+    document.getElementById('backup-db-path').textContent  = s.db_path || '—';
+    document.getElementById('backup-dir').textContent      = s.backup_dir || '—';
+    document.getElementById('backup-scheduler').textContent =
+      `${s.scheduler_running ? 'running' : 'stopped'} · ${cfg.enabled ? 'auto on' : 'auto off'}`;
+    const lastBits = [];
+    if (s.last_run_at)     lastBits.push(_fmtIso(s.last_run_at));
+    if (s.last_run_status) lastBits.push(s.last_run_status);
+    if (s.last_run_error)  lastBits.push(s.last_run_error);
+    document.getElementById('backup-last-run').textContent = lastBits.length ? lastBits.join(' · ') : '—';
+
+    document.getElementById('backup-cfg-enabled').checked = !!cfg.enabled;
+    document.getElementById('backup-cfg-interval').value  = cfg.interval_minutes ?? 60;
+    document.getElementById('backup-cfg-keep').value      = cfg.keep_count ?? 24;
+
+    const rows = (data.snapshots || []).map(it => `
+      <tr>
+        <td style="padding:6px 8px;font-family:var(--mono);font-size:12px">${it.name}</td>
+        <td style="padding:6px 8px;color:var(--muted)">${_fmtIso(it.created_at)}</td>
+        <td style="padding:6px 8px;color:var(--muted)">${_fmtBytes(it.size_bytes)}</td>
+        <td style="padding:6px 8px;text-align:right;white-space:nowrap">
+          <button class="btn btn-sm btn-ghost"   onclick="downloadBackup('${it.name}')">Download</button>
+          <button class="btn btn-sm btn-accent"  onclick="restoreBackup('${it.name}')">Restore</button>
+          <button class="btn btn-sm btn-danger"  onclick="deleteBackup('${it.name}')">Delete</button>
+        </td>
+      </tr>`).join('');
+    listEl.innerHTML = rows
+      ? `<table style="width:100%;border-collapse:collapse">
+           <thead><tr style="text-align:left;color:var(--muted);font-weight:500;border-bottom:1px solid rgba(255,255,255,.08)">
+             <th style="padding:6px 8px">Snapshot</th>
+             <th style="padding:6px 8px">Created</th>
+             <th style="padding:6px 8px">Size</th>
+             <th style="padding:6px 8px"></th>
+           </tr></thead>
+           <tbody>${rows}</tbody>
+         </table>`
+      : '<div style="color:var(--muted)">No snapshots yet.</div>';
+  } catch (e) {
+    listEl.innerHTML = `<div style="color:var(--danger,#f66)">Failed to load: ${e.message}</div>`;
+  }
+}
+
+async function runBackupNow() {
+  const btn = document.getElementById('backup-run-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Backing up…'; }
+  try {
+    const res = await api('POST', '/admin/backups/run');
+    toast(`Snapshot created: ${res.snapshot?.name || 'ok'}`);
+    await loadBackups();
+  } catch (e) {
+    toast(e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Back Up Now'; }
+  }
+}
+
+async function saveBackupConfig() {
+  const body = {
+    enabled: document.getElementById('backup-cfg-enabled').checked,
+    interval_minutes: Number(document.getElementById('backup-cfg-interval').value) || 60,
+    keep_count: Number(document.getElementById('backup-cfg-keep').value) || 24,
+  };
+  try {
+    await api('PATCH', '/admin/backups/config', body);
+    toast('Backup settings saved');
+    await loadBackups();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function restoreBackup(name) {
+  if (!confirm(`Restore database from ${name}?\n\nThe current database will be replaced. A pre-restore safety snapshot is captured automatically. You should restart the CGA service after restore.`)) return;
+  try {
+    const res = await api('POST', '/admin/backups/restore', { name });
+    toast(`Restored from ${res.restored_from}. ${res.note || ''}`.trim());
+    await loadBackups();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function deleteBackup(name) {
+  if (!confirm(`Delete snapshot ${name}?`)) return;
+  try {
+    await api('DELETE', `/admin/backups/${encodeURIComponent(name)}`);
+    toast('Snapshot deleted');
+    await loadBackups();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+async function downloadBackup(name) {
+  try {
+    const resp = await fetch(`/api/admin/backups/download/${encodeURIComponent(name)}`, {
+      headers: _jwt ? { 'Authorization': 'Bearer ' + _jwt } : {},
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+  } catch (e) { toast('Download failed: ' + e.message, 'error'); }
 }
 
 function refreshGraphViewer() {
@@ -2297,6 +2829,7 @@ function switchTab(name, btn, options = {}) {
   if (nextName === 'viewer') loadGraphViewerFrame();
   if (nextName === 'users') loadUsers();
   if (nextName === 'briefing') loadWorkBriefing();
+  if (nextName === 'report') loadWorkReport();
   if (nextName === 'settings') loadSettings();
   if (nextName === 'audit') {
     loadAudit();
@@ -2318,6 +2851,7 @@ let _indexStatusPollInterval = null;
 let _expandedProjectIds = new Set();
 let _auditRowsCache = [];
 let _projectExternalIdByDbId = {};
+let _projectIdByName = {};
 let _auditPollInterval = null;
 let _auditLoading = false;
 
@@ -2387,30 +2921,53 @@ function renderAuditRows() {
     return;
   }
 
-  tbody.innerHTML = rows.map(r => `
+  tbody.innerHTML = rows.map(r => {
+    const sc = Number(r.status_code || 0);
+    const statusCls = sc === 0 ? 'pill-gray' : sc < 300 ? 'pill-green' : sc < 400 ? 'pill-blue' : sc < 500 ? 'pill-amber' : 'pill-red';
+    const method = String(r.method || '').toUpperCase();
+    const methodCls = `pill pill-method pill-method-${method.toLowerCase() || 'gray'}`;
+    return `
     <tr>
-      <td style="text-align:center;font-size:12px;font-family:monospace;color:var(--muted)">${esc(r.created_at || '')}</td>
-      <td style="text-align:center;font-size:12px;font-family:monospace">${esc(r.project_external_id_display || '—')}</td>
+      <td class="mono" style="text-align:center">${esc(r.created_at || '')}</td>
+      <td class="mono" style="text-align:center">${renderProjectIdWithCopy(r.project_external_id_display, { extraClass: 'copy-id-btn-sm' })}</td>
       <td style="text-align:center"><span class="role-tag${r.scope === 'mcp' ? ' developer' : ''}">${esc(r.scope || '')}</span></td>
-      <td style="text-align:center">${esc(r.method || '')}</td>
-      <td style="font-family:monospace;font-size:12px">${esc(r.path || '')}</td>
-      <td style="text-align:center"><span class="${(r.status_code || 500) < 400 ? 'badge-active' : 'badge-inactive'}">${esc(String(r.status_code || ''))}</span></td>
-      <td style="text-align:center;font-family:monospace;font-size:12px">${esc(String(r.duration_ms || 0))} ms</td>
-      <td style="text-align:center;font-size:12px">${esc(r.actor_display || 'anonymous')}</td>
-      <td style="text-align:center;font-size:12px;font-family:monospace">${r.token_count_display ? esc(r.token_count_display) : '—'}</td>
-      <td style="font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.details_display || '')}">${esc(r.details_display || '')}</td>
+      <td style="text-align:center">${method ? `<span class="${methodCls}">${esc(method)}</span>` : ''}</td>
+      <td class="mono" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.path || '')}">${esc(r.path || '')}</td>
+      <td style="text-align:center"><span class="pill ${statusCls}">${esc(String(r.status_code || ''))}</span></td>
+      <td class="mono" style="text-align:center">${esc(String(r.duration_ms || 0))} ms</td>
+      <td style="text-align:center">${esc(r.actor_display || 'anonymous')}</td>
+      <td class="mono" style="text-align:center">${r.token_count_display ? esc(r.token_count_display) : '—'}</td>
+      <td style="max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.details_display || '')}">${esc(r.details_display || '')}</td>
     </tr>
-  `).join('');
+  `;}).join('');
 }
 
 async function loadProjects() {
   _allProjects = await api('GET', '/auth/projects');
   _projectExternalIdByDbId = {};
   _allProjects.forEach(p => { _projectExternalIdByDbId[p.id] = p.project_id; });
+  // Build name -> id lookup for briefing input resolution
+  _projectIdByName = {};
+  _allProjects.forEach(p => {
+    if (p.project_id && p.project_name) _projectIdByName[p.project_name] = p.project_id;
+  });
   const briefingOptions = document.getElementById('briefing-project-options');
   if (briefingOptions) {
-    const projectIds = [...new Set(_allProjects.map(p => p.project_id).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
-    briefingOptions.innerHTML = projectIds.map(projectId => `<option value="${esc(projectId)}"></option>`).join('');
+    // Dedupe by project_id; show project name as the highlighted value, project_id as dim label.
+    const seen = new Map();
+    _allProjects.forEach(p => {
+      if (p.project_id && !seen.has(p.project_id)) seen.set(p.project_id, p.project_name || '');
+    });
+    const entries = [...seen.entries()].sort((a, b) => {
+      const an = (a[1] || a[0]).toLowerCase();
+      const bn = (b[1] || b[0]).toLowerCase();
+      return an.localeCompare(bn);
+    });
+    briefingOptions.innerHTML = entries.map(([pid, name]) => {
+      const display = name || pid;
+      const tail = name ? pid : '';
+      return `<option value="${esc(display)}" label="${esc(tail)}"></option>`;
+    }).join('');
   }
   // pre-load tokens for all projects (used by search)
   await Promise.all(_allProjects.map(async p => {
@@ -2492,6 +3049,48 @@ function relativeTimeLabel(value) {
   } catch {
     return 'unknown';
   }
+}
+
+const _pdtTimestampFormatter = (() => {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Los_Angeles',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+      timeZoneName: 'short',
+    });
+  } catch { return null; }
+})();
+
+function formatPdtTimestamp(value) {
+  if (!value) return '';
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    if (!_pdtTimestampFormatter) return '';
+    const parts = _pdtTimestampFormatter.formatToParts(date);
+    const get = type => parts.find(p => p.type === type)?.value || '';
+    const tz = (get('timeZoneName') || 'PT').replace(/^GMT.*/, 'PT');
+    return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}:${get('second')} ${tz}`;
+  } catch { return ''; }
+}
+
+function formatPdtTimestampParts(value) {
+  if (!value) return null;
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    if (!_pdtTimestampFormatter) return null;
+    const parts = _pdtTimestampFormatter.formatToParts(date);
+    const get = type => parts.find(p => p.type === type)?.value || '';
+    const tz = (get('timeZoneName') || 'PT').replace(/^GMT.*/, 'PT');
+    return {
+      date: `${get('year')}-${get('month')}-${get('day')}`,
+      time: `${get('hour')}:${get('minute')}:${get('second')}`,
+      tz,
+    };
+  } catch { return null; }
 }
 
 function formatStatusLabel(job) {
@@ -2958,7 +3557,7 @@ function renderUsers() {
       <td>${u.id}</td>
       <td>${esc(u.username)}</td>
       <td style="text-align:center"><span class="role-tag${u.role==='admin'?'':' developer'}">${u.role}</span></td>
-      <td style="text-align:center"><span class="${u.is_active?'badge-active':'badge-inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
+      <td style="text-align:center"><span class="pill ${u.is_active?'pill-green':'pill-red'}">${u.is_active?'Active':'Inactive'}</span></td>
       <td style="text-align:center;color:var(--muted);font-size:12px;font-family:monospace">${u.created_at}</td>
       <td style="text-align:center">${u.id!==_me?.id
         ? `${u.role!=='admin'
@@ -3049,8 +3648,41 @@ function renderBriefingTags(tags) {
   `;
 }
 
+const BRIEFING_EVENT_ICONS = {
+  milestone: '🎯',
+  risk: '⚠️',
+  status_update: '📌',
+  workflow_complete: '✅',
+  documentation: '📚',
+  documentation_update: '📝',
+  decision: '🧩',
+  bug: '🐛',
+  release: '🚀',
+  test: '🧪',
+  deployment: '📦',
+};
+
+function renderBriefingEventIcon(eventType) {
+  const key = String(eventType || '').toLowerCase();
+  const icon = BRIEFING_EVENT_ICONS[key] || '🔹';
+  const label = key || 'event';
+  return `<span class="briefing-event-icon" title="${esc(label)}" aria-label="${esc(label)}">${icon}</span>`;
+}
+
+function renderBriefingStatusDot(status) {
+  const key = String(status || '').toLowerCase();
+  let cls = '';
+  if (key === 'done' || key === 'completed' || key === 'closed') cls = 'is-done';
+  else if (key === 'in_progress' || key === 'in-progress' || key === 'active') cls = 'is-progress';
+  else if (key === 'open' || key === 'new' || key === 'pending') cls = 'is-open';
+  else if (key === 'blocked' || key === 'failed' || key === 'error') cls = 'is-blocked';
+  const label = key || 'no status';
+  return `<span class="briefing-status-dot ${cls}" title="${esc(label)}" aria-label="status ${esc(label)}"></span>`;
+}
+
 function getWorkBriefingTemplateProjectId(payload) {
-  const explicit = document.getElementById('briefing-project-id')?.value.trim();
+  const raw = document.getElementById('briefing-project-id')?.value.trim();
+  const explicit = raw ? (_projectIdByName[raw] || raw) : '';
   if (explicit) return explicit;
   if (payload?.project_id) return String(payload.project_id);
   const projectCounts = Object.entries(payload?.project_counts || {})
@@ -3222,7 +3854,7 @@ function renderWorkBriefing(summary = _workBriefingSummary) {
       <div class="briefing-collapsible-head">
         <div>
           <span class="briefing-kicker">Command Center</span>
-          <h3>${payload.project_id ? `Focus on ${esc(payload.project_id)}` : 'Cross-project work pulse'}</h3>
+          <h3>${payload.project_id ? `Focus on <span class="project-id-inline">${esc(payload.project_id)}${renderCopyIdButton(payload.project_id, 'copy-id-btn-sm')}</span>` : 'Cross-project work pulse'}</h3>
         </div>
         ${renderBriefingCollapseButton('command-center', 'Command Center')}
       </div>
@@ -3231,7 +3863,7 @@ function renderWorkBriefing(summary = _workBriefingSummary) {
           ? `Tracking ${esc(String(payload.total_events))} recent event${Number(payload.total_events) === 1 ? '' : 's'} across the current dashboard scope.`
           : 'No work events have been captured yet. Once MCP activity arrives, this panel will summarize what deserves attention first.'}</p>
         <div class="briefing-command-pill-row">
-          <span class="briefing-command-pill"><span>Scope</span><strong>${esc(payload.project_id || 'All projects')}</strong></span>
+          <span class="briefing-command-pill"><span>Scope</span><strong>${payload.project_id ? `<span class="project-id-inline">${esc(payload.project_id)}${renderCopyIdButton(payload.project_id, 'copy-id-btn-sm')}</span>` : 'All projects'}</strong></span>
           <span class="briefing-command-pill"><span>Projects</span><strong>${esc(String(Object.keys(projectCounts).length))}</strong></span>
           <span class="briefing-command-pill"><span>Latest</span><strong>${esc(activities[0]?.occurred_at ? relativeTimeLabel(activities[0].occurred_at) : 'none')}</strong></span>
         </div>
@@ -3240,7 +3872,7 @@ function renderWorkBriefing(summary = _workBriefingSummary) {
             ? topActivities.map(activity => `
               <article class="briefing-focus-item">
                 <strong>${esc(activity.title || activity.event_type || 'Activity')}</strong>
-                <span>${esc(activity.project_id || 'unknown project')} · ${esc(activity.summary || activity.body_text || 'No summary provided')}</span>
+                <span>${activity.project_id ? `<span class="project-id-inline">${esc(activity.project_id)}${renderCopyIdButton(activity.project_id, 'copy-id-btn-sm')}</span>` : 'unknown project'} · ${esc(activity.summary || activity.body_text || 'No summary provided')}</span>
               </article>
             `).join('')
             : `<div class="briefing-empty">Recent focus items will appear here after activity is recorded.</div>`}
@@ -3262,7 +3894,7 @@ function renderWorkBriefing(summary = _workBriefingSummary) {
       </div>
       <div id="${esc(briefingSectionBodyId('workload-shape'))}" data-briefing-section-content>
         <p>${topProjects.length
-          ? `${esc(topProjects[0][0])} currently leads this snapshot with ${esc(String(topProjects[0][1]))} event${Number(topProjects[0][1]) === 1 ? '' : 's'}.`
+          ? `<span class="project-id-inline">${esc(topProjects[0][0])}${renderCopyIdButton(topProjects[0][0], 'copy-id-btn-sm')}</span> currently leads this snapshot with ${esc(String(topProjects[0][1]))} event${Number(topProjects[0][1]) === 1 ? '' : 's'}.`
           : 'Project and event concentration will render here once the dashboard has data.'}</p>
         <div class="briefing-shape-list">
           ${eventEntries.length
@@ -3285,7 +3917,9 @@ function renderWorkBriefing(summary = _workBriefingSummary) {
   renderWorkBriefingRequestTemplates(payload);
 
   document.getElementById('briefing-total-events').textContent = String(payload.total_events || 0);
-  document.getElementById('briefing-selected-project').textContent = payload.project_id || 'all projects';
+  document.getElementById('briefing-selected-project').innerHTML = payload.project_id
+    ? renderProjectIdWithCopy(payload.project_id, { extraClass: 'copy-id-btn-sm' })
+    : 'all projects';
   document.getElementById('briefing-project-total').textContent = String(Object.keys(projectCounts).length);
   document.getElementById('briefing-project-counts').innerHTML = renderBriefingChips(projectCounts, 'No project activity yet');
   document.getElementById('briefing-event-types').innerHTML = renderBriefingChips(payload.event_type_counts || {}, 'No event types recorded');
@@ -3297,37 +3931,46 @@ function renderWorkBriefing(summary = _workBriefingSummary) {
 
   const tbody = document.getElementById('briefing-activities-body');
   if (!activities.length) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">No work activity found for the current scope</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">No work activity found for the current scope</div></td></tr>`;
     return;
   }
 
   tbody.innerHTML = activities.map(activity => {
-    const projectLabel = activity.project_id || '—';
-    const workspaceLabel = activity.workspace_name || '—';
-    const statusMarkup = activity.status
-      ? `<span class="role-tag${activity.status === 'done' ? '' : ' developer'}">${esc(activity.status)}</span>`
-      : '<span style="color:var(--muted)">—</span>';
-    const summaryText = activity.summary || activity.body_text || '—';
+    const workspaceLabel = activity.workspace_name || '';
+    const summaryText = activity.summary || activity.body_text || '';
     const occurredAt = activity.occurred_at || '';
+    const projectCell = activity.project_id
+      ? `<div class="briefing-activity-cell">
+           <div class="row1">${renderProjectIdWithCopy(activity.project_id, { extraClass: 'copy-id-btn-sm' })}</div>
+           ${workspaceLabel ? `<div class="row2" title="${esc(workspaceLabel)}">${esc(workspaceLabel)}</div>` : ''}
+         </div>`
+      : '—';
     return `
-      <tr>
-        <td style="text-align:center;font-family:monospace;font-size:12px">${esc(projectLabel)}</td>
-        <td style="text-align:center;font-size:12px">${esc(workspaceLabel)}</td>
-        <td style="text-align:center">${esc(activity.event_type || '—')}</td>
+      <tr class="briefing-activity-row">
+        <td style="text-align:center">${projectCell}</td>
+        <td style="text-align:center">
+          <div class="briefing-icon-stack">
+            ${renderBriefingEventIcon(activity.event_type)}
+            ${renderBriefingStatusDot(activity.status)}
+          </div>
+        </td>
         <td>
-          <div class="briefing-title-cell">
-            <strong>${esc(activity.title || 'Untitled activity')}</strong>
+          <div class="briefing-activity-text">
+            <strong title="${esc(activity.title || '')}">${esc(activity.title || 'Untitled activity')}</strong>
+            ${summaryText ? `<div class="briefing-activity-summary" title="${esc(summaryText)}">${esc(summaryText)}</div>` : ''}
             ${renderBriefingTags(activity.tags)}
           </div>
         </td>
-        <td style="text-align:center">${statusMarkup}</td>
-        <td>
-          <div class="briefing-time" title="${esc(occurredAt)}">
-            <span>${esc(relativeTimeLabel(occurredAt))}</span>
-            <span>${esc(occurredAt || '—')}</span>
-          </div>
+        <td class="briefing-when-cell" title="${esc(occurredAt)}">
+          <div>${esc(relativeTimeLabel(occurredAt))}</div>
+          ${(() => {
+            const pdt = formatPdtTimestampParts(occurredAt);
+            if (!pdt) return '';
+            return `<div class="briefing-when-stamp">${esc(pdt.date)}</div>
+            <div class="briefing-when-stamp">${esc(pdt.time)}</div>
+            <div class="briefing-when-stamp">${esc(pdt.tz)}</div>`;
+          })()}
         </td>
-        <td style="font-size:12px;line-height:1.5">${esc(summaryText)}</td>
       </tr>
     `;
   }).join('');
@@ -3338,11 +3981,13 @@ async function loadWorkBriefing() {
   _workBriefingLoading = true;
   const tbody = document.getElementById('briefing-activities-body');
   if (tbody) {
-    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state">Loading dashboard…</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">Loading dashboard…</div></td></tr>`;
   }
 
   try {
-    const projectId = document.getElementById('briefing-project-id')?.value.trim() || '';
+    const rawProjectInput = document.getElementById('briefing-project-id')?.value.trim() || '';
+    // Input value may be a project name (highlighted in datalist) — resolve to project_id.
+    const projectId = _projectIdByName[rawProjectInput] || rawProjectInput;
     const limit = Math.max(1, Math.min(Number(document.getElementById('briefing-limit')?.value || 25), 100));
     const params = new URLSearchParams({ limit: String(limit) });
     if (projectId) params.set('project_id', projectId);

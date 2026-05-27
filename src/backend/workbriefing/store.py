@@ -2,14 +2,18 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Protocol
+from datetime import datetime, timezone
+from typing import Any, Protocol
 
-import aiosqlite
+import asyncpg
 
-from backend.auth import database as auth_database
-from backend.workbriefing.models import WorkActivity, parse_utc_datetime
+from backend.workbriefing.models import WorkActivity
+
+
+DEFAULT_DSN_ENV = "WORKBRIEFING_POSTGRES_DSN"
+DEFAULT_DSN = "postgresql://app:app@localhost:15432/appdb"
 
 
 @dataclass(frozen=True)
@@ -26,195 +30,297 @@ class ActivityStore(Protocol):
         ...
 
 
-class SqliteActivityStore:
-    def __init__(self, db_path: str | None = None) -> None:
-        self._db_path = db_path or auth_database.DB_PATH
+def resolve_dsn(dsn: str | None = None) -> str:
+    if dsn:
+        return dsn
+    env_dsn = os.getenv(DEFAULT_DSN_ENV)
+    if env_dsn:
+        return env_dsn
+    return DEFAULT_DSN
+
+
+class PgVectorActivityStore:
+    """Postgres + pgvector backed store for WorkBriefing activities."""
+
+    def __init__(
+        self,
+        dsn: str | None = None,
+        *,
+        schema: str = "public",
+        min_pool_size: int = 1,
+        max_pool_size: int = 5,
+    ) -> None:
+        self._dsn = resolve_dsn(dsn)
+        if not schema.replace("_", "").isalnum():
+            raise ValueError("schema must be alphanumeric/underscore only")
+        self._schema = schema
+        self._min_pool_size = min_pool_size
+        self._max_pool_size = max_pool_size
+        self._pool: asyncpg.Pool | None = None
+        self._pool_lock = asyncio.Lock()
         self._schema_ready = False
         self._schema_lock = asyncio.Lock()
 
-    async def _ensure_schema(self) -> None:
+    @property
+    def schema(self) -> str:
+        return self._schema
+
+    @property
+    def dsn(self) -> str:
+        return self._dsn
+
+    async def _get_pool(self) -> asyncpg.Pool:
+        if self._pool is not None:
+            return self._pool
+        async with self._pool_lock:
+            if self._pool is None:
+                self._pool = await asyncpg.create_pool(
+                    dsn=self._dsn,
+                    min_size=self._min_pool_size,
+                    max_size=self._max_pool_size,
+                )
+        return self._pool
+
+    async def close(self) -> None:
+        if self._pool is not None:
+            await self._pool.close()
+            self._pool = None
+            self._schema_ready = False
+
+    async def ensure_schema(self) -> None:
         if self._schema_ready:
             return
         async with self._schema_lock:
             if self._schema_ready:
                 return
-            await auth_database.init_db(self._db_path)
+            pool = await self._get_pool()
+            async with pool.acquire() as conn:
+                await conn.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+                await conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{self._schema}";')
+                await conn.execute(self._create_table_sql())
+                await conn.execute(self._create_unique_index_sql())
+                await conn.execute(self._create_project_time_index_sql())
+                await conn.execute(self._create_time_index_sql())
             self._schema_ready = True
 
-    async def upsert(self, activity: WorkActivity) -> ActivityUpsertResult:
-        await self._ensure_schema()
-        Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
-        key = self._key_for(activity)
+    def _qualified(self, name: str) -> str:
+        return f'"{self._schema}"."{name}"'
 
-        async with aiosqlite.connect(self._db_path) as db:
-            db.row_factory = aiosqlite.Row
-            async with db.execute(
-                """
-                SELECT activity_id
-                FROM work_activities
-                WHERE plugin_id = ? AND project_id = ? AND source_type = ? AND source_item_id = ?
-                """,
-                key,
-            ) as cursor:
-                existing = await cursor.fetchone()
-
-            persisted_activity = activity
-            operation = "created"
-            if existing:
-                operation = "updated"
-                persisted_activity = WorkActivity(
-                    activity_id=str(existing["activity_id"]),
-                    plugin_id=activity.plugin_id,
-                    source_system=activity.source_system,
-                    source_type=activity.source_type,
-                    source_item_id=activity.source_item_id,
-                    project_id=activity.project_id,
-                    workspace_name=activity.workspace_name,
-                    event_type=activity.event_type,
-                    title=activity.title,
-                    summary=activity.summary,
-                    body_text=activity.body_text,
-                    status=activity.status,
-                    priority=activity.priority,
-                    owner=activity.owner,
-                    source_url=activity.source_url,
-                    tags=activity.tags,
-                    occurred_at=activity.occurred_at,
-                    synced_at=activity.synced_at,
-                    content_hash=activity.content_hash,
-                    raw_metadata=activity.raw_metadata,
-                    embedding_text=activity.embedding_text,
-                )
-
-            await db.execute(
-                """
-                INSERT INTO work_activities (
-                    activity_id,
-                    plugin_id,
-                    source_system,
-                    source_type,
-                    source_item_id,
-                    project_id,
-                    workspace_name,
-                    event_type,
-                    title,
-                    summary,
-                    body_text,
-                    status,
-                    priority,
-                    owner,
-                    source_url,
-                    tags_json,
-                    occurred_at,
-                    synced_at,
-                    content_hash,
-                    raw_metadata_json,
-                    embedding_text
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(plugin_id, project_id, source_type, source_item_id)
-                DO UPDATE SET
-                    source_system = excluded.source_system,
-                    workspace_name = excluded.workspace_name,
-                    event_type = excluded.event_type,
-                    title = excluded.title,
-                    summary = excluded.summary,
-                    body_text = excluded.body_text,
-                    status = excluded.status,
-                    priority = excluded.priority,
-                    owner = excluded.owner,
-                    source_url = excluded.source_url,
-                    tags_json = excluded.tags_json,
-                    occurred_at = excluded.occurred_at,
-                    synced_at = excluded.synced_at,
-                    content_hash = excluded.content_hash,
-                    raw_metadata_json = excluded.raw_metadata_json,
-                    embedding_text = excluded.embedding_text
-                """,
-                self._row_for(persisted_activity),
-            )
-            await db.commit()
-
-        return ActivityUpsertResult(operation=operation, activity=persisted_activity)
-
-    async def list_recent(self, project_id: str | None = None, limit: int = 25) -> list[WorkActivity]:
-        await self._ensure_schema()
-        Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
-        safe_limit = max(1, min(limit, 100))
-        query = """
-            SELECT
-                activity_id,
-                plugin_id,
-                source_system,
-                source_type,
-                source_item_id,
-                project_id,
-                workspace_name,
-                event_type,
-                title,
-                summary,
-                body_text,
-                status,
-                priority,
-                owner,
-                source_url,
-                tags_json,
-                occurred_at,
-                synced_at,
-                content_hash,
-                raw_metadata_json,
-                embedding_text
-            FROM work_activities
+    def _create_table_sql(self) -> str:
+        return f"""
+        CREATE TABLE IF NOT EXISTS {self._qualified("work_activities")} (
+            activity_id       text PRIMARY KEY,
+            plugin_id         text NOT NULL,
+            source_system     text NOT NULL,
+            source_type       text NOT NULL,
+            source_item_id    text NOT NULL,
+            project_id        text NOT NULL,
+            workspace_name    text,
+            event_type        text NOT NULL,
+            title             text NOT NULL,
+            summary           text NOT NULL DEFAULT '',
+            body_text         text NOT NULL DEFAULT '',
+            status            text,
+            priority          text,
+            owner             text,
+            source_url        text,
+            tags              text[] NOT NULL DEFAULT ARRAY[]::text[],
+            occurred_at       timestamptz NOT NULL,
+            synced_at         timestamptz NOT NULL,
+            content_hash      text NOT NULL,
+            raw_metadata      jsonb NOT NULL DEFAULT '{{}}'::jsonb,
+            embedding_text    text NOT NULL DEFAULT '',
+            embedding         vector
+        );
         """
-        params: list[object] = []
-        if project_id:
-            query += " WHERE project_id = ?"
-            params.append(project_id)
-        query += " ORDER BY occurred_at DESC, synced_at DESC, source_item_id DESC LIMIT ?"
-        params.append(safe_limit)
 
-        async with aiosqlite.connect(self._db_path) as db:
-            db.row_factory = aiosqlite.Row
-            async with db.execute(query, params) as cursor:
-                rows = await cursor.fetchall()
+    def _create_unique_index_sql(self) -> str:
+        idx_name = f"idx_{self._schema}_work_activities_identity"
+        return (
+            f'CREATE UNIQUE INDEX IF NOT EXISTS "{idx_name}" '
+            f'ON {self._qualified("work_activities")}'
+            "(plugin_id, project_id, source_type, source_item_id);"
+        )
+
+    def _create_project_time_index_sql(self) -> str:
+        idx_name = f"idx_{self._schema}_work_activities_project_time"
+        return (
+            f'CREATE INDEX IF NOT EXISTS "{idx_name}" '
+            f'ON {self._qualified("work_activities")}'
+            "(project_id, occurred_at DESC, synced_at DESC);"
+        )
+
+    def _create_time_index_sql(self) -> str:
+        idx_name = f"idx_{self._schema}_work_activities_time"
+        return (
+            f'CREATE INDEX IF NOT EXISTS "{idx_name}" '
+            f'ON {self._qualified("work_activities")}'
+            "(occurred_at DESC, synced_at DESC);"
+        )
+
+    async def upsert(self, activity: WorkActivity) -> ActivityUpsertResult:
+        await self.ensure_schema()
+        pool = await self._get_pool()
+        sql = f"""
+        INSERT INTO {self._qualified("work_activities")} (
+            activity_id,
+            plugin_id,
+            source_system,
+            source_type,
+            source_item_id,
+            project_id,
+            workspace_name,
+            event_type,
+            title,
+            summary,
+            body_text,
+            status,
+            priority,
+            owner,
+            source_url,
+            tags,
+            occurred_at,
+            synced_at,
+            content_hash,
+            raw_metadata,
+            embedding_text
+        ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+            $11, $12, $13, $14, $15, $16, $17, $18, $19, $20::jsonb, $21
+        )
+        ON CONFLICT (plugin_id, project_id, source_type, source_item_id)
+        DO UPDATE SET
+            source_system  = EXCLUDED.source_system,
+            workspace_name = EXCLUDED.workspace_name,
+            event_type     = EXCLUDED.event_type,
+            title          = EXCLUDED.title,
+            summary        = EXCLUDED.summary,
+            body_text      = EXCLUDED.body_text,
+            status         = EXCLUDED.status,
+            priority       = EXCLUDED.priority,
+            owner          = EXCLUDED.owner,
+            source_url     = EXCLUDED.source_url,
+            tags           = EXCLUDED.tags,
+            occurred_at    = EXCLUDED.occurred_at,
+            synced_at      = EXCLUDED.synced_at,
+            content_hash   = EXCLUDED.content_hash,
+            raw_metadata   = EXCLUDED.raw_metadata,
+            embedding_text = EXCLUDED.embedding_text
+        RETURNING activity_id, (xmax = 0) AS inserted;
+        """
+
+        async with pool.acquire() as conn:
+            row = await conn.fetchrow(
+                sql,
+                activity.activity_id,
+                activity.plugin_id,
+                activity.source_system,
+                activity.source_type,
+                activity.source_item_id,
+                activity.project_id,
+                activity.workspace_name,
+                activity.event_type,
+                activity.title,
+                activity.summary,
+                activity.body_text,
+                activity.status,
+                activity.priority,
+                activity.owner,
+                activity.source_url,
+                list(activity.tags),
+                activity.occurred_at,
+                activity.synced_at,
+                activity.content_hash,
+                json.dumps(activity.raw_metadata, sort_keys=True, ensure_ascii=True),
+                activity.embedding_text,
+            )
+
+        operation = "created" if row["inserted"] else "updated"
+        persisted_id = str(row["activity_id"])
+        if persisted_id != activity.activity_id:
+            persisted = WorkActivity(
+                activity_id=persisted_id,
+                plugin_id=activity.plugin_id,
+                source_system=activity.source_system,
+                source_type=activity.source_type,
+                source_item_id=activity.source_item_id,
+                project_id=activity.project_id,
+                workspace_name=activity.workspace_name,
+                event_type=activity.event_type,
+                title=activity.title,
+                summary=activity.summary,
+                body_text=activity.body_text,
+                status=activity.status,
+                priority=activity.priority,
+                owner=activity.owner,
+                source_url=activity.source_url,
+                tags=activity.tags,
+                occurred_at=activity.occurred_at,
+                synced_at=activity.synced_at,
+                content_hash=activity.content_hash,
+                raw_metadata=activity.raw_metadata,
+                embedding_text=activity.embedding_text,
+            )
+        else:
+            persisted = activity
+        return ActivityUpsertResult(operation=operation, activity=persisted)
+
+    async def list_recent(
+        self,
+        project_id: str | None = None,
+        limit: int = 25,
+    ) -> list[WorkActivity]:
+        await self.ensure_schema()
+        pool = await self._get_pool()
+        safe_limit = max(1, min(limit, 100))
+
+        base_sql = f"""
+        SELECT
+            activity_id,
+            plugin_id,
+            source_system,
+            source_type,
+            source_item_id,
+            project_id,
+            workspace_name,
+            event_type,
+            title,
+            summary,
+            body_text,
+            status,
+            priority,
+            owner,
+            source_url,
+            tags,
+            occurred_at,
+            synced_at,
+            content_hash,
+            raw_metadata,
+            embedding_text
+        FROM {self._qualified("work_activities")}
+        """
+
+        if project_id:
+            sql = base_sql + " WHERE project_id = $1 ORDER BY occurred_at DESC, synced_at DESC, source_item_id DESC LIMIT $2"
+            params: tuple[Any, ...] = (project_id, safe_limit)
+        else:
+            sql = base_sql + " ORDER BY occurred_at DESC, synced_at DESC, source_item_id DESC LIMIT $1"
+            params = (safe_limit,)
+
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(sql, *params)
+
         return [self._activity_from_row(row) for row in rows]
 
     @staticmethod
-    def _key_for(activity: WorkActivity) -> tuple[str, str, str, str]:
-        return (
-            activity.plugin_id,
-            activity.project_id,
-            activity.source_type,
-            activity.source_item_id,
-        )
-
-    @staticmethod
-    def _row_for(activity: WorkActivity) -> tuple[object, ...]:
-        return (
-            activity.activity_id,
-            activity.plugin_id,
-            activity.source_system,
-            activity.source_type,
-            activity.source_item_id,
-            activity.project_id,
-            activity.workspace_name,
-            activity.event_type,
-            activity.title,
-            activity.summary,
-            activity.body_text,
-            activity.status,
-            activity.priority,
-            activity.owner,
-            activity.source_url,
-            json.dumps(list(activity.tags), ensure_ascii=True),
-            activity.occurred_at.isoformat(),
-            activity.synced_at.isoformat(),
-            activity.content_hash,
-            json.dumps(activity.raw_metadata, sort_keys=True, ensure_ascii=True),
-            activity.embedding_text,
-        )
-
-    @staticmethod
-    def _activity_from_row(row: aiosqlite.Row) -> WorkActivity:
+    def _activity_from_row(row: asyncpg.Record) -> WorkActivity:
+        raw_metadata = row["raw_metadata"]
+        if isinstance(raw_metadata, str):
+            raw_metadata = json.loads(raw_metadata or "{}")
+        elif raw_metadata is None:
+            raw_metadata = {}
+        occurred_at = _ensure_utc(row["occurred_at"])
+        synced_at = _ensure_utc(row["synced_at"])
         return WorkActivity(
             activity_id=str(row["activity_id"]),
             plugin_id=str(row["plugin_id"]),
@@ -231,10 +337,16 @@ class SqliteActivityStore:
             priority=row["priority"],
             owner=row["owner"],
             source_url=row["source_url"],
-            tags=tuple(json.loads(row["tags_json"] or "[]")),
-            occurred_at=parse_utc_datetime(row["occurred_at"], "occurred_at"),
-            synced_at=parse_utc_datetime(row["synced_at"], "synced_at"),
+            tags=tuple(row["tags"] or ()),
+            occurred_at=occurred_at,
+            synced_at=synced_at,
             content_hash=str(row["content_hash"]),
-            raw_metadata=json.loads(row["raw_metadata_json"] or "{}"),
+            raw_metadata=raw_metadata,
             embedding_text=str(row["embedding_text"] or ""),
         )
+
+
+def _ensure_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)

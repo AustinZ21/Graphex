@@ -12,13 +12,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode
 
-import aiosqlite
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from backend.auth.database import get_db
 from backend.auth.dependencies import get_current_user, require_admin, get_consumer, get_registry
+from backend.auth import pgshim as aiosqlite  # type: ignore  # asyncpg shim providing aiosqlite-compatible API
 from backend.auth.models import (
     AuditLogOut,
     AdminUserUpdate,

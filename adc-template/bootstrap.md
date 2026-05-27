@@ -17,6 +17,8 @@ Before starting the application, register with the ContextGraph ecosystem:
 
 # 2. Configure ContextGraph environment variables
 echo "CONTEXTGRAPH_MCP_SERVER_URL=http://localhost:18001/mcp/sse" >> .env
+echo "CONTEXTGRAPH_BRIEFING_API_URL=http://localhost:18001/api/project/work-briefing/activity" >> .env
+echo "CONTEXTGRAPH_INDEXING_POLICY=auto-incremental" >> .env
 echo "CONTEXTGRAPH_EDGE_AGENT_TOKEN=<token-from-cga-admin>" >> .env
 echo "CONTEXTGRAPH_PROJECT_ID=<project-id-from-cga-admin>" >> .env
 ```
@@ -31,9 +33,10 @@ Required one-time bootstrap indexing flow
 	- repo_path: repository root
 	- changed_files: all tracked source and documentation files
 3) Treat indexing as successful only after the ContextGraph service returns a successful completion status.
+4) Configure periodic work briefing reports for service starts, feature milestones, validation runs, and releases.
 ```
 
-For all later changes, run incremental indexing on changed files only.
+For all later changes, run `index_repo_changes(repo_path)` through `cga-mcp-server` so modified source, documentation, configuration, and test content is indexed automatically.
 
 ## Auto-Enable CGA MCP Server Profile (ADC Standard)
 
@@ -49,6 +52,7 @@ Quick enable checklist for downstream projects
 	- CONTEXTGRAPH_PROJECT_ID
 4) Import the MCP file in your AI client so the server profile is loaded automatically.
 5) Run one full-project index once, then switch to incremental indexing on changed files.
+6) Confirm project progress reporting can reach `CONTEXTGRAPH_BRIEFING_API_URL` without logging raw tokens.
 ```
 
 ## Local Development Setup
@@ -80,13 +84,13 @@ npm run dev
 Once running, verify local ContextGraph services are reachable:
 
 ```bash
-# Check local MCP server health (src/contextgraph-mcp)
+# Check optional repository-local MCP bridge health (only if this repo ships one)
 curl http://localhost:3001/mcp/health
 
 # Check local edge agent health (src/contextgraph-edge-agent)
 curl http://localhost:3002/edges/health
 
-# Verify upstream ContextGraph connectivity
+# Verify ContextGraph local dev API connectivity
 curl http://localhost:18001/health
 ```
 

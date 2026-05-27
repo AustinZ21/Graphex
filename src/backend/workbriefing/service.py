@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from backend.workbriefing.models import WorkActivity, parse_utc_datetime
-from backend.workbriefing.store import ActivityUpsertResult, SqliteActivityStore
+from backend.workbriefing.store import ActivityStore, ActivityUpsertResult, PgVectorActivityStore
 
 
 PLUGIN_ID = "workassist.mcp.activity"
@@ -20,8 +20,8 @@ class WorkActivityValidationError(ValueError):
 
 
 class WorkBriefingService:
-    def __init__(self, store: SqliteActivityStore | None = None) -> None:
-        self._store = store or SqliteActivityStore()
+    def __init__(self, store: ActivityStore | None = None) -> None:
+        self._store: ActivityStore = store or PgVectorActivityStore()
 
     async def record_activity(self, payload: dict[str, Any]) -> ActivityUpsertResult:
         project_id = self._required_string(payload, "project_id")
