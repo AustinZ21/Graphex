@@ -55,7 +55,7 @@ from backend.workbriefing.store import PgVectorActivityStore, resolve_dsn
 
 log = structlog.get_logger()
 
-APP_VERSION = "1.30.7"
+APP_VERSION = "1.30.8"
 
 FALKORDB_HOST = os.getenv("FALKORDB_HOST", "localhost")
 FALKORDB_PORT = int(os.getenv("FALKORDB_PORT", "6379"))
@@ -196,7 +196,7 @@ async def lifespan(app: FastAPI):
     log.info("cga.stopped")
 
 
-app = FastAPI(title="CGA (ContextGraphAdmin)", version="1.30.7", lifespan=lifespan)
+app = FastAPI(title="CGA (ContextGraphAdmin)", version="1.30.8", lifespan=lifespan)
 
 # ── Auth middleware (validates Bearer token on /mcp routes) ────────────────
 app.add_middleware(ProjectTokenMiddleware)

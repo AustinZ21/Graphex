@@ -1,9 +1,9 @@
 # CGA (ContextGraphAdmin)
 
-**Version:** 1.30.7
+**Version:** 1.30.8
 **Status:** Published
 **Author:** Nate Scott
-**Date:** 2026-05-26 (Backup: unified UI + sidecar mount, dropped SQLite cruft, pg_dump in API image)
+**Date:** 2026-05-26 (SQLite residue swept: pre-migration auth.db, one-shot migrator, AUTH_DB_PATH env)
 
 CGA, aka ContextGraphAdmin, is a local-first graph context service for AI-assisted development. It indexes repository structure, symbols, calls, imports, and lightweight data flow into FalkorDB, then exposes retrieval and analysis tools through an MCP-compatible API.
 

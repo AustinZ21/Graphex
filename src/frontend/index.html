@@ -1932,9 +1932,59 @@
       </section>
     </div>
 
+    <!-- REPORT (admin only) -->
+    <div class="pane" id="pane-report">
+      <div class="section-header">
+        <h2>Weekly Status Report</h2>
+        <div class="briefing-toolbar">
+          <select id="wsr-range" onchange="generateWorkReport()">
+            <option value="7" selected>Last 7 days</option>
+            <option value="14">Last 14 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+          <select id="wsr-auto" onchange="updateWsrAutoSchedule()" title="Periodic auto-regeneration">
+            <option value="0">Auto: off</option>
+            <option value="3600000">Auto: hourly</option>
+            <option value="21600000">Auto: every 6h</option>
+            <option value="86400000" selected>Auto: daily</option>
+            <option value="604800000">Auto: weekly</option>
+          </select>
+          <button class="btn btn-sm" onclick="generateWorkReport()">Generate</button>
+          <button class="btn btn-sm" onclick="copyWorkReport()">Copy Markdown</button>
+          <button class="btn btn-accent btn-sm" onclick="openWsrLoopPage()">Open Loop Page</button>
+        </div>
+      </div>
+
+      <section class="briefing-command-card briefing-command-card-full">
+        <h3>About this report</h3>
+        <p style="color:var(--muted);font-size:13px;line-height:1.5">
+          Weekly Status Report (WSR) is generated from the Work Dashboard activity feed for the
+          selected window. Use <strong>Copy Markdown</strong> and paste into the linked Microsoft Loop
+          page. Direct publish to Loop requires Microsoft Graph integration and is not yet wired up;
+          auto-regeneration runs locally while this tab is open.
+        </p>
+        <p style="margin-top:6px;font-size:12px;color:var(--muted)">
+          <span id="wsr-status">Idle.</span>
+          <span style="margin-left:10px">Last generated: <span id="wsr-generated-at">—</span></span>
+        </p>
+      </section>
+
+      <section class="briefing-section">
+        <div class="briefing-section-head">
+          <div>
+            <span class="briefing-kicker">WSR</span>
+            <h3 id="wsr-title">Weekly Status Report</h3>
+          </div>
+        </div>
+        <div style="padding:0 4px">
+          <pre id="wsr-preview" style="white-space:pre-wrap;background:#04060a;border:1px solid var(--border);border-radius:8px;padding:14px;font-family:Consolas,Menlo,monospace;font-size:12.5px;line-height:1.55;max-height:60vh;overflow:auto;color:var(--text)">Click Generate to build the report.</pre>
+        </div>
+      </section>
+    </div>
+
     <!-- GRAPH VIEWER -->
     <div class="pane" id="pane-viewer">
-      <iframe id="graph-viewer-frame" class="viewer-frame" title="CGA graph viewer" data-src="/viewer/?v=1.30.7"></iframe>
+      <iframe id="graph-viewer-frame" class="viewer-frame" title="CGA graph viewer" data-src="/viewer/?v=1.30.8"></iframe>
     </div>
 
     <!-- SETTINGS (admin only) -->
@@ -3977,7 +4027,6 @@ function renderWorkBriefing(summary = _workBriefingSummary) {
 }
 
 async function loadWorkBriefing() {
-  if (_workBriefingLoading) return;
   _workBriefingLoading = true;
   const tbody = document.getElementById('briefing-activities-body');
   if (tbody) {
