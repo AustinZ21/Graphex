@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>CGA Viewer</title>
-  <link rel="stylesheet" href="./styles.css?v=1.30.18" />
+  <link rel="stylesheet" href="./styles.css?v=1.30.38" />
   <script type="importmap">
     {
       "imports": {
@@ -63,9 +63,10 @@
           <div class="section-title">View</div>
           <div class="field-row">
             <button id="fit-view" class="btn secondary" type="button">Fit</button>
-            <button id="toggle-sim" class="btn secondary" type="button">3D Rotate</button>
+            <button id="toggle-sim" class="btn secondary" type="button">Play</button>
             <button id="toggle-edges" class="btn secondary" type="button" aria-pressed="false">Show Edges</button>
             <button id="toggle-performance" class="btn secondary" type="button" aria-pressed="true">Performance On</button>
+            <button id="open-layout-settings" class="btn secondary" type="button">Settings</button>
           </div>
           <div class="filter-title">Rendering Node Types</div>
           <div class="node-type-grid" aria-label="Rendering Node Types">
@@ -92,13 +93,46 @@
 
       <section class="graph-stage" aria-label="Graph canvas">
         <div id="graph-root"></div>
+        <div id="focus-layer-control" class="focus-layer-control" aria-label="Focused graph layers" hidden>
+          <div class="focus-layer-header">
+            <span id="focus-node-label" class="focus-node-label"></span>
+            <button id="clear-focus" class="focus-clear-button" type="button" aria-label="Clear focused graph" title="Clear focused graph">Clear</button>
+          </div>
+          <label for="focus-layer-slider"><span>Layer</span><strong id="focus-layer-value">1</strong></label>
+          <input id="focus-layer-slider" type="range" min="1" max="2" step="1" value="1" />
+        </div>
         <div id="cluster-overlay" class="cluster-overlay" hidden></div>
         <div id="status-line" class="status-line">Loading viewer...</div>
         <div id="fps-counter" class="fps-counter">FPS --</div>
       </section>
+
+      <div id="layout-settings-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="layout-settings-title">
+        <div class="settings-modal">
+          <div class="modal-header">
+            <h2 id="layout-settings-title">Layout Settings</h2>
+            <button id="close-layout-settings" class="modal-close" type="button" aria-label="Close layout settings" title="Close layout settings">X</button>
+          </div>
+          <div class="layout-settings-grid">
+            <label>Repulsion<input type="number" min="0" max="6000" step="50" data-layout-setting="repulsion" /></label>
+            <label>Link Distance<input type="number" min="20" max="800" step="10" data-layout-setting="linkDistance" /></label>
+            <label>Link Strength<input type="number" min="0" max="0.2" step="0.005" data-layout-setting="linkStrength" /></label>
+            <label>Collision Padding<input type="number" min="0" max="120" step="2" data-layout-setting="collisionPadding" /></label>
+            <label>Collision Cell<input type="number" min="80" max="800" step="10" data-layout-setting="collisionCellSize" /></label>
+            <label>Iterations<input type="number" min="0" max="12" step="1" data-layout-setting="relaxIterations" /></label>
+            <label>Max Step<input type="number" min="5" max="300" step="5" data-layout-setting="maxStep" /></label>
+            <label>Max Relax Nodes<input type="number" min="0" max="50000" step="500" data-layout-setting="relaxMaxPoints" /></label>
+            <label>Barnes-Hut Theta<input type="number" min="0.3" max="1.5" step="0.01" data-layout-setting="barnesHutTheta" /></label>
+            <label>Tree Depth<input type="number" min="8" max="24" step="1" data-layout-setting="maxDepth" /></label>
+          </div>
+          <div class="modal-actions">
+            <button id="reset-layout-settings" class="btn secondary" type="button">Reset</button>
+            <button id="apply-layout-settings" class="btn primary" type="button">Apply</button>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 
-  <script type="module" src="./main.js?v=1.30.18"></script>
+  <script type="module" src="./main.js?v=1.30.38"></script>
 </body>
 </html>

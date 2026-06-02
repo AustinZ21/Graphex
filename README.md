@@ -1,13 +1,17 @@
-# CGA (ContextGraphAdmin)
+# CGA (ContextGraphAgent)
 
-**Version:** 1.30.18
+**Version:** 1.30.38
 **Status:** Published
 **Author:** Nate Scott
-**Date:** 2026-05-27 (Schedule admin automation page)
+**Date:** 2026-06-02 (author attribution documented and Pages credit simplified)
 
-CGA, aka ContextGraphAdmin, is a local-first graph context service for AI-assisted development. It indexes repository structure, symbols, calls, imports, and lightweight data flow into FalkorDB, then exposes retrieval and analysis tools through an MCP-compatible API.
+CGA, aka ContextGraphAgent, is a local-first graph context service for AI-assisted development. It indexes repository structure, symbols, calls, imports, and lightweight data flow into FalkorDB, then exposes retrieval and analysis tools through an MCP-compatible API.
 
 It also hosts WA-compatible work briefing aggregation so progress signals from other repos can be recorded and summarized centrally inside CGA through the Admin Dashboard surface.
+
+## Author And Attribution
+
+CGA (ContextGraphAgent) was created and authored by Nate Scott. Public documentation, release notes, desktop bundle documentation, redistributions, and project notices should preserve that attribution while keeping the promotional website itself focused on the product experience.
 
 ## Work Briefing Aggregation
 
@@ -32,13 +36,16 @@ CGA includes an admin-only Schedule surface for recurring automation jobs.
 
 - Admin UI: `http://localhost:18001/admin/schedule` (Schedule tab beside Project)
 - Admin schedule API: `/api/admin/schedules`
-- Supported task types: BrowserAgent command POSTs, agent activation HTTP calls, and generic HTTP POST jobs
-- Each task stores cadence, target URL, project binding, agent ID, JSON payload, last run status, next run time, and recent execution history.
-- A lightweight background worker runs due enabled tasks and records each result in `scheduled_task_runs`.
+- Supported task types: BrowserAgent command POSTs, BrowserAgent page-test workflows, agent activation HTTP calls, and generic HTTP POST jobs
+- BrowserAgent page tests can target a page URL, text assertions, console capture, metrics, screenshots, and optional DOM snapshots from the Schedule editor.
+- Each task stores a unique copyable 8-character task ID, cadence, runner URL, project binding, agent ID, JSON payload, last run status, next run time, and recent execution history.
+- A lightweight background worker runs due enabled tasks, carries the opened BrowserAgent tab ID through each page-test step, retries text assertions while the page settles, and records each result in `scheduled_task_runs`.
 
 ## Runtime Persistence And Backup
 
 - CGA runtime state lives in a PostgreSQL database (`postgres` service, volume `postgres_data`) for users / projects / tokens / audit logs, and in FalkorDB for graph data.
+- The admin UI's **System Settings -> Indexing** panel stores the default repos folder used when project indexing resolves a project without an explicit Repository Path.
+- Runtime UI configuration is persisted in `data/runtime-config.json` by default, or in `CGA_RUNTIME_CONFIG_PATH` when that environment variable is set.
 - A backup sidecar dumps the auth PG database (`pg_dump --format=plain | gzip`) and FalkorDB runtime data into `data/backups/<stack>/` every hour by default.
 - The admin UI's **System Settings → Backup** panel reads and writes the same folder, so manual "Back Up Now" / restore / delete actions are visible to both the UI and the sidecar.
 - Override the backup destination with `CGA_BACKUP_DIR` and the schedule with `CGA_BACKUP_INTERVAL_SECONDS` / `CGA_BACKUP_KEEP_COUNT`.
@@ -46,6 +53,18 @@ CGA includes an admin-only Schedule surface for recurring automation jobs.
 - Restoring an auth snapshot uses `psql --single-transaction` and takes a pre-restore safety snapshot first.
 
 ## Public Quick Start
+
+Recommended one-click path for non-technical users:
+
+1. Install Docker Desktop.
+2. Download `CGA-Docker-Desktop-<version>.zip` from the release artifacts.
+3. Unzip it to a local folder.
+4. Double-click `start-cga-desktop.cmd`.
+5. CGA loads the bundled prebuilt API image, starts the services, waits for `/health`, and opens the Admin UI.
+
+Drop repositories into the bundled `repos` folder, or edit `.env` and set `CGA_REPOS_MOUNT` to another host folder.
+
+The one-click release package is intentionally clean: it does not include Nate Scott's local projects, private repositories, PostgreSQL data, FalkorDB graph indexes, Redis state, backups, or sample/demo project data. First run creates a fresh runtime, creates the configured admin account, and waits for you to add and index repositories.
 
 Prerequisites:
 - Git
@@ -112,12 +131,18 @@ Set-Location .\deploy\docker-desktop
 ./build-release-bundle.ps1
 ```
 
+The release builder produces `cga-desktop-api-image.tar` inside the release folder. The launcher loads that image automatically, so first startup does not need to build the CGA API image from source. Developers can still force the fallback build path with:
+
+```powershell
+./start-desktop.ps1 start -BuildFromSource
+```
+
 Docker Desktop recommended entry files:
 - `deploy/docker-desktop/docker-compose.yml`: local-build desktop bundle
 - `deploy/docker-desktop/start-desktop.ps1`: self-contained desktop launcher
 - `deploy/docker-desktop/README.md`: end-user bundle instructions
 - `deploy/docker-desktop/build-portable-bundle.ps1`: generates a zip-ready standalone desktop package under `dist/CGA-Docker-Desktop`
-- `deploy/docker-desktop/build-release-bundle.ps1`: generates a versioned release folder and zip under `dist/releases`
+- `deploy/docker-desktop/build-release-bundle.ps1`: generates a versioned release folder, prebuilt API image tar, and zip under `dist/releases`
 - `docker-compose.desktop.yml`: single-machine local deployment with sane defaults
 - `src/scripts/start-desktop.ps1`: start/stop/status/logs wrapper for local desktop usage
 - `start-cga-desktop.cmd`: Windows double-click launcher
@@ -132,9 +157,16 @@ Default local credentials come from the active launcher's `.env.example`. Change
 
 For release packaging, GitHub tags, GHCR images, and maintainer steps, see [docs/PUBLISHING.md](docs/PUBLISHING.md).
 
-## License
+## License And Notices
 
-CGA is released under the MIT License. See [LICENSE](LICENSE).
+CGA is released under the Apache License, Version 2.0. See [LICENSE](LICENSE).
+
+- Open source license package: [OPEN_SOURCE.md](OPEN_SOURCE.md)
+- Usage disclaimer: [DISCLAIMER.md](DISCLAIMER.md)
+- Project notices and Microsoft acknowledgement: [NOTICE.md](NOTICE.md)
+- Direct dependency notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+- Contribution terms: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Security reporting: [SECURITY.md](SECURITY.md)
 
 ## 1. Introduction
 

@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from jose import jwt as jose_jwt
 
+from backend import runtime_config
 from backend.auth.database import get_db
 from backend.auth.dependencies import get_current_user, require_admin, get_consumer, get_registry
 from backend.auth import pgshim as aiosqlite  # type: ignore  # asyncpg shim providing aiosqlite-compatible API
@@ -97,12 +98,12 @@ def _repo_name_key(value: str) -> str:
 
 
 def _repo_search_roots() -> list[Path]:
-    return [
+    return runtime_config.get_indexing_repo_search_roots([
         _LOCAL_REPOS_ROOT,
         Path("/repos"),
         Path("D:/Repos"),
         Path("d:/repos"),
-    ]
+    ])
 
 
 def _candidate_repo_paths(project_name: str) -> list[str]:
@@ -122,14 +123,10 @@ def _candidate_repo_paths(project_name: str) -> list[str]:
         except Exception:
             pass
 
-    fallbacks = [
-        f"D:/Repos/{normalized}",
-        f"D:/Repos/{normalized.lower()}",
-        f"d:/repos/{normalized}",
-        f"d:/repos/{normalized.lower()}",
-        f"/repos/{normalized}",
-        f"/repos/{normalized.lower()}",
-    ]
+    fallbacks = []
+    for root in _repo_search_roots():
+        fallbacks.append(str(root / normalized))
+        fallbacks.append(str(root / normalized.lower()))
     seen = {c.lower() for c in candidates}
     for candidate in fallbacks:
         if candidate.lower() not in seen:

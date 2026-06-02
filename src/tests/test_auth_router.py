@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from backend.auth import pgshim
+from backend import runtime_config
 from backend.auth import router as auth_router
 
 
@@ -66,6 +67,22 @@ def test_candidate_repo_paths_matches_punctuation_insensitive_local_repo(
 
     assert claude_candidates[0] == str(tmp_path / "ClaudeCLI")
     assert hermes_candidates[0] == str(tmp_path / "HermesAgent")
+
+
+def test_candidate_repo_paths_uses_configured_indexing_repos_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    configured_root = tmp_path / "configured-repos"
+    configured_root.mkdir()
+    (configured_root / "BrowserAgent").mkdir()
+
+    monkeypatch.setattr(runtime_config, "RUNTIME_CONFIG_PATH", tmp_path / "runtime-config.json")
+    monkeypatch.setattr(auth_router, "_LOCAL_REPOS_ROOT", tmp_path / "unused-local-root")
+    runtime_config.update_runtime_config({"indexing": {"repos_root": str(configured_root)}})
+
+    candidates = auth_router._candidate_repo_paths("browser-agent")
+
+    assert candidates[0] == str(configured_root / "BrowserAgent")
 
 
 def test_build_index_job_status_marks_stale_processing(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -171,7 +171,7 @@ class WorkBriefingService:
             if cleaned and cleaned not in seen:
                 normalized.append(cleaned)
                 seen.add(cleaned)
-        return tuple(sorted(normalized, key=str.casefold))
+        return tuple(normalized)
 
     @staticmethod
     def _normalize_metadata(value: Any) -> dict[str, Any]:

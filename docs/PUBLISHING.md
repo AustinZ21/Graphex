@@ -1,11 +1,12 @@
-# Publishing CGA (ContextGraphAdmin)
+# Publishing CGA (ContextGraphAgent)
 
-This guide covers the public GitHub release path for CGA, aka ContextGraphAdmin: source code, Docker images, and a one-file runtime compose download.
+This guide covers the public GitHub release path for CGA, aka ContextGraphAgent: source code, Docker images, and a one-file runtime compose download.
 
 ## Release Channels
 
 - Source download: GitHub automatically provides zip/tarball downloads for every release tag.
 - Runtime bundle: the release workflow attaches `cga-<version>.tar.gz`, `docker-compose.release.yml`, and `SHA256SUMS.txt`.
+- One-click Docker Desktop zip: `deploy/docker-desktop/build-release-bundle.ps1` creates `CGA-Docker-Desktop-<version>.zip` with Windows launchers and `cga-desktop-api-image.tar` for fast local startup.
 - Container image: tag pushes publish the API/runtime image to GitHub Container Registry:
   - `ghcr.io/nascousa/cga-api:<tag>`
 
@@ -13,10 +14,13 @@ This guide covers the public GitHub release path for CGA, aka ContextGraphAdmin:
 
 Before the first public release:
 
-1. Confirm the MIT license in `LICENSE` is still the intended public license.
-2. Confirm `.env`, `.deploy-keys/`, `data/`, `tmp/`, logs, local databases, and private keys are not tracked.
-3. Update `README.md` version and date.
-4. Run local validation from the repository root:
+1. Confirm the Apache License 2.0 text in `LICENSE` is still the intended public license.
+2. Review `NOTICE.md` for current acknowledgements and trademark boundaries.
+3. Review `DISCLAIMER.md` for current usage risks, sensitive-data handling, AI/automation limits, and third-party service boundaries.
+4. Review `THIRD_PARTY_NOTICES.md` against the exact dependency set, browser assets, fonts/icons/images, and container images used by the release.
+5. Confirm `.env`, `.deploy-keys/`, `data/`, `tmp/`, logs, local databases, and private keys are not tracked.
+6. Update `README.md` version and date.
+7. Run local validation from the repository root:
 
 ```bash
 docker compose --profile dev config
@@ -52,6 +56,24 @@ Open:
 - Admin UI: `http://localhost:8001/admin`
 - MCP discovery: `http://localhost:8001/mcp`
 - FalkorDB Browser: `http://localhost:13000`
+
+## User Install From One-Click Docker Desktop Zip
+
+For non-technical Windows users, publish or send the generated `CGA-Docker-Desktop-<version>.zip` artifact:
+
+1. Install Docker Desktop.
+2. Unzip `CGA-Docker-Desktop-<version>.zip`.
+3. Double-click `start-cga-desktop.cmd`.
+4. Wait for the Admin UI to open.
+
+The launcher creates `.env` when missing, loads `cga-desktop-api-image.tar` when present, starts the Docker Compose stack, waits for `/health`, and opens `http://localhost:18001/admin`. If the image tar is missing, it falls back to building from the packaged source.
+
+Maintainers build that artifact with:
+
+```powershell
+Set-Location .\deploy\docker-desktop
+.\build-release-bundle.ps1
+```
 
 ## User Install From Release Images
 
@@ -93,3 +115,4 @@ If GitHub returns `Public repositories are not permitted for Enterprise Managed 
 - Never commit real `.env` files, tokens, OAuth secrets, private keys, SQLite auth databases, or deployment keys.
 - Change `JWT_SECRET_KEY`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` before exposing the service beyond localhost.
 - For public deployments, put the API behind TLS and restrict MCP access with project-scoped tokens.
+- For formal public bundles, attach or archive an SBOM/license report for Python packages, npm packages, and container images.

@@ -17,11 +17,11 @@ async def _seed_project_auth(pool) -> None:
             "description, repo_path, is_active) VALUES (?, ?, ?, ?, ?, ?, 1)",
             (
                 1,
-                "contextgraphadmin",
+                "contextgraphagent",
                 "CGA123",
                 "http://localhost:18001",
                 "CGA host project",
-                "D:/Repos/ContextGraphAdmin",
+                "D:/Repos/ContextGraphAgent",
             ),
         )
         await db.execute(
@@ -69,7 +69,7 @@ async def test_project_api_records_activity_with_edge_agent_token(
     payload = response.json()
     assert payload["operation"] == "created"
     assert payload["activity"]["project_id"] == "CGA123"
-    assert payload["activity"]["workspace_name"] == "contextgraphadmin"
+    assert payload["activity"]["workspace_name"] == "contextgraphagent"
     assert payload["activity"]["status"] == "done"
 
 

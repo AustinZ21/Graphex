@@ -45,6 +45,16 @@ def _mock_producer(stream_id: str = "1234-0") -> AsyncMock:
     return producer
 
 
+class _FakeGitStatusProcess:
+    def __init__(self, stdout: str, stderr: str = "", returncode: int = 0) -> None:
+        self.returncode = returncode
+        self._stdout = stdout.encode()
+        self._stderr = stderr.encode()
+
+    async def communicate(self) -> tuple[bytes, bytes]:
+        return self._stdout, self._stderr
+
+
 def test_init_sets_singletons():
     registry = MagicMock()
     producer = MagicMock()
@@ -322,7 +332,7 @@ async def _seed_workassist_activity_service(pg_activity_store):
     await service.record_activity(
         {
             "project_id": "CGA123",
-            "workspace_name": "ContextGraphAdmin",
+            "workspace_name": "ContextGraphAgent",
             "event_type": "sync",
             "external_id": "sync-1",
             "title": "Synced work item",
@@ -333,7 +343,7 @@ async def _seed_workassist_activity_service(pg_activity_store):
     await service.record_activity(
         {
             "project_id": "CGA123",
-            "workspace_name": "ContextGraphAdmin",
+            "workspace_name": "ContextGraphAgent",
             "event_type": "review",
             "external_id": "review-1",
             "title": "Reviewed change",
@@ -413,18 +423,20 @@ async def test_index_repo_changes_uses_explicit_project_name_override():
     )
 
 
-def test_collect_git_changed_paths_parses_modified_and_untracked():
-    completed = MagicMock(returncode=0, stdout=" M src/a.py\n?? docs/b.md\n")
-    with patch("backend.tools.server.subprocess.run", return_value=completed):
-        result = mcp_srv._collect_git_changed_paths("/repo", include_untracked=True)
+@pytest.mark.asyncio
+async def test_collect_git_changed_paths_parses_modified_and_untracked():
+    proc = _FakeGitStatusProcess(stdout=" M src/a.py\n?? docs/b.md\n")
+    with patch("backend.tools.server.asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
+        result = await mcp_srv._collect_git_changed_paths("/repo", include_untracked=True)
     assert result["changed_paths"] == ["src/a.py", "docs/b.md"]
     assert result["destructive_paths"] == []
 
 
-def test_collect_git_changed_paths_marks_delete_and_rename_destructive():
-    completed = MagicMock(returncode=0, stdout=" D src/old.py\nR  src/old2.py -> src/new2.py\n")
-    with patch("backend.tools.server.subprocess.run", return_value=completed):
-        result = mcp_srv._collect_git_changed_paths("/repo", include_untracked=True)
+@pytest.mark.asyncio
+async def test_collect_git_changed_paths_marks_delete_and_rename_destructive():
+    proc = _FakeGitStatusProcess(stdout=" D src/old.py\nR  src/old2.py -> src/new2.py\n")
+    with patch("backend.tools.server.asyncio.create_subprocess_exec", new=AsyncMock(return_value=proc)):
+        result = await mcp_srv._collect_git_changed_paths("/repo", include_untracked=True)
     assert "src/old.py" in result["destructive_paths"]
     assert "src/new2.py" in result["changed_paths"]
     assert "src/old2.py" in result["destructive_paths"]

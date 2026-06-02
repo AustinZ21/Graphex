@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="CGA, ContextGraphAgent, is an open-source graph context service for AI-assisted development." />
+  <meta name="theme-color" content="#05070d" />
+  <meta property="og:title" content="CGA | ContextGraphAgent" />
+  <meta property="og:description" content="Open-source graph intelligence for AI-assisted engineering." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://nascousa.github.io/cga/" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <title>CGA | ContextGraphAgent</title>
+  <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="preconnect" href="https://unpkg.com" />
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareSourceCode",
+    "name": "CGA",
+    "alternateName": "ContextGraphAgent",
+    "description": "A local-first graph context service for AI-assisted development.",
+    "codeRepository": "https://github.com/nascousa/cga",
+    "programmingLanguage": ["Python", "JavaScript", "PowerShell"],
+    "license": "https://www.apache.org/licenses/LICENSE-2.0"
+  }
+  </script>
+</head>
+<body>
+  <div id="vanta-net" aria-hidden="true"></div>
+  <div class="site-shell">
+    <header class="topbar" aria-label="Primary navigation">
+      <a class="brand" href="#top" aria-label="CGA home">
+        <span class="brand-mark">CGA</span>
+        <span class="brand-copy">ContextGraphAgent</span>
+      </a>
+      <nav class="nav-links" aria-label="Site sections">
+        <a href="#engine">Engine</a>
+        <a href="#desktop">Desktop</a>
+        <a href="#open-source">Open Source</a>
+      </nav>
+      <a class="nav-action" href="https://github.com/nascousa/cga" target="_blank" rel="noreferrer">
+        <i data-lucide="code-2" aria-hidden="true"></i>
+        GitHub
+      </a>
+    </header>
+
+    <main id="top">
+      <section class="hero" aria-labelledby="hero-title">
+        <p class="eyebrow">Open source graph intelligence</p>
+        <h1 id="hero-title">CGA</h1>
+        <p class="hero-subtitle">ContextGraphAgent gives AI coding agents a live, queryable map of repositories: symbols, calls, imports, dependencies, project work, and the evidence needed to ship with less guesswork.</p>
+        <div class="hero-actions" aria-label="Primary actions">
+          <a class="button primary" href="https://github.com/nascousa/cga" target="_blank" rel="noreferrer">
+            <i data-lucide="star" aria-hidden="true"></i>
+            View Project
+          </a>
+          <a class="button secondary" href="https://codespaces.new/nascousa/cga?quickstart=1" target="_blank" rel="noreferrer">
+            <i data-lucide="square-terminal" aria-hidden="true"></i>
+            Open Codespace
+          </a>
+        </div>
+      </section>
+
+      <section id="engine" class="section band dark-band" aria-labelledby="engine-title">
+        <div class="section-heading">
+          <p class="eyebrow">Evidence first</p>
+          <h2 id="engine-title">A graph runtime for serious AI engineering</h2>
+          <p>CGA turns a codebase into an operational graph so agents can ask for the right context instead of flooding prompts with files.</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card">
+            <i data-lucide="network" aria-hidden="true"></i>
+            <h3>Repository Graph</h3>
+            <p>Indexes files, symbols, calls, imports, and dependency paths into FalkorDB.</p>
+          </article>
+          <article class="feature-card">
+            <i data-lucide="plug" aria-hidden="true"></i>
+            <h3>MCP Native</h3>
+            <p>Exposes tools for indexing, retrieval, call graphs, dependency views, and work activity.</p>
+          </article>
+          <article class="feature-card">
+            <i data-lucide="shield-check" aria-hidden="true"></i>
+            <h3>Local First</h3>
+            <p>Runs on Docker Desktop with local data, project-scoped tokens, audit trails, and backups.</p>
+          </article>
+          <article class="feature-card">
+            <i data-lucide="activity" aria-hidden="true"></i>
+            <h3>Work Briefing</h3>
+            <p>Records project activity and builds concise engineering status signals from one dashboard.</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="desktop" class="section band split-band" aria-labelledby="desktop-title">
+        <div class="section-heading compact">
+          <p class="eyebrow">One-click local stack</p>
+          <h2 id="desktop-title">Ship CGA as a desktop-grade open-source package</h2>
+          <p>The Docker Desktop bundle starts CGA, PostgreSQL, FalkorDB, Redis, and backups from a single launcher.</p>
+        </div>
+        <div class="terminal-panel" aria-label="Quick start steps">
+          <div class="terminal-chrome"><span></span><span></span><span></span></div>
+          <pre><code>Install Docker Desktop
+Download CGA-Docker-Desktop.zip
+Double-click start-cga-desktop.cmd
+Open http://localhost:18001/admin</code></pre>
+        </div>
+        <div class="metric-row" aria-label="Project highlights">
+          <div><strong>Apache 2.0</strong><span>Open-source license</span></div>
+          <div><strong>FalkorDB</strong><span>Graph backend</span></div>
+          <div><strong>MCP SSE</strong><span>Agent interface</span></div>
+          <div><strong>Docker Desktop</strong><span>One-click package</span></div>
+        </div>
+      </section>
+
+      <section id="open-source" class="section band final-band" aria-labelledby="open-source-title">
+        <div class="section-heading">
+          <p class="eyebrow">Open source, ready to inspect</p>
+          <h2 id="open-source-title">Built for public release</h2>
+          <p>The repository includes license, notices, security guidance, contribution terms, and a customer-ready Docker Desktop package.</p>
+        </div>
+        <div class="cta-strip">
+          <a class="button primary" href="https://github.com/nascousa/cga" target="_blank" rel="noreferrer">
+            <i data-lucide="git-branch" aria-hidden="true"></i>
+            Source Code
+          </a>
+          <a class="button secondary" href="https://github.com/nascousa/cga/releases" target="_blank" rel="noreferrer">
+            <i data-lucide="package" aria-hidden="true"></i>
+            Releases
+          </a>
+          <a class="button secondary" href="https://codespaces.new/nascousa/cga?quickstart=1" target="_blank" rel="noreferrer">
+            <i data-lucide="code-2" aria-hidden="true"></i>
+            Codespaces
+          </a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>CGA / ContextGraphAgent</p>
+      <p class="footer-credit">Created and authored by <strong>Nate Scott</strong>.</p>
+    </footer>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.net.min.js" defer></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+  <script src="./site.js" defer></script>
+</body>
+</html>

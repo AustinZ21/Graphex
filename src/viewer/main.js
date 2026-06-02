@@ -1,7 +1,7 @@
 import Graphology from 'graphology'
 import Sigma from 'sigma'
 
-const VIEWER_VERSION = '1.30.18'
+const VIEWER_VERSION = '1.30.38'
 const EDGE_STYLES = {
   CALLS: { label: 'Calls', color: '#4ae387', width: 1.7, priority: 6 },
   IMPORTS: { label: 'Imports', color: '#5badff', width: 1.45, priority: 5 },
@@ -28,8 +28,10 @@ const FALKOR_CONNECTION_URL = 'falkor://cga-falkordb-dev:6379'
 const EDGE_VISIBILITY_STORAGE_KEY = 'cg_viewer_edges_visible_v4'
 const NODE_KIND_VISIBILITY_STORAGE_KEY = 'cg_viewer_node_kinds_visible_v1'
 const PERFORMANCE_MODE_STORAGE_KEY = 'cg_viewer_performance_mode_v1'
+const LAYOUT_SETTINGS_STORAGE_KEY = 'cg_viewer_layout_settings_v1'
 const FPS_SAMPLE_MS = 500
-const MAX_AUTO_CHUNK_FETCHES = 80
+const MAX_AUTO_CHUNK_FETCHES = 100
+const VISIBLE_NODE_BATCH_LIMIT = 5000
 const LIVE_ROTATION_NODE_LIMIT = 120000
 const LOD_NODE_THRESHOLD = 2500
 const LOD_MID_RATIO = 0.72
@@ -39,12 +41,40 @@ const EDGE_MID_RATIO = 0.62
 const EDGE_FAR_RATIO = 0.92
 const CLUSTER_NODE_PREFIX = '__cg_cluster__'
 const CLUSTER_NODE_VISIBILITY_RATIO = 0.84
+const CLUSTER_NODE_THRESHOLD = 6000
+const CLUSTER_ONLY_RATIO = 1.16
+const CLUSTER_MOTION_RATIO = 0.72
+const CAMERA_INTERACTION_IDLE_MS = 160
+const MOTION_LOD_NODE_THRESHOLD = 1600
+const MOTION_EDGE_NODE_THRESHOLD = 1600
 const WORKER_TIMEOUT_MS = 8000
 
 const ROTATION_FRAME_MS = 72
 const GOLDEN_ANGLE = 2.399963229728653
 const BASE_DEPTH = 900
 const CAMERA_DISTANCE = 3200
+const LAYOUT_RELAX_ITERATIONS = 3
+const LAYOUT_RELAX_MAX_POINTS = 10000
+const LAYOUT_BARNES_HUT_THETA = 0.72
+const LAYOUT_REPULSION = 1500
+const LAYOUT_LINK_DISTANCE = 210
+const LAYOUT_LINK_STRENGTH = 0.035
+const LAYOUT_COLLISION_PADDING = 22
+const LAYOUT_COLLISION_CELL_SIZE = 260
+const LAYOUT_MAX_STEP = 95
+const LAYOUT_MAX_DEPTH = 16
+const LAYOUT_SETTING_SCHEMA = Object.freeze({
+  relaxIterations: { defaultValue: LAYOUT_RELAX_ITERATIONS, min: 0, max: 12, integer: true },
+  relaxMaxPoints: { defaultValue: LAYOUT_RELAX_MAX_POINTS, min: 0, max: 50000, integer: true },
+  barnesHutTheta: { defaultValue: LAYOUT_BARNES_HUT_THETA, min: 0.3, max: 1.5 },
+  repulsion: { defaultValue: LAYOUT_REPULSION, min: 0, max: 6000 },
+  linkDistance: { defaultValue: LAYOUT_LINK_DISTANCE, min: 20, max: 800 },
+  linkStrength: { defaultValue: LAYOUT_LINK_STRENGTH, min: 0, max: 0.2 },
+  collisionPadding: { defaultValue: LAYOUT_COLLISION_PADDING, min: 0, max: 120 },
+  collisionCellSize: { defaultValue: LAYOUT_COLLISION_CELL_SIZE, min: 80, max: 800 },
+  maxStep: { defaultValue: LAYOUT_MAX_STEP, min: 5, max: 300 },
+  maxDepth: { defaultValue: LAYOUT_MAX_DEPTH, min: 8, max: 24, integer: true },
+})
 const BASE_NODE_SIZE = 3.6
 const NODE_SIZE_STEP = 1.55
 const MAX_NODE_SIZE = 18
@@ -53,6 +83,27 @@ const HOVER_LABEL_FONT = '600 13px "Segoe UI", "Noto Sans", Arial, sans-serif'
 const HOVER_LABEL_PADDING_X = 10
 const HOVER_LABEL_HEIGHT = 28
 const HOVER_LABEL_RADIUS = 6
+
+function defaultLayoutSettings() {
+  return Object.fromEntries(Object.entries(LAYOUT_SETTING_SCHEMA).map(([key, schema]) => [key, schema.defaultValue]))
+}
+
+function normalizeLayoutSetting(key, value) {
+  const schema = LAYOUT_SETTING_SCHEMA[key]
+  if (!schema) return undefined
+  const numericValue = Number(value)
+  const fallbackValue = schema.defaultValue
+  const boundedValue = Number.isFinite(numericValue) ? clamp(numericValue, schema.min, schema.max) : fallbackValue
+  return schema.integer ? Math.round(boundedValue) : Number(boundedValue.toFixed(4))
+}
+
+function normalizeLayoutSettings(settings = {}) {
+  const normalized = {}
+  for (const key of Object.keys(LAYOUT_SETTING_SCHEMA)) {
+    normalized[key] = normalizeLayoutSetting(key, settings[key])
+  }
+  return normalized
+}
 
 const state = {
   graph: null,
@@ -71,18 +122,27 @@ const state = {
   hasNext: false,
   edgesVisible: DEFAULT_EDGE_VISIBILITY,
   performanceMode: DEFAULT_PERFORMANCE_MODE,
+  layoutSettings: defaultLayoutSettings(),
   visibleNodeKinds: new Set(KIND_ORDER),
   controlPanelCollapsed: false,
   cameraRatio: 1,
+  cameraMoving: false,
+  cameraIdleTimer: null,
   lodLevel: 'full',
   edgeLevel: 'full',
   performanceSignature: '',
   performanceFrame: null,
   hoveredNode: null,
+  focusRootNode: null,
+  focusLayerDepth: 1,
+  focusVisibleNodes: new Set(),
+  focusVisibleEdges: new Set(),
+  focusPreviousEdgesVisible: null,
   dataNodeCount: 0,
   clusterNodes: new Set(),
   clusterCounts: new Map(),
   edgesByNode: new Map(),
+  outgoingEdgesByNode: new Map(),
   projectionNodeIds: [],
   nodeProjectionIndex: new Map(),
   projectionCapacity: 0,
@@ -117,12 +177,23 @@ const elements = {
   toggleSim: document.getElementById('toggle-sim'),
   toggleEdges: document.getElementById('toggle-edges'),
   togglePerformance: document.getElementById('toggle-performance'),
+  openLayoutSettings: document.getElementById('open-layout-settings'),
+  layoutSettingsModal: document.getElementById('layout-settings-modal'),
+  closeLayoutSettings: document.getElementById('close-layout-settings'),
+  applyLayoutSettings: document.getElementById('apply-layout-settings'),
+  resetLayoutSettings: document.getElementById('reset-layout-settings'),
+  layoutSettingInputs: [...document.querySelectorAll('[data-layout-setting]')],
   edgeGrid: document.getElementById('edge-grid'),
   nodeTypeInputs: [...document.querySelectorAll('input[name="node-type"]')],
   searchInput: document.getElementById('search-input'),
   chunkLimit: document.getElementById('chunk-limit'),
   graphRoot: document.getElementById('graph-root'),
   clusterOverlay: document.getElementById('cluster-overlay'),
+  focusLayerControl: document.getElementById('focus-layer-control'),
+  focusLayerSlider: document.getElementById('focus-layer-slider'),
+  focusLayerValue: document.getElementById('focus-layer-value'),
+  focusNodeLabel: document.getElementById('focus-node-label'),
+  clearFocus: document.getElementById('clear-focus'),
   fpsCounter: document.getElementById('fps-counter'),
   statusLine: document.getElementById('status-line'),
   dbNodes: document.getElementById('db-nodes'),
@@ -324,6 +395,247 @@ function initial3dPosition(point, nodeIndex) {
   }
 }
 
+function layoutMass(degree) {
+  return 1 + Math.log2(degree + 1) * 1.7
+}
+
+function layoutCollisionRadius(degree, settings) {
+  return 18 + Math.log2(degree + 1) * 8 + settings.collisionPadding
+}
+
+function safeLayoutVector(deltaX, deltaY, fallbackIndex) {
+  const distance = Math.hypot(deltaX, deltaY)
+  if (distance > 0.0001) return { x: deltaX / distance, y: deltaY / distance, distance }
+  const angle = fallbackIndex * GOLDEN_ANGLE
+  return { x: Math.cos(angle), y: Math.sin(angle), distance: 0.0001 }
+}
+
+function buildLayoutModel(points, links, settings) {
+  const indexById = new Map()
+  points.forEach((point, index) => indexById.set(point.id, index))
+
+  const degrees = new Float32Array(points.length)
+  const edgeSources = []
+  const edgeTargets = []
+
+  for (const link of links || []) {
+    const sourceIndex = indexById.get(link.source)
+    const targetIndex = indexById.get(link.target)
+    if (sourceIndex === undefined || targetIndex === undefined) continue
+    degrees[sourceIndex] += 1
+    degrees[targetIndex] += 1
+    if (sourceIndex === targetIndex) continue
+    edgeSources.push(sourceIndex)
+    edgeTargets.push(targetIndex)
+  }
+
+  const masses = new Float32Array(points.length)
+  const radii = new Float32Array(points.length)
+  for (let index = 0; index < points.length; index += 1) {
+    masses[index] = layoutMass(degrees[index])
+    radii[index] = layoutCollisionRadius(degrees[index], settings)
+  }
+
+  return { degrees, masses, radii, edgeSources, edgeTargets }
+}
+
+function createQuadNode(minX, minY, maxX, maxY) {
+  return { minX, minY, maxX, maxY, mass: 0, centerX: 0, centerY: 0, point: -1, children: null }
+}
+
+function subdivideQuad(node) {
+  const midX = (node.minX + node.maxX) / 2
+  const midY = (node.minY + node.maxY) / 2
+  node.children = [
+    createQuadNode(node.minX, node.minY, midX, midY),
+    createQuadNode(midX, node.minY, node.maxX, midY),
+    createQuadNode(node.minX, midY, midX, node.maxY),
+    createQuadNode(midX, midY, node.maxX, node.maxY),
+  ]
+}
+
+function quadChildFor(node, x, y) {
+  const midX = (node.minX + node.maxX) / 2
+  const midY = (node.minY + node.maxY) / 2
+  return (y >= midY ? 2 : 0) + (x >= midX ? 1 : 0)
+}
+
+function insertQuadPoint(node, pointIndex, positionsX, positionsY, masses, settings, depth = 0) {
+  const x = positionsX[pointIndex]
+  const y = positionsY[pointIndex]
+  const mass = masses[pointIndex]
+  const nextMass = node.mass + mass
+  node.centerX = nextMass ? ((node.centerX * node.mass) + (x * mass)) / nextMass : x
+  node.centerY = nextMass ? ((node.centerY * node.mass) + (y * mass)) / nextMass : y
+  node.mass = nextMass
+
+  if (!node.children && node.point === -1) {
+    node.point = pointIndex
+    return
+  }
+  if (!node.children) {
+    if (depth >= settings.maxDepth) return
+    const existingPoint = node.point
+    node.point = -1
+    subdivideQuad(node)
+    insertQuadPoint(node.children[quadChildFor(node, positionsX[existingPoint], positionsY[existingPoint])], existingPoint, positionsX, positionsY, masses, settings, depth + 1)
+  }
+  insertQuadPoint(node.children[quadChildFor(node, x, y)], pointIndex, positionsX, positionsY, masses, settings, depth + 1)
+}
+
+function buildBarnesHutTree(positionsX, positionsY, masses, count, settings) {
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+  for (let index = 0; index < count; index += 1) {
+    minX = Math.min(minX, positionsX[index])
+    minY = Math.min(minY, positionsY[index])
+    maxX = Math.max(maxX, positionsX[index])
+    maxY = Math.max(maxY, positionsY[index])
+  }
+  const span = Math.max(maxX - minX, maxY - minY, 1)
+  const padding = span * 0.05 + 1
+  const root = createQuadNode(minX - padding, minY - padding, maxX + padding, maxY + padding)
+  for (let index = 0; index < count; index += 1) insertQuadPoint(root, index, positionsX, positionsY, masses, settings)
+  return root
+}
+
+function applyBarnesHutRepulsion(node, pointIndex, positionsX, positionsY, masses, deltasX, deltasY, settings) {
+  if (!node.mass || (node.point === pointIndex && !node.children)) return
+  const deltaX = positionsX[pointIndex] - node.centerX
+  const deltaY = positionsY[pointIndex] - node.centerY
+  const vector = safeLayoutVector(deltaX, deltaY, pointIndex)
+  const width = node.maxX - node.minX
+
+  if (!node.children || width / Math.max(vector.distance, 1) < settings.barnesHutTheta) {
+    const distanceSq = Math.max(vector.distance * vector.distance, 64)
+    const force = (settings.repulsion * masses[pointIndex] * node.mass) / distanceSq
+    deltasX[pointIndex] += vector.x * force
+    deltasY[pointIndex] += vector.y * force
+    return
+  }
+
+  for (const child of node.children) applyBarnesHutRepulsion(child, pointIndex, positionsX, positionsY, masses, deltasX, deltasY, settings)
+}
+
+function applyLinkAttraction(model, positionsX, positionsY, deltasX, deltasY, settings) {
+  for (let edgeIndex = 0; edgeIndex < model.edgeSources.length; edgeIndex += 1) {
+    const sourceIndex = model.edgeSources[edgeIndex]
+    const targetIndex = model.edgeTargets[edgeIndex]
+    const deltaX = positionsX[targetIndex] - positionsX[sourceIndex]
+    const deltaY = positionsY[targetIndex] - positionsY[sourceIndex]
+    const vector = safeLayoutVector(deltaX, deltaY, sourceIndex + targetIndex)
+    const minDegree = Math.max(1, Math.min(model.degrees[sourceIndex], model.degrees[targetIndex]))
+    const targetDistance = settings.linkDistance + Math.log2(minDegree + 1) * 18
+    const linkStrength = settings.linkStrength / minDegree
+    const pull = (vector.distance - targetDistance) * linkStrength
+    const sourceMass = model.masses[sourceIndex]
+    const targetMass = model.masses[targetIndex]
+    const totalMass = sourceMass + targetMass
+    const sourceShare = targetMass / totalMass
+    const targetShare = sourceMass / totalMass
+    deltasX[sourceIndex] += vector.x * pull * sourceShare
+    deltasY[sourceIndex] += vector.y * pull * sourceShare
+    deltasX[targetIndex] -= vector.x * pull * targetShare
+    deltasY[targetIndex] -= vector.y * pull * targetShare
+  }
+}
+
+function collisionCellKey(cellX, cellY) {
+  return `${cellX}:${cellY}`
+}
+
+function applyCollisionForce(model, positionsX, positionsY, deltasX, deltasY, settings) {
+  const cells = new Map()
+  for (let index = 0; index < positionsX.length; index += 1) {
+    const cellX = Math.floor(positionsX[index] / settings.collisionCellSize)
+    const cellY = Math.floor(positionsY[index] / settings.collisionCellSize)
+    const key = collisionCellKey(cellX, cellY)
+    let bucket = cells.get(key)
+    if (!bucket) {
+      bucket = []
+      cells.set(key, bucket)
+    }
+    bucket.push(index)
+  }
+
+  for (let index = 0; index < positionsX.length; index += 1) {
+    const cellX = Math.floor(positionsX[index] / settings.collisionCellSize)
+    const cellY = Math.floor(positionsY[index] / settings.collisionCellSize)
+    for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+      for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
+        const bucket = cells.get(collisionCellKey(cellX + offsetX, cellY + offsetY))
+        if (!bucket) continue
+        for (const otherIndex of bucket) {
+          if (otherIndex <= index) continue
+          const requiredDistance = model.radii[index] + model.radii[otherIndex]
+          const deltaX = positionsX[index] - positionsX[otherIndex]
+          const deltaY = positionsY[index] - positionsY[otherIndex]
+          const distance = Math.hypot(deltaX, deltaY)
+          if (distance >= requiredDistance) continue
+          const vector = safeLayoutVector(deltaX, deltaY, index + otherIndex)
+          const push = (requiredDistance - distance) * 0.58
+          deltasX[index] += vector.x * push
+          deltasY[index] += vector.y * push
+          deltasX[otherIndex] -= vector.x * push
+          deltasY[otherIndex] -= vector.y * push
+        }
+      }
+    }
+  }
+}
+
+function relaxLayoutPositions(points, links, baseNodeIndex, layoutSettings = state.layoutSettings) {
+  const settings = normalizeLayoutSettings(layoutSettings)
+  const positions = new Float32Array(points.length * 3)
+  for (let index = 0; index < points.length; index += 1) {
+    const position = initial3dPosition(points[index], baseNodeIndex + index)
+    const offset = index * 3
+    positions[offset] = position.x3d
+    positions[offset + 1] = position.y3d
+    positions[offset + 2] = position.z3d
+  }
+
+  if (points.length < 2 || points.length > settings.relaxMaxPoints) return positions
+
+  const model = buildLayoutModel(points, links, settings)
+  const positionsX = new Float32Array(points.length)
+  const positionsY = new Float32Array(points.length)
+  const deltasX = new Float32Array(points.length)
+  const deltasY = new Float32Array(points.length)
+  for (let index = 0; index < points.length; index += 1) {
+    const offset = index * 3
+    positionsX[index] = positions[offset]
+    positionsY[index] = positions[offset + 1]
+  }
+
+  for (let iteration = 0; iteration < settings.relaxIterations; iteration += 1) {
+    deltasX.fill(0)
+    deltasY.fill(0)
+    const root = buildBarnesHutTree(positionsX, positionsY, model.masses, points.length, settings)
+    for (let index = 0; index < points.length; index += 1) {
+      applyBarnesHutRepulsion(root, index, positionsX, positionsY, model.masses, deltasX, deltasY, settings)
+    }
+    applyLinkAttraction(model, positionsX, positionsY, deltasX, deltasY, settings)
+    applyCollisionForce(model, positionsX, positionsY, deltasX, deltasY, settings)
+
+    for (let index = 0; index < points.length; index += 1) {
+      const step = Math.hypot(deltasX[index], deltasY[index])
+      const scale = step > settings.maxStep ? settings.maxStep / step : 1
+      positionsX[index] += deltasX[index] * scale
+      positionsY[index] += deltasY[index] * scale
+    }
+  }
+
+  for (let index = 0; index < points.length; index += 1) {
+    const offset = index * 3
+    positions[offset] = positionsX[index]
+    positions[offset + 1] = positionsY[index]
+  }
+  return positions
+}
+
 function clusterNodeId(kind) {
   return `${CLUSTER_NODE_PREFIX}${kind}`
 }
@@ -425,7 +737,7 @@ function pointPositionFromBatch(batch, pointIndex) {
 function rejectWorkerCallbacks(error) {
   for (const callback of state.workerCallbacks.values()) {
     window.clearTimeout(callback.timeout)
-    callback.resolve(preprocessBatchOnMainThread(callback.batch, callback.baseNodeIndex))
+    callback.resolve(preprocessBatchOnMainThread(callback.batch, callback.baseNodeIndex, callback.layoutSettings))
   }
   state.workerCallbacks.clear()
   console.warn(error)
@@ -463,43 +775,39 @@ function ensurePreprocessWorker() {
   return state.worker
 }
 
-function preprocessBatchOnMainThread(batch, baseNodeIndex) {
-  const positions = new Float32Array(batch.points.length * 3)
-  for (let index = 0; index < batch.points.length; index += 1) {
-    const position = initial3dPosition(batch.points[index], baseNodeIndex + index)
-    const offset = index * 3
-    positions[offset] = position.x3d
-    positions[offset + 1] = position.y3d
-    positions[offset + 2] = position.z3d
-  }
+function preprocessBatchOnMainThread(batch, baseNodeIndex, layoutSettings = state.layoutSettings) {
+  const positions = relaxLayoutPositions(batch.points, batch.links, baseNodeIndex, layoutSettings)
   return { ...batch, positions }
 }
 
 async function preprocessBatch(batch, baseNodeIndex) {
-  if (!state.performanceMode) return preprocessBatchOnMainThread(batch, baseNodeIndex)
+  const layoutSettings = normalizeLayoutSettings(state.layoutSettings)
+  if (!state.performanceMode) return preprocessBatchOnMainThread(batch, baseNodeIndex, layoutSettings)
   const worker = ensurePreprocessWorker()
-  if (!worker) return preprocessBatchOnMainThread(batch, baseNodeIndex)
+  if (!worker) return preprocessBatchOnMainThread(batch, baseNodeIndex, layoutSettings)
 
   const id = state.workerRequestId + 1
   state.workerRequestId = id
   return new Promise((resolve) => {
     const timeout = window.setTimeout(() => {
       state.workerCallbacks.delete(id)
-      resolve(preprocessBatchOnMainThread(batch, baseNodeIndex))
+      resolve(preprocessBatchOnMainThread(batch, baseNodeIndex, layoutSettings))
     }, WORKER_TIMEOUT_MS)
-    state.workerCallbacks.set(id, { batch, baseNodeIndex, resolve, timeout })
+    state.workerCallbacks.set(id, { batch, baseNodeIndex, layoutSettings, resolve, timeout })
     try {
       worker.postMessage({
         id,
         type: 'preprocessBatch',
         baseNodeIndex,
+        layoutSettings: state.layoutSettings,
         points: batch.points.map((point) => ({ id: point.id, kind: point.kind })),
+        links: (batch.links || []).map((link) => ({ source: link.source, target: link.target })),
       })
     } catch (error) {
       window.clearTimeout(timeout)
       state.workerCallbacks.delete(id)
       console.warn(error)
-      resolve(preprocessBatchOnMainThread(batch, baseNodeIndex))
+      resolve(preprocessBatchOnMainThread(batch, baseNodeIndex, layoutSettings))
     }
   })
 }
@@ -629,24 +937,88 @@ function drawNodeHover(context, nodeData) {
   context.restore()
 }
 
+function shouldUseClusterLod() {
+  if (!state.performanceMode || state.dataNodeCount < CLUSTER_NODE_THRESHOLD) return false
+  if (state.cameraRatio >= CLUSTER_ONLY_RATIO) return true
+  return state.cameraMoving && state.cameraRatio >= CLUSTER_MOTION_RATIO
+}
+
 function computeLodLevel() {
-  if (!state.performanceMode || state.dataNodeCount < LOD_NODE_THRESHOLD) return 'full'
+  if (!state.performanceMode) return 'full'
+  const motionLodActive = state.cameraMoving && state.dataNodeCount >= MOTION_LOD_NODE_THRESHOLD
+  if (!motionLodActive && state.dataNodeCount < LOD_NODE_THRESHOLD) return 'full'
+  if (shouldUseClusterLod()) return 'cluster'
+  if (motionLodActive) {
+    return state.cameraRatio >= LOD_MID_RATIO ? 'far' : 'mid'
+  }
   if (state.cameraRatio >= LOD_FAR_RATIO) return 'far'
   if (state.cameraRatio >= LOD_MID_RATIO) return 'mid'
   return 'full'
 }
 
 function computeEdgeLevel() {
-  if (!state.performanceMode || state.dataNodeCount < EDGE_THROTTLE_NODE_THRESHOLD) return 'full'
+  if (!state.performanceMode) return 'full'
+  const motionEdgeActive = state.cameraMoving && state.dataNodeCount >= MOTION_EDGE_NODE_THRESHOLD
+  if (shouldUseClusterLod() || motionEdgeActive) return 'hidden'
+  if (state.dataNodeCount < EDGE_THROTTLE_NODE_THRESHOLD) return 'full'
   if (state.rotating || state.cameraRatio >= EDGE_FAR_RATIO) return 'focus'
   if (state.cameraRatio >= EDGE_MID_RATIO) return 'priority'
   return 'full'
 }
 
 function shouldShowClusters() {
+  if (state.focusRootNode) return false
   return state.performanceMode
     && state.dataNodeCount >= LOD_NODE_THRESHOLD
-    && state.cameraRatio >= CLUSTER_NODE_VISIBILITY_RATIO
+    && (state.lodLevel === 'cluster' || state.cameraRatio >= CLUSTER_NODE_VISIBILITY_RATIO)
+}
+
+function buildFocusScope(rootNodeId, layerDepth) {
+  const visibleNodes = new Set()
+  const visibleEdges = new Set()
+  if (!state.graph?.hasNode(rootNodeId)) return { visibleNodes, visibleEdges }
+
+  visibleNodes.add(rootNodeId)
+  let frontier = new Set([rootNodeId])
+  for (let depth = 0; depth < layerDepth; depth += 1) {
+    const nextFrontier = new Set()
+    for (const nodeId of frontier) {
+      const edgeIds = state.outgoingEdgesByNode.get(nodeId)
+      if (!edgeIds) continue
+      for (const edgeId of edgeIds) {
+        if (!state.graph.hasEdge(edgeId)) continue
+        const attributes = state.graph.getEdgeAttributes(edgeId)
+        if (attributes.sourceNodeId !== nodeId) continue
+        const targetNodeId = attributes.targetNodeId
+        if (!targetNodeId || !state.graph.hasNode(targetNodeId)) continue
+        visibleEdges.add(edgeId)
+        if (!visibleNodes.has(targetNodeId)) nextFrontier.add(targetNodeId)
+        visibleNodes.add(targetNodeId)
+      }
+    }
+    if (!nextFrontier.size) break
+    frontier = nextFrontier
+  }
+
+  return { visibleNodes, visibleEdges }
+}
+
+function rebuildFocusScope() {
+  if (!state.focusRootNode) return
+  const scope = buildFocusScope(state.focusRootNode, state.focusLayerDepth)
+  state.focusVisibleNodes = scope.visibleNodes
+  state.focusVisibleEdges = scope.visibleEdges
+}
+
+function nodeHiddenByFocus(nodeId, attributes) {
+  if (!state.focusRootNode) return false
+  if (attributes.clusterNode === true) return true
+  return !state.focusVisibleNodes.has(nodeId)
+}
+
+function edgeHiddenByFocus(edgeId) {
+  if (!state.focusRootNode) return false
+  return !state.focusVisibleEdges.has(edgeId)
 }
 
 function kindLodBase(kind) {
@@ -670,8 +1042,10 @@ function lodTierFor(kind, degree) {
 
 function nodeHiddenByPerformance(_nodeId, attributes) {
   if (!state.performanceMode) return false
+  if (state.focusRootNode && state.focusVisibleNodes.has(_nodeId)) return false
   if (attributes.clusterNode === true) return !shouldShowClusters()
   if (state.lodLevel === 'full') return false
+  if (state.lodLevel === 'cluster') return true
   const tier = attributes.lodTier || lodTierFor(attributes.kind, attributes.degree || 0)
   if (state.lodLevel === 'far') return tier < 4
   if (state.lodLevel === 'mid') return tier < 2
@@ -680,7 +1054,9 @@ function nodeHiddenByPerformance(_nodeId, attributes) {
 
 function edgeHiddenByPerformance(_edgeId, attributes) {
   if (!state.performanceMode || attributes.hidden === true) return false
+  if (state.focusRootNode && state.focusVisibleEdges.has(_edgeId)) return false
   if (state.edgeLevel === 'full') return false
+  if (state.edgeLevel === 'hidden') return true
   const hoveredNode = state.hoveredNode
   if (hoveredNode && (attributes.sourceNodeId === hoveredNode || attributes.targetNodeId === hoveredNode)) return false
   if (state.edgeLevel === 'focus') return true
@@ -693,7 +1069,12 @@ function edgeHiddenByPerformance(_edgeId, attributes) {
 
 function reduceNode(nodeId, attributes) {
   const reduced = { ...attributes }
-  if (nodeHiddenByPerformance(nodeId, attributes)) reduced.hidden = true
+  if (nodeHiddenByFocus(nodeId, attributes) || nodeHiddenByPerformance(nodeId, attributes)) reduced.hidden = true
+  if (!reduced.hidden && state.focusRootNode === nodeId) {
+    reduced.color = '#66d9ef'
+    reduced.size = Math.max(reduced.size || attributes.size || BASE_NODE_SIZE, (attributes.baseSize || BASE_NODE_SIZE) + 3)
+    reduced.zIndex = 3
+  }
   if (attributes.clusterNode === true) {
     reduced.size = clamp(attributes.baseSize || BASE_NODE_SIZE, 10, MAX_NODE_SIZE + 16)
     reduced.zIndex = 1
@@ -703,7 +1084,7 @@ function reduceNode(nodeId, attributes) {
 
 function reduceEdge(edgeId, attributes) {
   const reduced = { ...attributes }
-  if (edgeHiddenByPerformance(edgeId, attributes)) reduced.hidden = true
+  if (edgeHiddenByFocus(edgeId, attributes) || edgeHiddenByPerformance(edgeId, attributes)) reduced.hidden = true
   return reduced
 }
 
@@ -738,7 +1119,16 @@ function updatePerformanceStateFromCamera() {
 }
 
 function performanceSignature() {
-  return [state.performanceMode ? '1' : '0', state.lodLevel, state.edgeLevel, state.hoveredNode || '', state.rotating ? '1' : '0'].join(':')
+  return [
+    state.performanceMode ? '1' : '0',
+    state.lodLevel,
+    state.edgeLevel,
+    state.hoveredNode || '',
+    state.focusRootNode || '',
+    String(state.focusLayerDepth),
+    state.rotating ? '1' : '0',
+    state.cameraMoving ? '1' : '0',
+  ].join(':')
 }
 
 function refreshPerformanceView(force = false) {
@@ -758,6 +1148,30 @@ function schedulePerformanceRefresh(force = false) {
     state.performanceFrame = null
     refreshPerformanceView(force)
   })
+}
+
+function clearCameraActivityTimer() {
+  if (!state.cameraIdleTimer) return
+  window.clearTimeout(state.cameraIdleTimer)
+  state.cameraIdleTimer = null
+}
+
+function resetCameraActivity() {
+  clearCameraActivityTimer()
+  state.cameraMoving = false
+}
+
+function markCameraActivity() {
+  const wasMoving = state.cameraMoving
+  state.cameraMoving = true
+  clearCameraActivityTimer()
+  state.cameraIdleTimer = window.setTimeout(() => {
+    state.cameraIdleTimer = null
+    if (!state.cameraMoving) return
+    state.cameraMoving = false
+    schedulePerformanceRefresh(true)
+  }, CAMERA_INTERACTION_IDLE_MS)
+  schedulePerformanceRefresh(!wasMoving)
 }
 
 function rendererSettings() {
@@ -801,7 +1215,7 @@ function tuneRendererForScale() {
 }
 
 function bindRendererEvents() {
-  state.renderer.getCamera().on('updated', () => schedulePerformanceRefresh())
+  state.renderer.getCamera().on('updated', markCameraActivity)
   state.renderer.on('enterNode', ({ node }) => {
     state.hoveredNode = node
     schedulePerformanceRefresh(true)
@@ -825,6 +1239,12 @@ function bindRendererEvents() {
     const degree = state.nodeDegrees.get(node) || 0
     setStatus(`${point.kind}: ${point.label}${location} (${typeLabel}, ${formatNumber(degree)} connection${degree === 1 ? '' : 's'})`, 'ok')
   })
+  state.renderer.on('rightClickNode', ({ node, event }) => {
+    event?.preventSigmaDefault?.()
+    event?.original?.preventDefault?.()
+    event?.original?.stopPropagation?.()
+    focusNodeNeighborhood(node, true)
+  })
 }
 
 function ensureRenderer() {
@@ -841,12 +1261,13 @@ function stopRotation() {
   if (state.rotationFrame) cancelAnimationFrame(state.rotationFrame)
   state.rotationFrame = null
   state.rotating = false
-  elements.toggleSim.textContent = '3D Rotate'
+  elements.toggleSim.textContent = 'Play'
   schedulePerformanceRefresh(true)
 }
 
 async function destroyGraph() {
   stopRotation()
+  resetCameraActivity()
   if (state.performanceFrame) cancelAnimationFrame(state.performanceFrame)
   state.performanceFrame = null
   state.renderer?.kill?.()
@@ -869,11 +1290,18 @@ function resetState() {
   state.skippedEdges = 0
   state.hasNext = false
   state.hoveredNode = null
+  state.focusRootNode = null
+  state.focusLayerDepth = 1
+  state.focusVisibleNodes.clear()
+  state.focusVisibleEdges.clear()
+  state.focusPreviousEdgesVisible = null
   state.dataNodeCount = 0
   state.clusterNodes.clear()
   state.clusterCounts.clear()
   state.edgesByNode.clear()
+  state.outgoingEdgesByNode.clear()
   state.cameraRatio = 1
+  resetCameraActivity()
   state.lodLevel = 'full'
   state.edgeLevel = 'full'
   state.performanceSignature = ''
@@ -882,6 +1310,7 @@ function resetState() {
   state.rotationY = 0.64
   state.rotationZ = 0.08
   stopRotation()
+  updateFocusLayerControl()
   updateCounters()
 }
 
@@ -945,6 +1374,10 @@ function statusWithSkippedSummary(message) {
   return skipped ? `${message} ${skipped}` : message
 }
 
+function yieldToBrowserFrame() {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()))
+}
+
 function setEdgesVisible(visible, showStatus = false) {
   state.edgesVisible = visible
   elements.toggleEdges.textContent = visible ? 'Hide Edges' : 'Show Edges'
@@ -965,6 +1398,168 @@ function setPerformanceMode(enabled, showStatus = false) {
   localStorage.setItem(PERFORMANCE_MODE_STORAGE_KEY, enabled ? '1' : '0')
   refreshPerformanceView(true)
   if (showStatus) setStatus(`Performance mode ${enabled ? 'enabled' : 'disabled'}.`, 'ok')
+}
+
+function formatLayoutSettingValue(key, value) {
+  if (LAYOUT_SETTING_SCHEMA[key]?.integer) return String(Math.round(value))
+  if (key === 'linkStrength') return String(Number(value).toFixed(3))
+  return String(Number(value))
+}
+
+function updateLayoutSettingsForm() {
+  for (const input of elements.layoutSettingInputs) {
+    const key = input.dataset.layoutSetting
+    if (!key || state.layoutSettings[key] === undefined) continue
+    input.value = formatLayoutSettingValue(key, state.layoutSettings[key])
+  }
+}
+
+function restoreLayoutSettings() {
+  const storedValue = localStorage.getItem(LAYOUT_SETTINGS_STORAGE_KEY)
+  if (!storedValue) {
+    state.layoutSettings = defaultLayoutSettings()
+    updateLayoutSettingsForm()
+    return
+  }
+  try {
+    state.layoutSettings = normalizeLayoutSettings(JSON.parse(storedValue))
+  } catch (error) {
+    console.warn(error)
+    state.layoutSettings = defaultLayoutSettings()
+  }
+  updateLayoutSettingsForm()
+}
+
+function persistLayoutSettings() {
+  localStorage.setItem(LAYOUT_SETTINGS_STORAGE_KEY, JSON.stringify(state.layoutSettings))
+}
+
+function readLayoutSettingsForm() {
+  const nextSettings = {}
+  for (const input of elements.layoutSettingInputs) {
+    const key = input.dataset.layoutSetting
+    if (!key) continue
+    nextSettings[key] = input.value
+  }
+  return normalizeLayoutSettings(nextSettings)
+}
+
+function setLayoutSettings(settings, persist = true) {
+  state.layoutSettings = normalizeLayoutSettings(settings)
+  if (persist) persistLayoutSettings()
+  updateLayoutSettingsForm()
+}
+
+function openLayoutSettingsModal() {
+  if (!elements.layoutSettingsModal) return
+  updateLayoutSettingsForm()
+  elements.layoutSettingsModal.hidden = false
+  elements.layoutSettingInputs[0]?.focus()
+}
+
+function closeLayoutSettingsModal() {
+  if (elements.layoutSettingsModal) elements.layoutSettingsModal.hidden = true
+}
+
+async function applyLayoutSettingsToLoadedGraph(showStatus = false) {
+  if (!state.graph?.order || !state.nodesById.size) {
+    if (showStatus) setStatus('Layout settings saved.', 'ok')
+    return
+  }
+  const pointIds = state.projectionNodeIds.filter((nodeId) => state.nodesById.has(nodeId))
+  const points = pointIds.map((nodeId) => state.nodesById.get(nodeId))
+  const pointIdSet = new Set(pointIds)
+  const links = []
+  state.graph.forEachEdge((_edgeId, attributes) => {
+    if (pointIdSet.has(attributes.sourceNodeId) && pointIdSet.has(attributes.targetNodeId)) {
+      links.push({ source: attributes.sourceNodeId, target: attributes.targetNodeId })
+    }
+  })
+  setStatus(`Applying layout settings to ${formatNumber(points.length)} loaded nodes...`)
+  const preprocessed = await preprocessBatch({ points, links }, 0)
+  for (let index = 0; index < points.length; index += 1) {
+    const point = points[index]
+    const baseSize = state.graph.getNodeAttribute(point.id, 'baseSize') || BASE_NODE_SIZE
+    recordProjectionNode(point.id, pointPositionFromBatch(preprocessed, index), baseSize)
+  }
+  applyProjectionToAllNodes()
+  if (showStatus) setStatus(`Layout settings applied to ${formatNumber(points.length)} loaded nodes.`, 'ok')
+}
+
+async function applyLayoutSettingsFromModal() {
+  setLayoutSettings(readLayoutSettingsForm())
+  closeLayoutSettingsModal()
+  await applyLayoutSettingsToLoadedGraph(true)
+}
+
+function resetLayoutSettings() {
+  localStorage.removeItem(LAYOUT_SETTINGS_STORAGE_KEY)
+  setLayoutSettings(defaultLayoutSettings(), false)
+  setStatus('Layout settings reset.', 'ok')
+}
+
+function updateFocusLayerControl() {
+  if (!elements.focusLayerControl) return
+  const hasFocus = Boolean(state.focusRootNode)
+  elements.focusLayerControl.hidden = !hasFocus
+  if (elements.focusLayerSlider) elements.focusLayerSlider.value = String(state.focusLayerDepth)
+  if (elements.focusLayerValue) elements.focusLayerValue.textContent = String(state.focusLayerDepth)
+  if (!elements.focusNodeLabel) return
+  if (!hasFocus) {
+    elements.focusNodeLabel.textContent = ''
+    return
+  }
+  const point = state.nodesById.get(state.focusRootNode)
+  elements.focusNodeLabel.textContent = truncateHoverLabel(point?.label || state.focusRootNode)
+}
+
+function refreshFocusView() {
+  updateFocusLayerControl()
+  updateClusterOverlay()
+  state.performanceSignature = ''
+  state.renderer?.refresh({ skipIndexation: false, schedule: true })
+  refreshPerformanceView(true)
+}
+
+function focusStatusMessage() {
+  const point = state.nodesById.get(state.focusRootNode)
+  const label = point?.label || state.focusRootNode
+  const nodeCount = state.focusVisibleNodes.size
+  const edgeCount = state.focusVisibleEdges.size
+  return `Focused ${label} at layer ${state.focusLayerDepth}. Showing ${formatNumber(nodeCount)} downstream node${nodeCount === 1 ? '' : 's'} and ${formatNumber(edgeCount)} edge${edgeCount === 1 ? '' : 's'}.`
+}
+
+function focusNodeNeighborhood(nodeId, showStatus = false) {
+  if (!state.graph?.hasNode(nodeId)) return
+  if (state.graph.getNodeAttribute(nodeId, 'clusterNode') === true) return
+  const newFocus = !state.focusRootNode
+  if (newFocus) state.focusPreviousEdgesVisible = state.edgesVisible
+  state.focusRootNode = nodeId
+  rebuildFocusScope()
+  if (newFocus && !state.edgesVisible) setEdgesVisible(true)
+  refreshFocusView()
+  if (showStatus) setStatus(focusStatusMessage(), 'ok')
+}
+
+function setFocusLayerDepth(layerDepth, showStatus = false) {
+  state.focusLayerDepth = clamp(Math.round(Number(layerDepth) || 1), 1, 2)
+  if (!state.focusRootNode) {
+    updateFocusLayerControl()
+    return
+  }
+  focusNodeNeighborhood(state.focusRootNode, showStatus)
+}
+
+function clearFocusedGraph(showStatus = false) {
+  if (!state.focusRootNode) return
+  const previousEdgesVisible = state.focusPreviousEdgesVisible
+  state.focusRootNode = null
+  state.focusVisibleNodes.clear()
+  state.focusVisibleEdges.clear()
+  state.focusPreviousEdgesVisible = null
+  refreshFocusView()
+  if (previousEdgesVisible !== null && previousEdgesVisible !== state.edgesVisible) setEdgesVisible(previousEdgesVisible)
+  if (showStatus) setStatus(statusWithSkippedSummary('Graph focus cleared.'), 'ok')
 }
 
 function nodeIsHidden(nodeId) {
@@ -1017,6 +1612,15 @@ function indexEdgeForNode(nodeId, edgeId) {
   if (!edgeIds) {
     edgeIds = new Set()
     state.edgesByNode.set(nodeId, edgeIds)
+  }
+  edgeIds.add(edgeId)
+}
+
+function indexOutgoingEdgeForNode(nodeId, edgeId) {
+  let edgeIds = state.outgoingEdgesByNode.get(nodeId)
+  if (!edgeIds) {
+    edgeIds = new Set()
+    state.outgoingEdgesByNode.set(nodeId, edgeIds)
   }
   edgeIds.add(edgeId)
 }
@@ -1149,6 +1753,7 @@ function addLink(link, dirtyNodes) {
   state.loadedEdgeIds.add(link.id)
   indexEdgeForNode(link.source, link.id)
   indexEdgeForNode(link.target, link.id)
+  indexOutgoingEdgeForNode(link.source, link.id)
   assignNodeType(link.source, link.type)
   assignNodeType(link.target, link.type)
   incrementNodeDegree(link.source)
@@ -1178,6 +1783,7 @@ function appendBatchToGraph(batch) {
     updateNodeStyle(nodeId)
   }
   syncClusterNodes()
+  rebuildFocusScope()
 
   ensureRenderer()
   tuneRendererForScale()
@@ -1230,13 +1836,44 @@ async function appendBatch(batch, reset) {
   return normalized
 }
 
-async function loadStats(projectName) {
-  const stats = await api(`/api/viewer/graphs/${encodeURIComponent(projectName)}/stats`)
+async function fetchProjectStats(projectName) {
+  return api(`/api/viewer/graphs/${encodeURIComponent(projectName)}/stats`)
+}
+
+function applyProjectStats(stats) {
   elements.dbNodes.textContent = formatNumber(stats.total_nodes)
   elements.dbEdges.textContent = formatNumber(stats.total_edges)
   if (stats.max_chunk_limit) {
     elements.chunkLimit.max = String(Math.min(MAX_CHUNK_LIMIT, stats.max_chunk_limit))
   }
+}
+
+async function loadStats(projectName) {
+  const stats = await fetchProjectStats(projectName)
+  applyProjectStats(stats)
+  return stats
+}
+
+async function projectWithGraphStats(project) {
+  try {
+    const stats = await fetchProjectStats(project.project_name)
+    return { ...project, viewerStats: stats, viewerTotalNodes: Number(stats.total_nodes || 0) }
+  } catch (error) {
+    console.warn(`Skipping project without readable graph stats: ${project.project_name}`, error)
+    return { ...project, viewerStats: null, viewerTotalNodes: 0 }
+  }
+}
+
+async function activeProjectsWithNodes(projects) {
+  const activeProjects = projects.filter((project) => project.is_active)
+  const projectsWithStats = await Promise.all(activeProjects.map(projectWithGraphStats))
+  return projectsWithStats
+    .filter((project) => project.viewerTotalNodes > 0)
+    .sort((left, right) => {
+      const leftName = String(left.project_name || '')
+      const rightName = String(right.project_name || '')
+      return leftName.localeCompare(rightName, undefined, { sensitivity: 'base' })
+    })
 }
 
 async function loadChunk(reset = false) {
@@ -1272,9 +1909,10 @@ async function loadChunk(reset = false) {
     let fetchCount = 0
     while (state.loadedNodes < targetVisibleNodes && fetchCount < MAX_AUTO_CHUNK_FETCHES) {
       const remainingVisibleNodes = Math.max(1, targetVisibleNodes - state.loadedNodes)
+      const requestVisibleNodes = Math.min(remainingVisibleNodes, VISIBLE_NODE_BATCH_LIMIT)
       const params = new URLSearchParams({
         offset: String(fetchCount === 0 ? offset : state.nextOffset),
-        limit: String(remainingVisibleNodes),
+        limit: String(requestVisibleNodes),
         edge_types: edgeTypes,
       })
       if (search) params.set('search', search)
@@ -1284,7 +1922,8 @@ async function loadChunk(reset = false) {
       fetchCount += 1
       if (state.loadedNodes >= targetVisibleNodes || !state.hasNext) break
       const loadedVisibleNodes = state.loadedNodes - startingVisibleNodes
-      setStatus(`Loaded ${formatNumber(loadedVisibleNodes)} of ${formatNumber(requestedVisibleNodes)} visible nodes from ${projectName}...`)
+      setStatus(`Loaded ${formatNumber(loadedVisibleNodes)} of ${formatNumber(requestedVisibleNodes)} visible nodes from ${projectName} in ${formatNumber(fetchCount)} batch${fetchCount === 1 ? '' : 'es'}...`)
+      await yieldToBrowserFrame()
     }
     const loadedVisibleNodes = Math.max(0, state.loadedNodes - startingVisibleNodes)
     const hitScanLimit = state.loadedNodes < targetVisibleNodes && state.hasNext
@@ -1303,14 +1942,9 @@ async function loadChunk(reset = false) {
 async function loadProjects() {
   setStatus('Loading projects...')
   try {
+    const selectedProject = elements.projectSelect.value
     const projects = await api('/api/auth/projects')
-    const activeProjects = projects
-      .filter((project) => project.is_active)
-      .sort((left, right) => {
-        const leftName = String(left.project_name || '')
-        const rightName = String(right.project_name || '')
-        return leftName.localeCompare(rightName, undefined, { sensitivity: 'base' })
-      })
+    const activeProjects = await activeProjectsWithNodes(projects)
     elements.projectSelect.replaceChildren(
       ...activeProjects.map((project) => {
         const option = document.createElement('option')
@@ -1320,10 +1954,15 @@ async function loadProjects() {
       }),
     )
     if (activeProjects.length) {
-      await loadStats(activeProjects[0].project_name)
-      setStatus('Select a graph window and load a chunk.', 'ok')
+      const selectedStillAvailable = activeProjects.some((project) => project.project_name === selectedProject)
+      elements.projectSelect.value = selectedStillAvailable ? selectedProject : activeProjects[0].project_name
+      const selected = activeProjects.find((project) => project.project_name === elements.projectSelect.value)
+      if (selected?.viewerStats) applyProjectStats(selected.viewerStats)
+      setStatus(`Showing ${formatNumber(activeProjects.length)} project${activeProjects.length === 1 ? '' : 's'} with graph nodes.`, 'ok')
     } else {
-      setStatus('No active projects are registered.', 'warn')
+      elements.dbNodes.textContent = '-'
+      elements.dbEdges.textContent = '-'
+      setStatus('No active projects with graph nodes are available.', 'warn')
     }
   } catch (error) {
     setStatus(error.message, 'error')
@@ -1348,8 +1987,24 @@ function wireEvents() {
     setStatus('Graph cleared.', 'ok')
   })
   elements.fitView.addEventListener('click', fitGraph)
-  elements.toggleEdges.addEventListener('click', () => setEdgesVisible(!state.edgesVisible, true))
+  elements.toggleEdges.addEventListener('click', () => {
+    if (state.focusRootNode) state.focusPreviousEdgesVisible = null
+    setEdgesVisible(!state.edgesVisible, true)
+  })
   elements.togglePerformance?.addEventListener('click', () => setPerformanceMode(!state.performanceMode, true))
+  elements.openLayoutSettings?.addEventListener('click', openLayoutSettingsModal)
+  elements.closeLayoutSettings?.addEventListener('click', closeLayoutSettingsModal)
+  elements.applyLayoutSettings?.addEventListener('click', () => applyLayoutSettingsFromModal())
+  elements.resetLayoutSettings?.addEventListener('click', resetLayoutSettings)
+  elements.layoutSettingsModal?.addEventListener('click', (event) => {
+    if (event.target === elements.layoutSettingsModal) closeLayoutSettingsModal()
+  })
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !elements.layoutSettingsModal?.hidden) closeLayoutSettingsModal()
+  })
+  elements.focusLayerSlider?.addEventListener('input', () => setFocusLayerDepth(elements.focusLayerSlider.value, true))
+  elements.clearFocus?.addEventListener('click', () => clearFocusedGraph(true))
+  elements.graphRoot?.addEventListener('contextmenu', (event) => event.preventDefault())
   elements.nodeTypeInputs.forEach((input) => input.addEventListener('change', () => setNodeKindVisibility(true)))
   elements.toggleSim.addEventListener('click', () => {
     if (!state.graph) return
@@ -1367,6 +2022,7 @@ async function boot() {
   if (Number(elements.chunkLimit.value) > MAX_CHUNK_LIMIT) elements.chunkLimit.value = String(DEFAULT_CHUNK_LIMIT)
   setControlPanelCollapsed(localStorage.getItem('cg_viewer_controls_collapsed') === '1')
   restoreNodeKindVisibility()
+  restoreLayoutSettings()
   const storedEdgeVisibility = localStorage.getItem(EDGE_VISIBILITY_STORAGE_KEY)
   setEdgesVisible(storedEdgeVisibility === null ? DEFAULT_EDGE_VISIBILITY : storedEdgeVisibility === '1')
   const storedPerformanceMode = localStorage.getItem(PERFORMANCE_MODE_STORAGE_KEY)
