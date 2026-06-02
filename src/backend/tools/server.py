@@ -1,4 +1,4 @@
-"""CGA (ContextGraphAdmin) MCP Server – exposes indexing and retrieval tools.
+"""CGA (ContextGraphAgent) MCP Server – exposes indexing and retrieval tools.
 
 Phase 1 tools
 -------------

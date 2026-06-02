@@ -222,18 +222,31 @@ def test_viewer_entrypoint_is_served() -> None:
     assert "<title>CGA Viewer</title>" in response.text
     assert '"sigma"' in response.text
     assert '"graphology"' in response.text
-    assert 'src="./main.js?v=1.30.18"' in response.text
+    assert 'src="./main.js?v=1.30.38"' in response.text
     assert 'id="copy-falkor-url"' in response.text
     assert 'aria-label="Copy FalkorDB connection URL"' in response.text
     assert '<label for="chunk-limit">Display Nodes</label>' in response.text
     assert 'value="250"' in response.text
     assert '<div id="edge-grid" class="edge-grid" aria-label="Edge types"></div>' in response.text
     assert 'id="toggle-edges" class="btn secondary" type="button" aria-pressed="false">Show Edges</button>' in response.text
+    assert 'id="open-layout-settings" class="btn secondary" type="button">Settings</button>' in response.text
     assert '<div class="filter-title">Rendering Node Types</div>' in response.text
     assert 'class="node-type-grid" aria-label="Rendering Node Types"' in response.text
     assert 'name="node-type" value="Repository" checked' in response.text
     assert 'name="node-type" value="Variable" checked' in response.text
     assert '<div id="fps-counter" class="fps-counter">FPS --</div>' in response.text
+    assert '<div id="focus-layer-control" class="focus-layer-control" aria-label="Focused graph layers" hidden>' in response.text
+    assert 'id="focus-layer-slider" type="range" min="1" max="2" step="1" value="1"' in response.text
+    assert '<span>Layer</span><strong id="focus-layer-value">1</strong>' in response.text
+    assert 'id="clear-focus" class="focus-clear-button" type="button" aria-label="Clear focused graph"' in response.text
+    assert '<div id="layout-settings-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="layout-settings-title">' in response.text
+    assert '<h2 id="layout-settings-title">Layout Settings</h2>' in response.text
+    assert 'data-layout-setting="repulsion"' in response.text
+    assert 'data-layout-setting="linkStrength"' in response.text
+    assert 'id="apply-layout-settings" class="btn primary" type="button">Apply</button>' in response.text
+    assert 'id="reset-layout-settings" class="btn secondary" type="button">Reset</button>' in response.text
+    assert '<button id="toggle-sim" class="btn secondary" type="button">Play</button>' in response.text
+    assert '>3D Rotate</button>' not in response.text
     assert 'id="toggle-performance" class="btn secondary" type="button" aria-pressed="true">Performance On</button>' in response.text
     assert '<div id="cluster-overlay" class="cluster-overlay" hidden></div>' in response.text
     normalized_html = response.text.replace("\r\n", "\n")
@@ -251,19 +264,43 @@ def test_viewer_static_assets_are_not_cached() -> None:
     assert response.headers["cache-control"] == "no-store, no-cache, must-revalidate, max-age=0"
     assert "Sigma" in response.text
     assert "DEFAULT_CHUNK_LIMIT = 250" in response.text
-    assert "MAX_AUTO_CHUNK_FETCHES = 80" in response.text
+    assert "MAX_AUTO_CHUNK_FETCHES = 100" in response.text
+    assert "VISIBLE_NODE_BATCH_LIMIT = 5000" in response.text
     assert "DEFAULT_EDGE_VISIBILITY = false" in response.text
     assert "FALKOR_CONNECTION_URL = 'falkor://cga-falkordb-dev:6379'" in response.text
     assert "EDGE_VISIBILITY_STORAGE_KEY = 'cg_viewer_edges_visible_v4'" in response.text
     assert "NODE_KIND_VISIBILITY_STORAGE_KEY" in response.text
     assert "PERFORMANCE_MODE_STORAGE_KEY = 'cg_viewer_performance_mode_v1'" in response.text
+    assert "LAYOUT_SETTINGS_STORAGE_KEY = 'cg_viewer_layout_settings_v1'" in response.text
+    assert "function normalizeLayoutSettings" in response.text
+    assert "layoutSettings: defaultLayoutSettings()" in response.text
+    assert "function openLayoutSettingsModal" in response.text
+    assert "function applyLayoutSettingsToLoadedGraph" in response.text
+    assert "layoutSettings: state.layoutSettings" in response.text
     assert "new Worker(workerUrl, { type: 'module' })" in response.text
     assert "Float32Array" in response.text
     assert "function reduceNode" in response.text
     assert "function reduceEdge" in response.text
+    assert "focusRootNode: null" in response.text
+    assert "focusLayerDepth: 1" in response.text
+    assert "function setFocusLayerDepth" in response.text
+    assert "function buildFocusScope" in response.text
+    assert "function focusNodeNeighborhood" in response.text
+    assert "rightClickNode" in response.text
+    assert "attributes.sourceNodeId !== nodeId" in response.text
+    assert "state.focusVisibleEdges.has(edgeId)" in response.text
     assert "function syncClusterNodes" in response.text
     assert "function preprocessBatch" in response.text
+    assert "LAYOUT_BARNES_HUT_THETA = 0.72" in response.text
+    assert "function relaxLayoutPositions" in response.text
+    assert "function applyBarnesHutRepulsion" in response.text
+    assert "function applyCollisionForce" in response.text
+    assert "const linkStrength = settings.linkStrength / minDegree" in response.text
     assert "function refreshPerformanceView" in response.text
+    assert "CAMERA_INTERACTION_IDLE_MS = 160" in response.text
+    assert "function markCameraActivity" in response.text
+    assert "state.edgeLevel === 'hidden'" in response.text
+    assert "state.lodLevel === 'cluster'" in response.text
     assert "EDGE_TYPE_ORDER = ['CALLS', 'IMPORTS', 'DEFINES', 'CONTAINS', 'USES_VARIABLE', 'FLOWS_TO']" in response.text
     assert "DEFAULT_SELECTED_EDGE_TYPES = new Set(['CALLS', 'IMPORTS', 'DEFINES', 'CONTAINS'])" in response.text
     assert "function renderEdgeTypeControls" in response.text
@@ -274,9 +311,18 @@ def test_viewer_static_assets_are_not_cached() -> None:
     assert "function setNodeKindVisibility" in response.text
     assert "function syncLoadedCounts" in response.text
     assert "function startFpsCounter" in response.text
+    assert "elements.toggleSim.textContent = 'Play'" in response.text
+    assert "elements.toggleSim.textContent = 'Stop'" in response.text
+    assert "function fetchProjectStats" in response.text
+    assert "async function activeProjectsWithNodes" in response.text
+    assert "viewerTotalNodes > 0" in response.text
+    assert "No active projects with graph nodes are available." in response.text
     assert "Loading up to ${formatNumber(requestedVisibleNodes)} visible nodes" in response.text
     assert "Loaded ${formatNumber(loadedVisibleNodes)} visible nodes" in response.text
     assert "remainingVisibleNodes = Math.max(1, targetVisibleNodes - state.loadedNodes)" in response.text
+    assert "requestVisibleNodes = Math.min(remainingVisibleNodes, VISIBLE_NODE_BATCH_LIMIT)" in response.text
+    assert "limit: String(requestVisibleNodes)" in response.text
+    assert "function yieldToBrowserFrame" in response.text
     assert "loadNext" not in response.text
     assert "Load more" not in response.text
     assert "defaultDrawNodeHover: drawNodeHover" in response.text
@@ -296,6 +342,17 @@ def test_viewer_styles_keep_control_buttons_visible() -> None:
     assert "flex-wrap: wrap" in response.text
     assert ".field-row .btn {" in response.text
     assert "flex: 1 1 120px" in response.text
+    assert ".focus-layer-control {" in response.text
+    assert "left: 18px" in response.text
+    assert "width: fit-content" in response.text
+    assert "min-width: min(244px, calc(100% - 36px))" in response.text
+    assert "max-width: min(720px, calc(100% - 36px))" in response.text
+    assert ".focus-node-label {" in response.text
+    assert "max-width: 100%" in response.text
+    assert ".focus-layer-control input[type=\"range\"]" in response.text
+    assert ".modal-backdrop {" in response.text
+    assert ".layout-settings-grid {" in response.text
+    assert ".modal-actions {" in response.text
 
 
 def test_viewer_worker_asset_is_not_cached() -> None:
@@ -306,6 +363,12 @@ def test_viewer_worker_asset_is_not_cached() -> None:
     assert "preprocessBatch" in response.text
     assert "Float32Array" in response.text
     assert "initial3dPosition" in response.text
+    assert "function normalizeLayoutSettings" in response.text
+    assert "message.layoutSettings" in response.text
+    assert "settings.repulsion" in response.text
+    assert "LAYOUT_BARNES_HUT_THETA = 0.72" in response.text
+    assert "function relaxLayoutPositions" in response.text
+    assert "function applyCollisionForce" in response.text
 
 
 def test_viewer_entrypoint_redirects_to_trailing_slash() -> None:
@@ -319,7 +382,13 @@ def test_admin_embeds_versioned_graph_viewer() -> None:
     response = TestClient(app).get("/admin")
 
     assert response.status_code == 200
-    assert 'data-src="/viewer/?v=1.30.18"' in response.text
+    assert 'data-src="/viewer/?v=1.30.38"' in response.text
+    assert 'id="wsr-save-btn" onclick="saveWorkReportEdit(\'this\')"' in response.text
+    assert 'id="wsr-save-prev-btn" onclick="saveWorkReportEdit(\'prev\')"' in response.text
+    assert 'id="wsr-preview" class="wsr-preview-editor"' in response.text
+    assert 'id="wsr-preview-prev" class="wsr-preview-editor"' in response.text
+    assert 'onclick="copyFalkorDbUrl()"' in response.text
+    assert 'aria-label="Copy FalkorDB connection URL"' in response.text
     assert "const ADMIN_TAB_ROUTES" in response.text
     assert "viewer: '/admin/graph'" in response.text
 
@@ -341,7 +410,7 @@ def test_admin_deep_links_are_served() -> None:
     for path in ["/admin/projects", "/admin/users", "/admin/audit", "/admin/graph", "/admin/settings"]:
         response = client.get(path)
         assert response.status_code == 200
-        assert "<title>CGA (ContextGraphAdmin)</title>" in response.text
+        assert "<title>CGA (ContextGraphAgent)</title>" in response.text
         assert "const ADMIN_TAB_ROUTES" in response.text
 
 

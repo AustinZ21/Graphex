@@ -6,8 +6,11 @@ Bootstrap the auth PostgreSQL database (asyncpg via the pgshim):
   1. Create tables (idempotent).
   2. Create the initial admin user (ADMIN_USERNAME / ADMIN_PASSWORD env vars,
      defaults: admin / changeme).
-  3. Import projects + tokens from config/project-token-registry.json
-     (skips entries that already exist).
+  3. Optionally import projects + tokens from config/project-token-registry.json
+      when a caller explicitly supplies that file (skips entries that already exist).
+
+The Docker Desktop release package does not ship Nate Scott's local projects,
+prebuilt indexes, database dumps, or sample/demo project data.
 
 Safe to re-run; project + token inserts use ``ON CONFLICT DO NOTHING``.
 

@@ -29,14 +29,16 @@ jobs:
           set -euo pipefail
           mkdir -p site/docs
 
-          if [ -f README.md ]; then
+          if [ -f docs/site/index.html ]; then
+            cp -R docs/site/. site/
+          elif [ -f README.md ]; then
             cp README.md site/index.md
           else
-            echo "# ADC" > site/index.md
+            echo "# CGA" > site/index.md
           fi
 
           if [ -d docs ]; then
-            cp -R docs/. site/docs/
+            find docs -mindepth 1 -maxdepth 1 ! -name site -exec cp -R {} site/docs/ \;
           fi
 
           touch site/.nojekyll

@@ -15,12 +15,20 @@ if (Test-Path $portableRoot) {
 
 New-Item -ItemType Directory -Path $portableRoot | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $portableRoot 'repos') | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $portableRoot 'src\scripts') -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $portableRoot 'src') -Force | Out-Null
 
 $filesToCopy = @(
     @{ Source = Join-Path $repoRoot 'Dockerfile.dev'; Target = Join-Path $portableRoot 'Dockerfile.dev' },
     @{ Source = Join-Path $repoRoot 'docker-entrypoint.sh'; Target = Join-Path $portableRoot 'docker-entrypoint.sh' },
     @{ Source = Join-Path $repoRoot 'requirements.txt'; Target = Join-Path $portableRoot 'requirements.txt' },
+    @{ Source = Join-Path $repoRoot 'LICENSE'; Target = Join-Path $portableRoot 'LICENSE' },
+    @{ Source = Join-Path $repoRoot 'NOTICE.md'; Target = Join-Path $portableRoot 'NOTICE.md' },
+    @{ Source = Join-Path $repoRoot 'OPEN_SOURCE.md'; Target = Join-Path $portableRoot 'OPEN_SOURCE.md' },
+    @{ Source = Join-Path $repoRoot 'THIRD_PARTY_NOTICES.md'; Target = Join-Path $portableRoot 'THIRD_PARTY_NOTICES.md' },
+    @{ Source = Join-Path $repoRoot 'DISCLAIMER.md'; Target = Join-Path $portableRoot 'DISCLAIMER.md' },
+    @{ Source = Join-Path $repoRoot 'SECURITY.md'; Target = Join-Path $portableRoot 'SECURITY.md' },
+    @{ Source = Join-Path $repoRoot 'CONTRIBUTING.md'; Target = Join-Path $portableRoot 'CONTRIBUTING.md' },
+    @{ Source = Join-Path $repoRoot 'CODE_OF_CONDUCT.md'; Target = Join-Path $portableRoot 'CODE_OF_CONDUCT.md' },
     @{ Source = Join-Path $PSScriptRoot 'start-desktop.ps1'; Target = Join-Path $portableRoot 'start-desktop.ps1' },
     @{ Source = Join-Path $PSScriptRoot 'start-cga-desktop.cmd'; Target = Join-Path $portableRoot 'start-cga-desktop.cmd' },
     @{ Source = Join-Path $PSScriptRoot 'open-cga-desktop.cmd'; Target = Join-Path $portableRoot 'open-cga-desktop.cmd' },
@@ -33,7 +41,11 @@ foreach ($item in $filesToCopy) {
     Copy-Item -Path $item.Source -Destination $item.Target -Force
 }
 
-Copy-Item -Path (Join-Path $repoRoot 'src') -Destination (Join-Path $portableRoot 'src') -Recurse -Force
+Copy-Item -Path (Join-Path $repoRoot 'src\*') -Destination (Join-Path $portableRoot 'src') -Recurse -Force
+
+if (-not (Test-Path (Join-Path $portableRoot 'src\scripts\init_auth_db.py'))) {
+  throw 'Portable bundle source copy failed: src\scripts\init_auth_db.py is missing.'
+}
 
 # The backup sidecar mounts this script directly; make sure it lives at the
 # expected path inside the bundle.
@@ -219,13 +231,50 @@ $portableReadme = @"
 # CGA Portable Docker Desktop Package
 
 This folder is a self-contained CGA package for Docker Desktop. CGA runs on
-PostgreSQL for auth, projects, audit logs, and work-briefing vectors.
+PostgreSQL for auth, projects, audit logs, and work-briefing vectors. Release
+packages include a prebuilt CGA API image tar that the launcher loads before
+startup; developer packages fall back to building from source when the tar is
+not present.
+
+The package does not include Nate Scott's local projects, private repositories,
+PostgreSQL data, FalkorDB graph indexes, Redis state, backups, or sample/demo
+project data. First run creates a fresh local runtime with an admin account and
+empty data stores. Add repositories to ``repos`` or set ``CGA_REPOS_MOUNT``,
+then index them from CGA.
+
+## Author And Attribution
+
+CGA (ContextGraphAgent) was created and authored by Nate Scott. Preserve this
+attribution when sharing, publishing, or redistributing this Docker Desktop
+bundle.
 
 ## Use
 
-1. Copy repository folders you want to analyze into `repos`.
-2. Double-click `start-cga-desktop.cmd`.
-3. Open `http://localhost:18001/admin` if the browser does not open automatically.
+1. Copy repository folders you want to analyze into ``repos``.
+2. Double-click ``start-cga-desktop.cmd``.
+3. Open ``http://localhost:18001/admin`` if the browser does not open automatically.
+
+For scripted validation without opening a browser, run:
+
+~~~powershell
+.\start-desktop.ps1 start -WaitForReady:`$true
+~~~
+
+## License And Notices
+
+The package root includes the CGA open-source and customer-facing notice files:
+
+- ``LICENSE``
+- ``NOTICE.md``
+- ``OPEN_SOURCE.md``
+- ``THIRD_PARTY_NOTICES.md``
+- ``DISCLAIMER.md``
+- ``SECURITY.md``
+- ``CONTRIBUTING.md``
+- ``CODE_OF_CONDUCT.md``
+
+Review these files before redistributing or exposing CGA beyond a local desktop
+environment.
 
 ## Backups
 
@@ -245,7 +294,10 @@ PostgreSQL for auth, projects, audit logs, and work-briefing vectors.
 
 ## Notes
 
-- The first startup builds the local CGA image from the packaged source files.
+- Release zips load ``cga-desktop-api-image.tar`` automatically and start from
+  the prebuilt CGA API image.
+- If ``cga-desktop-api-image.tar`` is absent, startup uses the source-build
+  fallback and builds the local CGA image from the packaged source files.
 - Edit ``.env`` if you want different ports, credentials, or a different
   ``CGA_REPOS_MOUNT`` / ``CGA_BACKUP_DIR`` path.
 - The packaged ``.dockerignore`` excludes ``repos`` and ``data/backups`` so
@@ -254,6 +306,6 @@ PostgreSQL for auth, projects, audit logs, and work-briefing vectors.
 Set-Content -Path (Join-Path $portableRoot 'README.md') -Value $portableReadme -Encoding UTF8
 
 New-Item -ItemType File -Path (Join-Path $portableRoot 'repos\.gitkeep') -Force | Out-Null
-Set-Content -Path (Join-Path $portableRoot 'repos\README.txt') -Value "Drop repositories to index in this folder, or edit .env and point CGA_REPOS_MOUNT at another host folder." -Encoding UTF8
+Set-Content -Path (Join-Path $portableRoot 'repos\README.txt') -Value "Drop repositories to index in this folder, or edit .env and point CGA_REPOS_MOUNT at another host folder. The release package does not ship Nate Scott's local project repositories or prebuilt index data." -Encoding UTF8
 
 Write-Host "Portable bundle created at: $portableRoot"

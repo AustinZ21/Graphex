@@ -3,7 +3,10 @@ param(
     [string]$Version,
 
     [Parameter(Mandatory = $false)]
-    [string]$ReleaseRoot = (Join-Path $PSScriptRoot 'dist\releases')
+    [string]$ReleaseRoot = (Join-Path $PSScriptRoot 'dist\releases'),
+
+    [Parameter(Mandatory = $false)]
+    [switch]$SkipImageBuild
 )
 
 Set-StrictMode -Version Latest
@@ -25,6 +28,10 @@ if (-not $Version) {
 $bundleName = "CGA-Docker-Desktop-$Version"
 $versionedFolder = Join-Path $ReleaseRoot $bundleName
 $zipPath = Join-Path $ReleaseRoot "$bundleName.zip"
+$imageName = 'cga-desktop-portable-cga'
+$imageTag = "$imageName`:$Version"
+$localImageTag = "$imageName`:local"
+$imageTarPath = Join-Path $versionedFolder 'cga-desktop-api-image.tar'
 
 if (-not (Test-Path $ReleaseRoot)) {
     New-Item -ItemType Directory -Path $ReleaseRoot | Out-Null
@@ -43,6 +50,20 @@ if ($LASTEXITCODE -ne 0) {
     throw "Portable bundle build failed with exit code $LASTEXITCODE"
 }
 
+if (-not $SkipImageBuild) {
+    Write-Host "Building prebuilt CGA API image: $imageTag"
+    & docker build --file (Join-Path $versionedFolder 'Dockerfile.dev') --tag $imageTag --tag $localImageTag $versionedFolder
+    if ($LASTEXITCODE -ne 0) {
+        throw "Docker image build failed with exit code $LASTEXITCODE"
+    }
+
+    Write-Host "Saving prebuilt CGA API image to: $imageTarPath"
+    & docker image save -o $imageTarPath $localImageTag $imageTag
+    if ($LASTEXITCODE -ne 0) {
+        throw "Docker image save failed with exit code $LASTEXITCODE"
+    }
+}
+
 $releaseNotes = @"
 CGA Docker Desktop Release Package
 Version: $Version
@@ -52,6 +73,10 @@ Contents:
 - Portable Docker Desktop bundle directory
 - Windows one-click launchers
 - Local repos drop folder
+- Project author and creator attribution: Nate Scott
+- Open-source and notice files: LICENSE, NOTICE.md, OPEN_SOURCE.md, THIRD_PARTY_NOTICES.md, DISCLAIMER.md, SECURITY.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md
+- Fresh runtime default: no bundled local projects, repository index data, database volumes, backups, or sample/demo project data
+- Prebuilt CGA API image tar: $(if ($SkipImageBuild) { 'not included' } else { 'cga-desktop-api-image.tar' })
 "@
 Set-Content -Path (Join-Path $versionedFolder 'RELEASE.txt') -Value $releaseNotes -Encoding UTF8
 

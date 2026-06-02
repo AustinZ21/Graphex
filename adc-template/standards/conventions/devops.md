@@ -47,7 +47,7 @@
 
 ### Baseline Inputs
 - Git provider and repository URL MUST be defined using GitHub.
-- ADC source distribution and checkins MUST target `git@github.com:nascousa/ADC.git`; future ADC changes MUST NOT check in to `nasco_microsoft`.
+- CGA source distribution and customer-facing repository URL MUST target `https://github.com/nascousa/cga`; future CGA changes MUST NOT check in to `nasco_microsoft`.
 - Deployment target MUST include a reachable deployment webhook endpoint.
 - Production deployment branch is `main` unless explicitly overridden.
 - Branch policy: `main -> production`, `dev/* -> staging/non-prod`.

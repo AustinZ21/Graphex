@@ -4,9 +4,16 @@ This folder is the recommended local distribution for non-developer Docker Deskt
 
 ## What It Does
 
-- Builds the CGA API image directly from the checked-out repository.
-- Starts CGA, FalkorDB, and Redis with one command.
+- Starts CGA, PostgreSQL, FalkorDB, Redis, and the backup sidecar with one command.
+- In release zips, loads the bundled prebuilt CGA API image before startup.
+- Falls back to building the CGA API image from source when no prebuilt image tar is present.
+- Includes the CGA license, notices, disclaimer, security, contribution, and third-party notice files at the package root.
+- Starts with a fresh local runtime: no customer projects, private repositories, PostgreSQL data, FalkorDB graph index, Redis state, backups, or sample/demo project data are bundled.
 - Stores the last active local ports in `tmp/cga-desktop-runtime.json` so the reopen launcher can find the correct URL.
+
+## Author And Attribution
+
+CGA (ContextGraphAgent) was created and authored by Nate Scott. Preserve this attribution when sharing, publishing, or redistributing the Docker Desktop bundle.
 
 ## One-Click Windows Launchers
 
@@ -20,7 +27,8 @@ This folder is the recommended local distribution for non-developer Docker Deskt
 
 - Run `build-portable-bundle.cmd`.
 - It creates `dist/CGA-Docker-Desktop` with a self-contained copy of the launcher, Docker build files, and a local `repos` folder.
-- That generated folder is the one you can zip and hand to a non-developer user.
+- This developer package can still build locally if no prebuilt CGA API image tar is present.
+- The package root includes `LICENSE`, `NOTICE.md`, `OPEN_SOURCE.md`, `THIRD_PARTY_NOTICES.md`, `DISCLAIMER.md`, `SECURITY.md`, `CONTRIBUTING.md`, and `CODE_OF_CONDUCT.md`.
 
 ## Build A Versioned Release Zip
 
@@ -28,7 +36,21 @@ This folder is the recommended local distribution for non-developer Docker Deskt
 - It reads the current CGA app version and creates both:
 	- `dist/releases/CGA-Docker-Desktop-<version>`
 	- `dist/releases/CGA-Docker-Desktop-<version>.zip`
+- The release folder includes `cga-desktop-api-image.tar`, a prebuilt CGA API image that the launcher loads automatically.
 - That zip is the recommended release artifact to publish or send to another user.
+
+## License And Notices
+
+Release zips include these files at the package root:
+
+- `LICENSE`: Apache License 2.0 terms for CGA.
+- `NOTICE.md`: project notices and acknowledgements.
+- `OPEN_SOURCE.md`: open-source release summary and redistributor notes.
+- `THIRD_PARTY_NOTICES.md`: direct dependency and container image notices.
+- `DISCLAIMER.md`: usage limits, sensitive-data, and third-party service boundaries.
+- `SECURITY.md`: vulnerability reporting and security guidance.
+- `CONTRIBUTING.md`: contribution terms.
+- `CODE_OF_CONDUCT.md`: community participation expectations.
 
 ## Default URLs
 
@@ -44,7 +66,15 @@ This folder is the recommended local distribution for non-developer Docker Deskt
 4. Wait for the browser to open the Admin UI.
 
 If `.env` does not exist yet, the launcher creates it from `.env.example` automatically.
-The first launch takes longer because Docker Desktop builds the CGA API image from local source.
+In release zips, the launcher loads the prebuilt CGA API image from `cga-desktop-api-image.tar`, starts the services, waits for `/health`, and then opens the Admin UI. If that image tar is missing, startup uses the source-build fallback.
+
+The first run initializes empty PostgreSQL, FalkorDB, and Redis Docker volumes. It creates the configured admin account and database tables, but it does not import Nate Scott's local projects, ship prebuilt repository indexes, or seed a sample project. Add repositories to `repos` or set `CGA_REPOS_MOUNT`, then index them from CGA.
+
+For scripted validation without opening a browser, run:
+
+```powershell
+.\start-desktop.ps1 start -WaitForReady:$true
+```
 
 ## Configuration
 

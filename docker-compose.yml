@@ -1,5 +1,5 @@
 # ──────────────────────────────────────────────────────────────────────────────
-# CGA (ContextGraphAdmin) Docker Compose
+# CGA (ContextGraphAgent) Docker Compose
 #
 # PORT REGISTRY (ADC standard — do not change without updating ADC)
 # ┌──────────────────────────────────────────────────────────────────────────┐

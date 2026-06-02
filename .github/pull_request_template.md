@@ -6,6 +6,8 @@ Describe what changed and why.
 
 - [ ] Unit/E2E tests pass locally
 - [ ] New dependencies were checked for CVEs/CVSS threshold policy
+- [ ] License, NOTICE, and third-party notices were updated if dependencies, fonts/icons/images, browser assets, container images, distribution terms, or acknowledgements changed
+- [ ] DISCLAIMER.md was updated if usage risks, sensitive-data handling, AI/automation behavior, or third-party service boundaries changed
 - [ ] This change was developed on `dev/*` (or `hotfix/*`) branch and not committed directly to `main`
 - [ ] `docs/deploy_key.md` is updated with the current public deploy key when deploy credentials changed
 - [ ] Mermaid diagrams were updated if architecture/data-flow/schema changed
