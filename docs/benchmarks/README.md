@@ -2,6 +2,8 @@
 
 This directory contains deterministic ContextGraph context-quality benchmarks.
 
+For the current live multi-project benchmark summary, full result table, caveats, and reproduction command, see [live-context-quality.md](live-context-quality.md).
+
 The benchmark compares baseline broad context against CG-reduced context for the same task. It reports token counts, useless tokens, gold evidence coverage, ambiguity, redundancy, and Hallucination Pressure Score (HPS).
 
 Run the live database-backed project benchmark:
