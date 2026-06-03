@@ -67,7 +67,7 @@ def test_promotional_site_uses_vanta_net_and_project_links() -> None:
     assert "NET" in script
     assert "integrity=\"sha384-" in index
     assert "crossorigin=\"anonymous\"" in index
-    assert "--vanta-bg-opacity: 0.25" in styles
+    assert "--vanta-bg-opacity: 0.15" in styles
     assert "#vanta-net canvas" in styles
     assert "opacity: var(--vanta-bg-opacity)" in styles
     assert "https://github.com/nascousa/cga" in index
@@ -91,24 +91,28 @@ def test_promotional_site_topbar_uses_full_brand_text() -> None:
     styles = _read("docs/site/styles.css")
 
     assert '<span class="brand-copy">CONTEXT GRAPH AGENT</span>' in index
-    assert '<span class="brand-copy">ContextGraphAgent</span>' not in index
+    assert ('<span class="brand-copy">ContextGraph' + 'Agent</span>') not in index
     assert ".brand-copy { color: var(--muted); font-size: 14px; font-weight: 700; letter-spacing: 0; white-space: nowrap; }" in styles
 
 
-def test_promotional_site_uses_contextgraphagent_name() -> None:
+def test_promotional_site_uses_context_graph_agent_name() -> None:
     index = _read("docs/site/index.html")
 
-    assert "ContextGraphAgent" in index
+    assert "Context Graph Agent" in index
+    assert "ContextGraph" + "Agent" not in index
     assert "ContextGraph" + "Admin" not in index
 
 
 def test_promotional_site_highlights_cga_retrieval_model() -> None:
     index = _read("docs/site/index.html")
 
+    assert "about 90% fewer prompt tokens" in index
+    assert "lower hallucination pressure" in index
+    assert "find the right files, symbols, and dependencies faster" in index
     assert "retrieves the right evidence before generation" in index
     assert "query repository relationships" in index
     assert "keyword search alone" in index
     assert "Evidence Before Generation" in index
     assert "Repository Relationships" in index
-    assert "Impact graph -> optimized context -> minimal code" in index
-    assert "Better file and symbol targeting with dependency awareness" in index
+    assert "impact graph to optimized context to minimal code" in index
+    assert "files, symbols, calls, and dependencies faster" in index

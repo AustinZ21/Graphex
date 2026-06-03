@@ -1,4 +1,4 @@
-"""CGA (ContextGraphAgent) application entry point.
+"""CGA (Context Graph Agent) application entry point.
 
 Startup sequence
 ----------------
@@ -213,7 +213,7 @@ async def lifespan(app: FastAPI):
     log.info("cga.stopped")
 
 
-app = FastAPI(title="CGA (ContextGraphAgent)", version="1.30.44", lifespan=lifespan)
+app = FastAPI(title="CGA (Context Graph Agent)", version="1.30.44", lifespan=lifespan)
 
 # ── Auth middleware (validates Bearer token on /mcp routes) ────────────────
 app.add_middleware(ProjectTokenMiddleware)
@@ -515,7 +515,7 @@ async def audit_request_middleware(request: Request, call_next):
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "service": "cga", "name": "ContextGraphAgent", "version": APP_VERSION}
+    return {"status": "ok", "service": "cga", "name": "Context Graph Agent", "version": APP_VERSION}
 
 
 @app.get("/mcp")

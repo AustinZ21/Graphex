@@ -1,4 +1,4 @@
-# CGA (ContextGraphAgent) release compose file.
+# CGA (Context Graph Agent) release compose file.
 # Pulls prebuilt images from GitHub Container Registry instead of building locally.
 
 services:

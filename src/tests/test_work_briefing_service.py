@@ -12,7 +12,7 @@ async def test_record_activity_persists_and_updates_by_external_id(pg_activity_s
     created = await service.record_activity(
         {
             "project_id": "CGA123",
-            "workspace_name": "ContextGraphAgent",
+            "workspace_name": "Context Graph Agent",
             "event_type": "code_change",
             "external_id": "pr-42",
             "title": "Integrate WA",
@@ -24,7 +24,7 @@ async def test_record_activity_persists_and_updates_by_external_id(pg_activity_s
     updated = await service.record_activity(
         {
             "project_id": "CGA123",
-            "workspace_name": "ContextGraphAgent",
+            "workspace_name": "Context Graph Agent",
             "event_type": "code_change",
             "external_id": "pr-42",
             "title": "Integrate WA",

@@ -1,6 +1,6 @@
 # Contributing To CGA
 
-Thank you for considering a contribution to CGA (ContextGraphAgent). The goal
+Thank you for considering a contribution to CGA (Context Graph Agent). The goal
 of this guide is to keep contributions easy to review, safe to merge, and clear
 from a licensing perspective.
 

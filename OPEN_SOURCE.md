@@ -1,6 +1,6 @@
 # CGA Open Source License Package
 
-CGA (ContextGraphAgent) is released as open source under the Apache License
+CGA (Context Graph Agent) is released as open source under the Apache License
 2.0. This file explains the project-level licensing package and the operational
 rules maintainers should follow when publishing source code, container images,
 or desktop bundles.
@@ -43,7 +43,7 @@ unsupported assumptions.
 
 ## Author And Attribution
 
-CGA (ContextGraphAgent) was created and authored by Nate Scott. Public project
+CGA (Context Graph Agent) was created and authored by Nate Scott. Public project
 documentation, notices, release notes, desktop bundle documentation, and
 redistributions should retain that attribution. The promotional website may keep
 author credit limited to its footer while these project documents carry the

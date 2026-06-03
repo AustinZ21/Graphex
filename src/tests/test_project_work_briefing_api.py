@@ -21,7 +21,7 @@ async def _seed_project_auth(pool) -> None:
                 "CGA123",
                 "http://localhost:18001",
                 "CGA host project",
-                "D:/Repos/ContextGraphAgent",
+                "D:/Repos/Context Graph Agent",
             ),
         )
         await db.execute(

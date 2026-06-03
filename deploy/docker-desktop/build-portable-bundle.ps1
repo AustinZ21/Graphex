@@ -244,7 +244,7 @@ then index them from CGA.
 
 ## Author And Attribution
 
-CGA (ContextGraphAgent) was created and authored by Nate Scott. Preserve this
+CGA (Context Graph Agent) was created and authored by Nate Scott. Preserve this
 attribution when sharing, publishing, or redistributing this Docker Desktop
 bundle.
 

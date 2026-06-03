@@ -13,7 +13,7 @@ This folder is the recommended local distribution for non-developer Docker Deskt
 
 ## Author And Attribution
 
-CGA (ContextGraphAgent) was created and authored by Nate Scott. Preserve this attribution when sharing, publishing, or redistributing the Docker Desktop bundle.
+CGA (Context Graph Agent) was created and authored by Nate Scott. Preserve this attribution when sharing, publishing, or redistributing the Docker Desktop bundle.
 
 ## One-Click Windows Launchers
 

@@ -206,7 +206,7 @@ def _public_smtp_config(raw: dict[str, Any]) -> dict[str, Any]:
         "security": _normalize_smtp_security(smtp.get("security", "starttls")),
         "username": _normalize_text(smtp.get("username", ""), "smtp.username", max_length=MAX_SMTP_TEXT_LENGTH),
         "from_email": _normalize_text(smtp.get("from_email", ""), "smtp.from_email", max_length=MAX_SMTP_EMAIL_LENGTH),
-        "from_name": _normalize_text(smtp.get("from_name", "ContextGraphAgent"), "smtp.from_name", max_length=MAX_SMTP_TEXT_LENGTH),
+        "from_name": _normalize_text(smtp.get("from_name", "Context Graph Agent"), "smtp.from_name", max_length=MAX_SMTP_TEXT_LENGTH),
         "password_set": bool(smtp.get("password")),
     }
 

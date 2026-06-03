@@ -1,6 +1,6 @@
-# Publishing CGA (ContextGraphAgent)
+# Publishing CGA (Context Graph Agent)
 
-This guide covers the public GitHub release path for CGA, aka ContextGraphAgent: source code, Docker images, and a one-file runtime compose download.
+This guide covers the public GitHub release path for CGA, aka Context Graph Agent: source code, Docker images, and a one-file runtime compose download.
 
 ## Release Channels
 

@@ -332,7 +332,7 @@ async def _seed_workassist_activity_service(pg_activity_store):
     await service.record_activity(
         {
             "project_id": "CGA123",
-            "workspace_name": "ContextGraphAgent",
+            "workspace_name": "Context Graph Agent",
             "event_type": "sync",
             "external_id": "sync-1",
             "title": "Synced work item",
@@ -343,7 +343,7 @@ async def _seed_workassist_activity_service(pg_activity_store):
     await service.record_activity(
         {
             "project_id": "CGA123",
-            "workspace_name": "ContextGraphAgent",
+            "workspace_name": "Context Graph Agent",
             "event_type": "review",
             "external_id": "review-1",
             "title": "Reviewed change",
