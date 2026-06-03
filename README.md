@@ -1,9 +1,9 @@
 # CGA (Context Graph Agent)
 
-**Version:** 1.30.47
+**Version:** 1.30.49
 **Status:** Published
 **Author:** Nate Scott
-**Date:** 2026-06-02 (branding and website copy refresh)
+**Date:** 2026-06-03 (corrected CGA icon letterforms)
 
 CGA, aka Context Graph Agent, helps AI coding agents work with much smaller, more relevant code context. In the current live multi-project benchmark, CGA reduced prompt tokens by **90.44%** on average while lowering hallucination pressure by **13.34%**, which helps agents answer, edit, and search through repositories faster.
 

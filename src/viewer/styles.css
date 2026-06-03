@@ -82,6 +82,10 @@ select {
   font-weight: 700;
 }
 
+.brand-logo {
+  flex: 0 0 auto;
+}
+
 .topbar-actions,
 .field-row {
   display: flex;

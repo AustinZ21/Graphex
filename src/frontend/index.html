@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#05070d" />
   <title>CGA (Context Graph Agent)</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <style>
     :root {
       --bg: #06080d;
@@ -2115,25 +2117,10 @@
 <div id="app">
   <div class="topbar">
     <a class="logo" onclick="goHome(event)" href="/admin/briefing">
-      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <!-- outer ring -->
-        <circle cx="14" cy="14" r="13" stroke="#4ae387" stroke-width="1.5" opacity="0.35"/>
-        <!-- center node -->
-        <circle cx="14" cy="14" r="3.2" fill="#4ae387"/>
-        <!-- satellite nodes -->
-        <circle cx="14" cy="4.5"  r="2.2" fill="#4ae387" opacity="0.8"/>
-        <circle cx="23.1" cy="9.5" r="2.2" fill="#4ae387" opacity="0.8"/>
-        <circle cx="23.1" cy="18.5" r="2.2" fill="#4ae387" opacity="0.8"/>
-        <circle cx="14" cy="23.5" r="2.2" fill="#4ae387" opacity="0.8"/>
-        <circle cx="4.9" cy="18.5" r="2.2" fill="#4ae387" opacity="0.8"/>
-        <circle cx="4.9" cy="9.5"  r="2.2" fill="#4ae387" opacity="0.8"/>
-        <!-- edges center -> satellites -->
-        <line x1="14" y1="14" x2="14"   y2="6.7"  stroke="#4ae387" stroke-width="1" opacity="0.5"/>
-        <line x1="14" y1="14" x2="21.3" y2="10.5" stroke="#4ae387" stroke-width="1" opacity="0.5"/>
-        <line x1="14" y1="14" x2="21.3" y2="17.5" stroke="#4ae387" stroke-width="1" opacity="0.5"/>
-        <line x1="14" y1="14" x2="14"   y2="21.3" stroke="#4ae387" stroke-width="1" opacity="0.5"/>
-        <line x1="14" y1="14" x2="6.7"  y2="17.5" stroke="#4ae387" stroke-width="1" opacity="0.5"/>
-        <line x1="14" y1="14" x2="6.7"  y2="10.5" stroke="#4ae387" stroke-width="1" opacity="0.5"/>
+      <svg class="brand-logo" width="28" height="28" viewBox="0 0 64 64" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+        <rect width="64" height="64" rx="10" fill="#05070d"/>
+        <path d="M14 16h36M14 48h36M10 24l44 16M10 40l44-16" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" opacity="0.45"/>
+        <text x="32" y="41" text-anchor="middle" fill="#39f2bd" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="22" font-weight="800" letter-spacing="0">CGA</text>
       </svg>
       <span class="logo-text">CONTEXT GRAPH AGENT</span>
     </a>

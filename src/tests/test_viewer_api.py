@@ -220,6 +220,9 @@ def test_viewer_entrypoint_is_served() -> None:
 
     assert response.status_code == 200
     assert "<title>CGA Viewer</title>" in response.text
+    assert '<link rel="icon" href="./favicon.svg" type="image/svg+xml" />' in response.text
+    assert '<svg class="brand-logo" width="28" height="28" viewBox="0 0 64 64" aria-hidden="true" focusable="false"' in response.text
+    assert '>CGA</text>' in response.text
     assert '"sigma"' in response.text
     assert '"graphology"' in response.text
     assert 'src="./main.js?v=1.30.44"' in response.text
@@ -382,8 +385,11 @@ def test_admin_embeds_versioned_graph_viewer() -> None:
     response = TestClient(app).get("/admin")
 
     assert response.status_code == 200
+    assert '<link rel="icon" href="/favicon.svg" type="image/svg+xml" />' in response.text
     assert 'data-src="/viewer/?v=1.30.44"' in response.text
     assert '<h1>CONTEXT GRAPH AGENT</h1>' in response.text
+    assert '<svg class="brand-logo" width="28" height="28" viewBox="0 0 64 64" aria-hidden="true" focusable="false"' in response.text
+    assert '>CGA</text>' in response.text
     assert '<span class="logo-text">CONTEXT GRAPH AGENT</span>' in response.text
     assert '<strong>Retrieve the right evidence before generation</strong>' in response.text
     assert 'Repository relationships, not only keywords' in response.text
