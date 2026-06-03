@@ -1,6 +1,6 @@
 # CGA Usage Disclaimer
 
-CGA (ContextGraphAgent) is provided for developer productivity, local-first
+CGA (Context Graph Agent) is provided for developer productivity, local-first
 project indexing, graph analysis, MCP-compatible retrieval, and work briefing
 automation. Use of CGA is subject to the Apache License, Version 2.0, including
 its warranty and liability limitations. This document highlights practical usage

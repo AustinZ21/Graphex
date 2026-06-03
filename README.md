@@ -1,13 +1,15 @@
 # CGA (Context Graph Agent)
 
-**Version:** 1.30.46
+**Version:** 1.30.47
 **Status:** Published
 **Author:** Nate Scott
-**Date:** 2026-06-02 (CodeQL alert cleanup)
+**Date:** 2026-06-02 (branding and website copy refresh)
 
-CGA, aka ContextGraphAgent, is a local-first graph context service for AI-assisted development. It indexes repository structure, symbols, calls, imports, and lightweight data flow into FalkorDB, then exposes retrieval and analysis tools through an MCP-compatible API.
+CGA, aka Context Graph Agent, helps AI coding agents work with much smaller, more relevant code context. In the current live multi-project benchmark, CGA reduced prompt tokens by **90.44%** on average while lowering hallucination pressure by **13.34%**, which helps agents answer, edit, and search through repositories faster.
 
-CGA is designed for evidence-first generation: agents retrieve the right code evidence before writing, query repository relationships instead of only keywords, follow an impact graph -> optimized context -> minimal code flow, and target files/symbols with dependency awareness.
+Instead of sending whole files or broad keyword-search results to the model, CGA returns focused evidence packs: target symbol excerpts, nearby relationship context, dependency paths, and recent project facts.
+
+Under the hood, CGA is a local-first graph context service for AI-assisted development. It indexes repository structure, symbols, calls, imports, and lightweight data flow into FalkorDB, then exposes retrieval and analysis tools through an MCP-compatible API. Context Graph Agent retrieves the right evidence before generation, so AI coding agents query repository relationships, dependencies, files, and symbols instead of relying on keyword search alone.
 
 It also hosts WA-compatible work briefing aggregation so progress signals from other repos can be recorded and summarized centrally inside CGA through the Admin Dashboard surface.
 
@@ -31,7 +33,7 @@ It also hosts WA-compatible work briefing aggregation so progress signals from o
 
 ## Author And Attribution
 
-CGA (ContextGraphAgent) was created and authored by Nate Scott. Public documentation, release notes, desktop bundle documentation, redistributions, and project notices should preserve that attribution while keeping the promotional website itself focused on the product experience.
+CGA (Context Graph Agent) was created and authored by Nate Scott. Public documentation, release notes, desktop bundle documentation, redistributions, and project notices should preserve that attribution while keeping the promotional website itself focused on the product experience.
 
 ## Work Briefing Aggregation
 
@@ -487,7 +489,7 @@ Since the ADC acts as the absolute Digital Constitution, altering core rules (li
 
 ## 4. Token Efficiency — CG Context vs. Full Source
 
-CGA's graph-indexed retrieval delivers **precise, structured context** (type signatures, call edges, dependency subgraphs) instead of raw source files. This directly reduces the token budget consumed by each AI Agent turn.
+Context Graph Agent's graph-indexed retrieval delivers **precise, structured context** (type signatures, call edges, dependency subgraphs) instead of raw source files or broad file dumps. This directly reduces the token budget consumed by each AI Agent turn.
 
 ### 4.1 Why Token Savings Matter
 

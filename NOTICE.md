@@ -1,13 +1,13 @@
 # CGA Notices
 
-CGA (ContextGraphAgent)
+CGA (Context Graph Agent)
 
 Copyright (c) 2026 Nate Scott
 
 CGA is made available under the Apache License, Version 2.0. See
 [LICENSE](LICENSE) for the full license text.
 
-This product includes CGA (ContextGraphAgent), originally created and
+This product includes CGA (Context Graph Agent), originally created and
 maintained by Nate Scott.
 
 ## Acknowledgements

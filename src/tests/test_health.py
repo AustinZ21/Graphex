@@ -10,4 +10,4 @@ def test_health_endpoint_returns_ok() -> None:
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "cga", "name": "ContextGraphAgent", "version": APP_VERSION}
+    assert response.json() == {"status": "ok", "service": "cga", "name": "Context Graph Agent", "version": APP_VERSION}

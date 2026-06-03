@@ -419,7 +419,7 @@ def test_admin_deep_links_are_served() -> None:
     for path in ["/admin/projects", "/admin/users", "/admin/audit", "/admin/graph", "/admin/settings"]:
         response = client.get(path)
         assert response.status_code == 200
-        assert "<title>CGA (ContextGraphAgent)</title>" in response.text
+        assert "<title>CGA (Context Graph Agent)</title>" in response.text
         assert '<span class="logo-text">CONTEXT GRAPH AGENT</span>' in response.text
         assert "const ADMIN_TAB_ROUTES" in response.text
 
