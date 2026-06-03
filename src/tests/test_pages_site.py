@@ -74,6 +74,20 @@ def test_promotional_site_uses_vanta_net_and_project_links() -> None:
     assert "https://codespaces.new/nascousa/cga?quickstart=1" in index
 
 
+def test_project_icons_use_promotional_site_logo() -> None:
+    index = _read("docs/site/index.html")
+    favicon = _read("docs/site/favicon.svg")
+
+    assert '<link rel="icon" href="./favicon.svg" type="image/svg+xml" />' in index
+    assert 'aria-label="CGA"' in favicon
+    assert '<rect width="64" height="64" rx="10" fill="#05070d"/>' in favicon
+    assert '>CGA</text>' in favicon
+    assert 'font-size="22"' in favicon
+    assert "M12 42V22" not in favicon
+    assert _read("src/frontend/favicon.svg") == favicon
+    assert _read("src/viewer/favicon.svg") == favicon
+
+
 def test_promotional_site_topbar_links_to_linkedin() -> None:
     index = _read("docs/site/index.html")
 
