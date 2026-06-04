@@ -46,14 +46,16 @@ def test_author_attribution_lives_in_project_documents() -> None:
 
 def test_readme_uses_live_multi_project_benchmark_results() -> None:
     readme = _read("README.md")
+    live_benchmark = _read("docs/benchmarks/live-context-quality.md")
 
-    assert "### 4.2 Live Multi-Project Benchmark Results" in readme
-    assert "34 deterministic symbol-level cases per project" in readme
-    assert "**102**" in readme
+    assert "## Benchmark Snapshot" in readme
+    assert "docs/benchmarks/live-context-quality.md" in readme
+    assert "34 deterministic symbol-level cases per project" in live_benchmark
+    assert "| Total real-code cases | 102 |" in readme
     assert "**90.44%**" in readme
-    assert "BrowserAgent (BA)" not in readme
-    assert "OSAgent (OSA)" not in readme
-    assert "**68.4%**" not in readme
+    assert "BrowserAgent (BA)" not in live_benchmark
+    assert "OSAgent (OSA)" not in live_benchmark
+    assert "**68.4%**" not in live_benchmark
 
 
 def test_promotional_site_uses_vanta_net_and_project_links() -> None:
@@ -67,7 +69,7 @@ def test_promotional_site_uses_vanta_net_and_project_links() -> None:
     assert "NET" in script
     assert "integrity=\"sha384-" in index
     assert "crossorigin=\"anonymous\"" in index
-    assert "--vanta-bg-opacity: 0.15" in styles
+    assert "--vanta-bg-opacity: 0.20" in styles
     assert "#vanta-net canvas" in styles
     assert "opacity: var(--vanta-bg-opacity)" in styles
     assert "https://github.com/nascousa/cga" in index
