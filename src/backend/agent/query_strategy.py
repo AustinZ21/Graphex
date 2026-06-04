@@ -9,6 +9,7 @@ Strategy:
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -145,11 +146,24 @@ class StrategyConfig:
     fallback_max_files: int = 3
     fallback_context_lines: int = 3
     quality_threshold: float = 0.55
+    mcp_token: str | None = None
+    project_id: str | None = None
 
 
-def _read_message_endpoint(base_url: str, timeout: float = 10.0) -> str:
+def _auth_headers(token: str | None, project_id: str | None) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    token = token or os.getenv("CONTEXTGRAPH_MCP_TOKEN")
+    project_id = project_id or os.getenv("CONTEXTGRAPH_PROJECT_ID")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    if project_id:
+        headers["X-Project-ID"] = project_id
+    return headers
+
+
+def _read_message_endpoint(base_url: str, headers: dict[str, str], timeout: float = 10.0) -> str:
     sse_url = f"{base_url.rstrip('/')}/mcp/sse"
-    with httpx.stream("GET", sse_url, timeout=timeout) as resp:
+    with httpx.stream("GET", sse_url, headers=headers, timeout=timeout) as resp:
         resp.raise_for_status()
         data_lines: list[str] = []
         for raw_line in resp.iter_lines():
@@ -178,14 +192,14 @@ def _read_message_endpoint(base_url: str, timeout: float = 10.0) -> str:
     raise RuntimeError("Did not receive a message endpoint from SSE stream")
 
 
-def _rpc_call(endpoint: str, method: str, params: dict[str, Any]) -> dict[str, Any]:
+def _rpc_call(endpoint: str, method: str, params: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
     payload = {
         "jsonrpc": "2.0",
         "id": str(uuid.uuid4()),
         "method": method,
         "params": params,
     }
-    resp = httpx.post(endpoint, json=payload, timeout=20.0)
+    resp = httpx.post(endpoint, json=payload, headers=headers, timeout=20.0)
     resp.raise_for_status()
     body = resp.json()
     if "error" in body:
@@ -367,6 +381,7 @@ class CGFirstQueryStrategy:
 
     def __init__(self, config: StrategyConfig) -> None:
         self._cfg = config
+        self._headers = _auth_headers(config.mcp_token, config.project_id)
 
     def run(self, query: str) -> dict[str, Any]:
         if not self._cfg.base_url:
@@ -389,10 +404,10 @@ class CGFirstQueryStrategy:
         )
 
     def _read_message_endpoint(self, base_url: str, timeout: float = 10.0) -> str:
-        return _read_message_endpoint(base_url, timeout=timeout)
+        return _read_message_endpoint(base_url, self._headers, timeout=timeout)
 
     def _tool_call(self, endpoint: str, name: str, arguments: dict[str, Any]) -> Any:
-        raw = _rpc_call(endpoint, "tools/call", {"name": name, "arguments": arguments})
+        raw = _rpc_call(endpoint, "tools/call", {"name": name, "arguments": arguments}, self._headers)
         return _decode_tool_result(raw)
 
     def _retrieve_graph_hits(self, endpoint: str, query: str, limit: int) -> list[dict[str, Any]]:

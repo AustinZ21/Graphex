@@ -36,6 +36,10 @@ def _build_app() -> FastAPI:
     app = FastAPI()
     app.add_middleware(ProjectTokenMiddleware)
 
+    @app.get("/mcp")
+    async def mcp_discovery() -> dict:
+        return {"transport": "sse", "sse_endpoint": "/mcp/sse"}
+
     @app.get("/mcp/ping")
     async def ping() -> dict:
         return {"ok": True}
@@ -54,6 +58,16 @@ def _build_app() -> FastAPI:
 
 def _client(app: FastAPI) -> AsyncClient:
     return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
+
+
+@pytest.mark.asyncio
+async def test_mcp_discovery_is_public(auth_pg_pool):
+    await _seed_db(auth_pg_pool)
+    async with _client(_build_app()) as client:
+        resp = await client.get("/mcp")
+
+    assert resp.status_code == 200
+    assert resp.json() == {"transport": "sse", "sse_endpoint": "/mcp/sse"}
 
 
 @pytest.mark.asyncio

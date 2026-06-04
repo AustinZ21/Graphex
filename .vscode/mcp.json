@@ -1,0 +1,25 @@
+{
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "cga-mcp-token",
+      "description": "CGA MCP project token for the selected CGA project",
+      "password": true
+    },
+    {
+      "type": "promptString",
+      "id": "cga-project-id",
+      "description": "CGA project id, for example the project_id shown in CGA Admin"
+    }
+  ],
+  "servers": {
+    "cga-mcp-server": {
+      "type": "http",
+      "url": "http://localhost:18001/mcp/sse",
+      "headers": {
+        "Authorization": "Bearer ${input:cga-mcp-token}",
+        "X-Project-ID": "${input:cga-project-id}"
+      }
+    }
+  }
+}

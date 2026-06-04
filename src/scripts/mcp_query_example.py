@@ -6,17 +6,21 @@ What this script does:
 3. Sends a tools/call request for find_symbol.
 
 Usage:
+    set CONTEXTGRAPH_MCP_TOKEN=<project-token>
+    set CONTEXTGRAPH_PROJECT_ID=<project-id>
     python src/scripts/mcp_query_example.py --base-url http://127.0.0.1:8011 --name IndexPipeline
 
 Notes:
 - This script is intentionally minimal and synchronous.
 - It assumes the server exposes the SSE MCP transport under /mcp/sse.
+- It reads MCP credentials from environment variables unless --token and --project-id are provided.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import uuid
 from typing import Any
@@ -24,9 +28,18 @@ from typing import Any
 import httpx
 
 
-def _read_message_endpoint(base_url: str, timeout: float = 10.0) -> str:
+def _auth_headers(token: str | None, project_id: str | None) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    if project_id:
+        headers["X-Project-ID"] = project_id
+    return headers
+
+
+def _read_message_endpoint(base_url: str, headers: dict[str, str], timeout: float = 10.0) -> str:
     sse_url = f"{base_url.rstrip('/')}/mcp/sse"
-    with httpx.stream("GET", sse_url, timeout=timeout) as resp:
+    with httpx.stream("GET", sse_url, headers=headers, timeout=timeout) as resp:
         resp.raise_for_status()
         data_lines: list[str] = []
         for raw_line in resp.iter_lines():
@@ -58,14 +71,14 @@ def _read_message_endpoint(base_url: str, timeout: float = 10.0) -> str:
         raise RuntimeError("Did not receive a message endpoint from SSE stream")
 
 
-def _rpc_call(endpoint: str, method: str, params: dict[str, Any]) -> dict[str, Any]:
+def _rpc_call(endpoint: str, method: str, params: dict[str, Any], headers: dict[str, str]) -> dict[str, Any]:
     payload = {
         "jsonrpc": "2.0",
         "id": str(uuid.uuid4()),
         "method": method,
         "params": params,
     }
-    resp = httpx.post(endpoint, json=payload, timeout=20.0)
+    resp = httpx.post(endpoint, json=payload, headers=headers, timeout=20.0)
     resp.raise_for_status()
     body = resp.json()
     if "error" in body:
@@ -78,9 +91,12 @@ def main() -> int:
     parser.add_argument("--base-url", default="http://127.0.0.1:8011")
     parser.add_argument("--name", default="IndexPipeline", help="Symbol name to query")
     parser.add_argument("--limit", type=int, default=5)
+    parser.add_argument("--token", default=os.getenv("CONTEXTGRAPH_MCP_TOKEN"))
+    parser.add_argument("--project-id", default=os.getenv("CONTEXTGRAPH_PROJECT_ID"))
     args = parser.parse_args()
 
-    endpoint = _read_message_endpoint(args.base_url)
+    headers = _auth_headers(args.token, args.project_id)
+    endpoint = _read_message_endpoint(args.base_url, headers)
     print(f"[mcp] message endpoint: {endpoint}")
 
     result = _rpc_call(
@@ -90,6 +106,7 @@ def main() -> int:
             "name": "find_symbol",
             "arguments": {"name": args.name, "limit": args.limit},
         },
+        headers,
     )
 
     print(json.dumps(result, indent=2, ensure_ascii=True))

@@ -60,7 +60,7 @@ from backend.workbriefing.store import PgVectorActivityStore, resolve_dsn
 
 log = structlog.get_logger()
 
-APP_VERSION = "1.30.44"
+APP_VERSION = "1.30.53"
 
 FALKORDB_HOST = os.getenv("FALKORDB_HOST", "localhost")
 FALKORDB_PORT = int(os.getenv("FALKORDB_PORT", "6379"))
@@ -213,7 +213,7 @@ async def lifespan(app: FastAPI):
     log.info("cga.stopped")
 
 
-app = FastAPI(title="CGA (Context Graph Agent)", version="1.30.44", lifespan=lifespan)
+app = FastAPI(title="CGA (Context Graph Agent)", version=APP_VERSION, lifespan=lifespan)
 
 # ── Auth middleware (validates Bearer token on /mcp routes) ────────────────
 app.add_middleware(ProjectTokenMiddleware)
@@ -527,7 +527,7 @@ async def mcp_info() -> dict:
         "auth": {
             "type": "Bearer",
             "required_headers": ["Authorization", "X-Project-ID"],
-            "notes": "Bearer token must be an active mcp token bound to the provided project_id",
+            "notes": "MCP transport routes require an active mcp token bound to the provided project_id",
         },
     }
 

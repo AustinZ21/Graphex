@@ -7,6 +7,8 @@ If tool is omitted, defaults to find_symbol.
 If arguments are omitted, a fallback is generated from the line using key `query`.
 
 Usage:
+    set CONTEXTGRAPH_MCP_TOKEN=<project-token>
+    set CONTEXTGRAPH_PROJECT_ID=<project-id>
     python src/scripts/mcp_query_batch.py \
       --base-url http://127.0.0.1:8011 \
       --input docs/mcp-query-batch.sample.jsonl \
@@ -18,6 +20,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import time
 import uuid
 from pathlib import Path
@@ -26,9 +29,18 @@ from typing import Any
 import httpx
 
 
-def _read_message_endpoint(base_url: str, timeout: float = 10.0) -> str:
+def _auth_headers(token: str | None, project_id: str | None) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    if project_id:
+        headers["X-Project-ID"] = project_id
+    return headers
+
+
+def _read_message_endpoint(base_url: str, headers: dict[str, str], timeout: float = 10.0) -> str:
     sse_url = f"{base_url.rstrip('/')}/mcp/sse"
-    with httpx.stream("GET", sse_url, timeout=timeout) as resp:
+    with httpx.stream("GET", sse_url, headers=headers, timeout=timeout) as resp:
         resp.raise_for_status()
         data_lines: list[str] = []
         for raw_line in resp.iter_lines():
@@ -62,6 +74,7 @@ async def _rpc_call(
     endpoint: str,
     method: str,
     params: dict[str, Any],
+    headers: dict[str, str],
 ) -> dict[str, Any]:
     payload = {
         "jsonrpc": "2.0",
@@ -69,7 +82,7 @@ async def _rpc_call(
         "method": method,
         "params": params,
     }
-    resp = await client.post(endpoint, json=payload)
+    resp = await client.post(endpoint, json=payload, headers=headers)
     try:
         body = resp.json()
     except Exception:
@@ -105,6 +118,7 @@ async def _call_with_retry(
     tool: str,
     arguments: dict[str, Any],
     retries: int,
+    headers: dict[str, str],
 ) -> tuple[dict[str, Any], int]:
     attempts = 0
     while True:
@@ -114,6 +128,7 @@ async def _call_with_retry(
             endpoint,
             "tools/call",
             {"name": tool, "arguments": arguments},
+            headers,
         )
         if response.get("ok"):
             return response, attempts
@@ -175,9 +190,12 @@ async def run_batch(
     fail_fast: bool,
     max_errors: int,
     resume_from_output: bool,
+    token: str | None = None,
+    project_id: str | None = None,
     retry_failed_from_resume: bool = False,
 ) -> dict[str, Any]:
-    endpoint = _read_message_endpoint(base_url)
+    headers = _auth_headers(token, project_id)
+    endpoint = _read_message_endpoint(base_url, headers)
     started = time.time()
 
     tasks: list[tuple[int, str, dict[str, Any], str]] = []
@@ -261,6 +279,7 @@ async def run_batch(
                     tool,
                     arguments,
                     retries=retries,
+                    headers=headers,
                 )
 
             return {
@@ -359,6 +378,8 @@ def main() -> int:
     parser.add_argument("--max-errors", type=int, default=0, help="Stop when failures reach this number (0=disabled)")
     parser.add_argument("--resume-from-output", action="store_true", help="Reuse existing output file and skip already completed line numbers")
     parser.add_argument("--only-failed-from-output", action="store_true", help="Extract failed items from output file and retry only those queries")
+    parser.add_argument("--token", default=os.getenv("CONTEXTGRAPH_MCP_TOKEN"))
+    parser.add_argument("--project-id", default=os.getenv("CONTEXTGRAPH_PROJECT_ID"))
     args = parser.parse_args()
 
     input_path = Path(args.input)
@@ -393,6 +414,8 @@ def main() -> int:
                 fail_fast=args.fail_fast,
                 max_errors=max(0, args.max_errors),
                 resume_from_output=args.resume_from_output or args.only_failed_from_output,
+                token=args.token,
+                project_id=args.project_id,
                 retry_failed_from_resume=args.only_failed_from_output,
             )
         )

@@ -26,9 +26,27 @@ If the preferred port is occupied, the script automatically selects the next fre
 Invoke-RestMethod http://127.0.0.1:8011/mcp | ConvertTo-Json
 ```
 
+The discovery endpoint is public. MCP transport routes remain project-scoped and require both headers:
+
+- `Authorization: Bearer <CONTEXTGRAPH_MCP_TOKEN>`
+- `X-Project-ID: <CONTEXTGRAPH_PROJECT_ID>`
+
+For CLI examples, keep credentials in environment variables:
+
+```powershell
+$env:CONTEXTGRAPH_MCP_TOKEN = "<project-token>"
+$env:CONTEXTGRAPH_PROJECT_ID = "<project-id>"
+```
+
 Current transport:
 - `GET /mcp/sse`
 - `POST /mcp/messages` (session-aware endpoint discovered from SSE payload)
+
+## 3.1) Register MCP in VS Code
+
+The repository includes `.vscode/mcp.json` with placeholder inputs for the CGA token and project id. After starting the desktop stack on port `18001`, use the `cga-mcp-server` entry in VS Code and provide those two values when prompted.
+
+The shared config does not store secrets. It sends the same protected transport headers used by the CLI examples.
 
 ## 4) Run minimal query client
 
@@ -46,6 +64,8 @@ The script:
 1. Opens SSE stream at `/mcp/sse`.
 2. Reads first endpoint payload (with session context).
 3. Sends `tools/call` for `find_symbol`.
+
+Use `--token` and `--project-id` to override the environment variables for one run.
 
 ## 4.1) Run batch query client (for evaluation loops)
 

@@ -9,7 +9,9 @@ Thumbs.db
 
 # IDEs and Editors
 .idea/
-.vscode/
+.vscode/*
+!.vscode/
+!.vscode/mcp.json
 *.swp
 *.swo
 *~

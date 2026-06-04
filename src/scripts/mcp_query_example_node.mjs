@@ -1,6 +1,8 @@
 /* Minimal MCP client example for querying ContextGraph over SSE transport.
 
 Usage:
+  set CONTEXTGRAPH_MCP_TOKEN=<project-token>
+  set CONTEXTGRAPH_PROJECT_ID=<project-id>
   node src/scripts/mcp_query_example_node.mjs --base-url http://127.0.0.1:8011 --name IndexPipeline --limit 5
 
 Requirements:
@@ -14,6 +16,8 @@ function parseArgs(argv) {
     baseUrl: 'http://127.0.0.1:8011',
     name: 'IndexPipeline',
     limit: 5,
+    token: process.env.CONTEXTGRAPH_MCP_TOKEN || '',
+    projectId: process.env.CONTEXTGRAPH_PROJECT_ID || '',
   };
 
   for (let i = 2; i < argv.length; i += 1) {
@@ -28,9 +32,26 @@ function parseArgs(argv) {
     } else if (cur === '--limit' && next) {
       args.limit = Number.parseInt(next, 10);
       i += 1;
+    } else if (cur === '--token' && next) {
+      args.token = next;
+      i += 1;
+    } else if (cur === '--project-id' && next) {
+      args.projectId = next;
+      i += 1;
     }
   }
   return args;
+}
+
+function authHeaders(args) {
+  const headers = {};
+  if (args.token) {
+    headers.Authorization = `Bearer ${args.token}`;
+  }
+  if (args.projectId) {
+    headers['X-Project-ID'] = args.projectId;
+  }
+  return headers;
 }
 
 function absoluteEndpoint(baseUrl, endpoint) {
@@ -43,9 +64,9 @@ function absoluteEndpoint(baseUrl, endpoint) {
   return `${baseUrl.replace(/\/$/, '')}/${endpoint}`;
 }
 
-async function readMessageEndpoint(baseUrl) {
+async function readMessageEndpoint(baseUrl, headers) {
   const sseUrl = `${baseUrl.replace(/\/$/, '')}/mcp/sse`;
-  const resp = await fetch(sseUrl, { method: 'GET' });
+  const resp = await fetch(sseUrl, { method: 'GET', headers });
   if (!resp.ok || !resp.body) {
     throw new Error(`SSE connect failed: ${resp.status} ${resp.statusText}`);
   }
@@ -100,7 +121,7 @@ async function readMessageEndpoint(baseUrl) {
   throw new Error('Did not receive message endpoint from SSE stream');
 }
 
-async function rpcCall(endpoint, method, params) {
+async function rpcCall(endpoint, method, params, headers) {
   const payload = {
     jsonrpc: '2.0',
     id: randomUUID(),
@@ -110,7 +131,7 @@ async function rpcCall(endpoint, method, params) {
 
   const resp = await fetch(endpoint, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...headers },
     body: JSON.stringify(payload),
   });
 
@@ -126,7 +147,8 @@ async function rpcCall(endpoint, method, params) {
 
 async function main() {
   const args = parseArgs(process.argv);
-  const endpoint = await readMessageEndpoint(args.baseUrl);
+  const headers = authHeaders(args);
+  const endpoint = await readMessageEndpoint(args.baseUrl, headers);
   console.log(`[mcp] message endpoint: ${endpoint}`);
 
   const result = await rpcCall(endpoint, 'tools/call', {
@@ -135,7 +157,7 @@ async function main() {
       name: args.name,
       limit: args.limit,
     },
-  });
+  }, headers);
 
   console.log(JSON.stringify(result, null, 2));
 }
