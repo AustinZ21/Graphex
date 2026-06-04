@@ -32,6 +32,12 @@ _PROTECTED_ROUTE_RULES = (
     },
 )
 
+_PUBLIC_MCP_DISCOVERY_PATHS = frozenset({"/mcp", "/mcp/"})
+
+
+def _is_public_mcp_discovery(path: str, method: str) -> bool:
+    return method in {"GET", "HEAD", "OPTIONS"} and path in _PUBLIC_MCP_DISCOVERY_PATHS
+
 
 def _match_route_rule(path: str) -> dict | None:
     for rule in _PROTECTED_ROUTE_RULES:
@@ -67,6 +73,11 @@ class ProjectTokenMiddleware:
             return
 
         path = scope.get("path", "")
+        method = scope.get("method", "")
+        if _is_public_mcp_discovery(path, method):
+            await self.app(scope, receive, send)
+            return
+
         route_rule = _match_route_rule(path)
         if route_rule is None:
             await self.app(scope, receive, send)

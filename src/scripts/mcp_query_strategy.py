@@ -1,6 +1,8 @@
 """CG-first agent query strategy demo client.
 
 Usage:
+    set CONTEXTGRAPH_MCP_TOKEN=<project-token>
+    set CONTEXTGRAPH_PROJECT_ID=<project-id>
   python src/scripts/mcp_query_strategy.py \
     --query "index pipeline" \
     --base-url http://127.0.0.1:8011 \
@@ -12,7 +14,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from backend.agent.query_strategy import CGFirstQueryStrategy, StrategyConfig
 
@@ -27,6 +33,8 @@ def main() -> int:
     parser.add_argument("--token-budget", type=int, default=1800)
     parser.add_argument("--relation-depth", type=int, default=1)
     parser.add_argument("--fallback-max-files", type=int, default=3)
+    parser.add_argument("--token", default=os.getenv("CONTEXTGRAPH_MCP_TOKEN"))
+    parser.add_argument("--project-id", default=os.getenv("CONTEXTGRAPH_PROJECT_ID"))
     args = parser.parse_args()
 
     cfg = StrategyConfig(
@@ -37,6 +45,8 @@ def main() -> int:
         token_budget=max(200, args.token_budget),
         relation_depth=max(1, args.relation_depth),
         fallback_max_files=max(1, args.fallback_max_files),
+        mcp_token=args.token,
+        project_id=args.project_id,
     )
     strategy = CGFirstQueryStrategy(cfg)
     result = strategy.run(args.query)

@@ -8,13 +8,15 @@ Strategy:
 
 from __future__ import annotations
 
+import asyncio
 import json
-import uuid
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import httpx
+from mcp import ClientSession
+from mcp.client.sse import sse_client
 
 
 def estimate_tokens(text: str) -> int:
@@ -145,65 +147,33 @@ class StrategyConfig:
     fallback_max_files: int = 3
     fallback_context_lines: int = 3
     quality_threshold: float = 0.55
+    mcp_token: str | None = None
+    project_id: str | None = None
 
 
-def _read_message_endpoint(base_url: str, timeout: float = 10.0) -> str:
-    sse_url = f"{base_url.rstrip('/')}/mcp/sse"
-    with httpx.stream("GET", sse_url, timeout=timeout) as resp:
-        resp.raise_for_status()
-        data_lines: list[str] = []
-        for raw_line in resp.iter_lines():
-            if raw_line is None:
-                continue
-            line = raw_line.strip()
-            if line.startswith("data:"):
-                data_lines.append(line[len("data:") :].strip())
-            elif line == "" and data_lines:
-                payload = "\n".join(data_lines)
-                data_lines.clear()
-                if payload.startswith("http://") or payload.startswith("https://") or payload.startswith("/"):
-                    if payload.startswith("/"):
-                        return f"{base_url.rstrip('/')}{payload}"
-                    return payload
-                try:
-                    obj = json.loads(payload)
-                except json.JSONDecodeError:
-                    continue
-                for key in ("endpoint", "message_endpoint", "messages", "url"):
-                    endpoint = obj.get(key)
-                    if isinstance(endpoint, str):
-                        if endpoint.startswith("/"):
-                            return f"{base_url.rstrip('/')}{endpoint}"
-                        return endpoint
-    raise RuntimeError("Did not receive a message endpoint from SSE stream")
+def _auth_headers(token: str | None, project_id: str | None) -> dict[str, str]:
+    headers: dict[str, str] = {}
+    token = token or os.getenv("CONTEXTGRAPH_MCP_TOKEN")
+    project_id = project_id or os.getenv("CONTEXTGRAPH_PROJECT_ID")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    if project_id:
+        headers["X-Project-ID"] = project_id
+    return headers
 
 
-def _rpc_call(endpoint: str, method: str, params: dict[str, Any]) -> dict[str, Any]:
-    payload = {
-        "jsonrpc": "2.0",
-        "id": str(uuid.uuid4()),
-        "method": method,
-        "params": params,
-    }
-    resp = httpx.post(endpoint, json=payload, timeout=20.0)
-    resp.raise_for_status()
-    body = resp.json()
-    if "error" in body:
-        raise RuntimeError(f"MCP error: {body['error']}")
-    return body
-
-
-def _decode_tool_result(raw: dict[str, Any]) -> Any:
-    result = raw.get("result", {})
-    if isinstance(result, dict) and "content" in result:
-        content = result.get("content")
-        if isinstance(content, list) and content:
-            first = content[0]
-            if isinstance(first, dict) and "text" in first:
-                try:
-                    return json.loads(first["text"])
-                except Exception:
-                    return first["text"]
+def _decode_call_tool_result(result: Any) -> Any:
+    content = getattr(result, "content", None)
+    if isinstance(content, list) and content:
+        first = content[0]
+        text = getattr(first, "text", None)
+        if isinstance(text, str):
+            try:
+                return json.loads(text)
+            except Exception:
+                return text
+    if hasattr(result, "model_dump"):
+        return result.model_dump(mode="json")
     return result
 
 
@@ -367,16 +337,41 @@ class CGFirstQueryStrategy:
 
     def __init__(self, config: StrategyConfig) -> None:
         self._cfg = config
+        self._headers = _auth_headers(config.mcp_token, config.project_id)
 
     def run(self, query: str) -> dict[str, Any]:
+        return asyncio.run(self.run_async(query))
+
+    async def run_async(self, query: str) -> dict[str, Any]:
         if not self._cfg.base_url:
             raise RuntimeError("StrategyConfig.base_url is required for CGFirstQueryStrategy")
-        endpoint = self._read_message_endpoint(self._cfg.base_url)
+
+        async with sse_client(
+            f"{self._cfg.base_url.rstrip('/')}/mcp/sse",
+            headers=self._headers,
+            timeout=20,
+            sse_read_timeout=60,
+        ) as (read_stream, write_stream):
+            async with ClientSession(read_stream, write_stream) as session:
+                await session.initialize()
+                graph_hits = await self._retrieve_graph_hits(session, query, self._cfg.graph_top_k)
+                call_graphs: dict[str, dict[str, Any]] = {}
+                if self._cfg.include_relations:
+                    for hit in graph_hits:
+                        qualified_name = str(hit.get("qualified_name") or "")
+                        if not qualified_name or qualified_name in call_graphs:
+                            continue
+                        call_graphs[qualified_name] = await self._get_call_graph(
+                            session,
+                            qualified_name,
+                            self._cfg.relation_depth,
+                        )
+
         return run_cg_first_strategy(
             query=query,
             repo_root=self._cfg.repo_root,
-            retrieve_graph_hits=lambda query, limit: self._retrieve_graph_hits(endpoint, query, limit),
-            get_call_graph=lambda qualified_name, depth: self._get_call_graph(endpoint, qualified_name, depth),
+            retrieve_graph_hits=lambda query, limit: graph_hits[:limit],
+            get_call_graph=lambda qualified_name, depth: call_graphs.get(qualified_name, {}),
             graph_top_k=self._cfg.graph_top_k,
             min_graph_hits=self._cfg.min_graph_hits,
             token_budget=self._cfg.token_budget,
@@ -388,22 +383,19 @@ class CGFirstQueryStrategy:
             source_label="contextgraph-client",
         )
 
-    def _read_message_endpoint(self, base_url: str, timeout: float = 10.0) -> str:
-        return _read_message_endpoint(base_url, timeout=timeout)
+    async def _tool_call(self, session: ClientSession, name: str, arguments: dict[str, Any]) -> Any:
+        result = await session.call_tool(name, arguments)
+        return _decode_call_tool_result(result)
 
-    def _tool_call(self, endpoint: str, name: str, arguments: dict[str, Any]) -> Any:
-        raw = _rpc_call(endpoint, "tools/call", {"name": name, "arguments": arguments})
-        return _decode_tool_result(raw)
-
-    def _retrieve_graph_hits(self, endpoint: str, query: str, limit: int) -> list[dict[str, Any]]:
-        payload = self._tool_call(endpoint, "retrieve_context", {"query": query, "limit": limit})
+    async def _retrieve_graph_hits(self, session: ClientSession, query: str, limit: int) -> list[dict[str, Any]]:
+        payload = await self._tool_call(session, "retrieve_context", {"query": query, "limit": limit})
         if isinstance(payload, list):
             return [item for item in payload if isinstance(item, dict)]
         return []
 
-    def _get_call_graph(self, endpoint: str, qualified_name: str, depth: int) -> dict[str, Any]:
-        payload = self._tool_call(
-            endpoint,
+    async def _get_call_graph(self, session: ClientSession, qualified_name: str, depth: int) -> dict[str, Any]:
+        payload = await self._tool_call(
+            session,
             "find_call_graph",
             {"qualified_name": qualified_name, "depth": depth},
         )
