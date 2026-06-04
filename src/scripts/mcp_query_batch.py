@@ -22,11 +22,12 @@ import asyncio
 import json
 import os
 import time
-import uuid
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
-import httpx
+from mcp import ClientSession
+from mcp.client.sse import sse_client
 
 
 def _auth_headers(token: str | None, project_id: str | None) -> dict[str, str]:
@@ -38,64 +39,27 @@ def _auth_headers(token: str | None, project_id: str | None) -> dict[str, str]:
     return headers
 
 
-def _read_message_endpoint(base_url: str, headers: dict[str, str], timeout: float = 10.0) -> str:
-    sse_url = f"{base_url.rstrip('/')}/mcp/sse"
-    with httpx.stream("GET", sse_url, headers=headers, timeout=timeout) as resp:
-        resp.raise_for_status()
-        data_lines: list[str] = []
-        for raw_line in resp.iter_lines():
-            if raw_line is None:
-                continue
-            line = raw_line.strip()
-            if line.startswith("data:"):
-                data_lines.append(line[len("data:") :].strip())
-            elif line == "" and data_lines:
-                payload = "\n".join(data_lines)
-                data_lines.clear()
-                if payload.startswith("http://") or payload.startswith("https://") or payload.startswith("/"):
-                    if payload.startswith("/"):
-                        return f"{base_url.rstrip('/')}{payload}"
-                    return payload
-                try:
-                    obj = json.loads(payload)
-                except json.JSONDecodeError:
-                    continue
-                for key in ("endpoint", "message_endpoint", "messages", "url"):
-                    endpoint = obj.get(key)
-                    if isinstance(endpoint, str):
-                        if endpoint.startswith("/"):
-                            return f"{base_url.rstrip('/')}{endpoint}"
-                        return endpoint
-        raise RuntimeError("Did not receive a message endpoint from SSE stream")
+def _tool_result_to_json(result: Any) -> dict[str, Any]:
+    if hasattr(result, "model_dump"):
+        return result.model_dump(mode="json")
+    return {"result": str(result)}
 
 
-async def _rpc_call(
-    client: httpx.AsyncClient,
-    endpoint: str,
-    method: str,
-    params: dict[str, Any],
-    headers: dict[str, str],
+async def _mcp_tool_call(
+    session: ClientSession,
+    tool: str,
+    arguments: dict[str, Any],
+    request_timeout_sec: float,
 ) -> dict[str, Any]:
-    payload = {
-        "jsonrpc": "2.0",
-        "id": str(uuid.uuid4()),
-        "method": method,
-        "params": params,
-    }
-    resp = await client.post(endpoint, json=payload, headers=headers)
-    try:
-        body = resp.json()
-    except Exception:
-        body = {"raw": resp.text}
-    if resp.status_code >= 400:
-        return {
-            "ok": False,
-            "http_status": resp.status_code,
-            "error": body,
-        }
-    if isinstance(body, dict) and "error" in body:
-        return {"ok": False, "error": body["error"]}
-    return {"ok": True, "result": body}
+    result = await session.call_tool(
+        tool,
+        arguments,
+        read_timeout_seconds=timedelta(seconds=request_timeout_sec),
+    )
+    payload = _tool_result_to_json(result)
+    if payload.get("isError"):
+        return {"ok": False, "error": payload}
+    return {"ok": True, "result": payload}
 
 
 def _prepare_item(obj: dict[str, Any]) -> tuple[str, dict[str, Any]]:
@@ -113,32 +77,27 @@ def _prepare_item(obj: dict[str, Any]) -> tuple[str, dict[str, Any]]:
 
 
 async def _call_with_retry(
-    client: httpx.AsyncClient,
-    endpoint: str,
+    session: ClientSession,
     tool: str,
     arguments: dict[str, Any],
     retries: int,
-    headers: dict[str, str],
+    request_timeout_sec: float,
 ) -> tuple[dict[str, Any], int]:
     attempts = 0
     while True:
         attempts += 1
-        response = await _rpc_call(
-            client,
-            endpoint,
-            "tools/call",
-            {"name": tool, "arguments": arguments},
-            headers,
-        )
+        try:
+            response = await _mcp_tool_call(session, tool, arguments, request_timeout_sec)
+        except Exception as exc:
+            response = {"ok": False, "error": str(exc)}
         if response.get("ok"):
             return response, attempts
 
-        # Retry only for transient cases.
         transient = False
         status = response.get("http_status")
         if isinstance(status, int) and status in {408, 429, 500, 502, 503, 504}:
             transient = True
-        if "raw" in response.get("error", {}):
+        if isinstance(response.get("error"), dict) and "raw" in response.get("error", {}):
             transient = True
 
         if transient and attempts <= retries + 1:
@@ -180,41 +139,31 @@ def _reconstruct_input_jsonl(failed_items: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-async def run_batch(
-    base_url: str,
-    input_path: Path,
-    output_path: Path,
-    concurrency: int,
-    retries: int,
-    request_timeout_sec: float,
-    fail_fast: bool,
-    max_errors: int,
-    resume_from_output: bool,
-    token: str | None = None,
-    project_id: str | None = None,
-    retry_failed_from_resume: bool = False,
-) -> dict[str, Any]:
-    headers = _auth_headers(token, project_id)
-    endpoint = _read_message_endpoint(base_url, headers)
-    started = time.time()
-
-    tasks: list[tuple[int, str, dict[str, Any], str]] = []
+def _load_previous_results(output_path: Path, resume_from_output: bool) -> dict[int, dict[str, Any]]:
     previous_results: dict[int, dict[str, Any]] = {}
+    if not resume_from_output or not output_path.exists():
+        return previous_results
 
-    if resume_from_output and output_path.exists():
-        with output_path.open("r", encoding="utf-8") as prev:
-            for raw in prev:
-                raw = raw.strip()
-                if not raw:
-                    continue
-                try:
-                    obj = json.loads(raw)
-                    line_no = int(obj.get("line"))
-                    previous_results[line_no] = obj
-                except Exception:
-                    # Ignore malformed prior records and keep moving.
-                    continue
+    with output_path.open("r", encoding="utf-8") as prev:
+        for raw in prev:
+            raw = raw.strip()
+            if not raw:
+                continue
+            try:
+                obj = json.loads(raw)
+                line_no = int(obj.get("line"))
+                previous_results[line_no] = obj
+            except Exception:
+                continue
+    return previous_results
 
+
+def _load_tasks(
+    input_path: Path,
+    previous_results: dict[int, dict[str, Any]],
+    retry_failed_from_resume: bool,
+) -> list[tuple[int, str, dict[str, Any], str]]:
+    tasks: list[tuple[int, str, dict[str, Any], str]] = []
     with input_path.open("r", encoding="utf-8") as src:
         for source_line_no, raw in enumerate(src, start=1):
             raw = raw.strip()
@@ -241,90 +190,117 @@ async def run_batch(
                 if line_no in previous_results:
                     continue
                 tasks.append((line_no, "", {}, raw))
+    return tasks
 
+
+async def run_batch(
+    base_url: str,
+    input_path: Path,
+    output_path: Path,
+    concurrency: int,
+    retries: int,
+    request_timeout_sec: float,
+    fail_fast: bool,
+    max_errors: int,
+    resume_from_output: bool,
+    token: str | None = None,
+    project_id: str | None = None,
+    retry_failed_from_resume: bool = False,
+) -> dict[str, Any]:
+    headers = _auth_headers(token, project_id)
+    endpoint = f"{base_url.rstrip('/')}/mcp/sse"
+    started = time.time()
+
+    previous_results = _load_previous_results(output_path, resume_from_output)
+    tasks = _load_tasks(input_path, previous_results, retry_failed_from_resume)
     total = len(tasks) + len(previous_results)
+
     ok_count = 0
     fail_count = 0
     retry_count = 0
     cancelled_count = 0
+    results: list[dict[str, Any]] = []
 
     semaphore = asyncio.Semaphore(max(1, concurrency))
-    timeout = httpx.Timeout(request_timeout_sec)
     stop_event = asyncio.Event()
 
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        async def worker(item: tuple[int, str, dict[str, Any], str]) -> dict[str, Any]:
-            line_no, tool, arguments, raw = item
+    async with sse_client(
+        endpoint,
+        headers=headers,
+        timeout=request_timeout_sec,
+        sse_read_timeout=max(60.0, request_timeout_sec),
+    ) as (read_stream, write_stream):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
 
-            if stop_event.is_set():
+            async def worker(item: tuple[int, str, dict[str, Any], str]) -> dict[str, Any]:
+                line_no, tool, arguments, raw = item
+
+                if stop_event.is_set():
+                    return {
+                        "line": line_no,
+                        "ok": False,
+                        "cancelled": True,
+                        "error": "cancelled: fail-fast or max-errors reached",
+                    }
+
+                if not tool:
+                    return {
+                        "line": line_no,
+                        "ok": False,
+                        "error": "invalid_input: JSON line must be an object",
+                        "raw": raw,
+                    }
+
+                async with semaphore:
+                    response, attempts = await _call_with_retry(
+                        session,
+                        tool,
+                        arguments,
+                        retries=retries,
+                        request_timeout_sec=request_timeout_sec,
+                    )
+
                 return {
                     "line": line_no,
-                    "ok": False,
-                    "cancelled": True,
-                    "error": "cancelled: fail-fast or max-errors reached",
+                    "tool": tool,
+                    "arguments": arguments,
+                    "attempts": attempts,
+                    **response,
                 }
 
-            if not tool:
-                return {
-                    "line": line_no,
-                    "ok": False,
-                    "error": "invalid_input: JSON line must be an object",
-                    "raw": raw,
-                }
-
-            async with semaphore:
-                response, attempts = await _call_with_retry(
-                    client,
-                    endpoint,
-                    tool,
-                    arguments,
-                    retries=retries,
-                    headers=headers,
+            pending = [asyncio.create_task(worker(item)) for item in tasks]
+            while pending:
+                done, pending_set = await asyncio.wait(
+                    pending,
+                    return_when=asyncio.FIRST_COMPLETED,
                 )
+                pending = list(pending_set)
 
-            return {
-                "line": line_no,
-                "tool": tool,
-                "arguments": arguments,
-                "attempts": attempts,
-                **response,
-            }
+                for task in done:
+                    item = task.result()
+                    results.append(item)
 
-        pending = [asyncio.create_task(worker(item)) for item in tasks]
-        results: list[dict[str, Any]] = []
+                    if item.get("cancelled"):
+                        continue
 
-        while pending:
-            done, pending_set = await asyncio.wait(
-                pending,
-                return_when=asyncio.FIRST_COMPLETED,
-            )
-            pending = list(pending_set)
+                    if not item.get("ok"):
+                        fail_count += 1
+                        if fail_fast or (max_errors > 0 and fail_count >= max_errors):
+                            stop_event.set()
 
-            for task in done:
-                item = task.result()
-                results.append(item)
+                if stop_event.is_set():
+                    for task in pending:
+                        task.cancel()
+                    if pending:
+                        cancelled = await asyncio.gather(*pending, return_exceptions=True)
+                        for item in cancelled:
+                            if isinstance(item, dict):
+                                results.append(item)
+                            else:
+                                cancelled_count += 1
+                    pending = []
 
-                if item.get("cancelled"):
-                    continue
-
-                if not item.get("ok"):
-                    fail_count += 1
-                    if fail_fast or (max_errors > 0 and fail_count >= max_errors):
-                        stop_event.set()
-
-            if stop_event.is_set():
-                for task in pending:
-                    task.cancel()
-                if pending:
-                    cancelled = await asyncio.gather(*pending, return_exceptions=True)
-                    for c in cancelled:
-                        if isinstance(c, dict):
-                            results.append(c)
-                        else:
-                            cancelled_count += 1
-                pending = []
-
-    # Merge resumed records and newly executed records.
     merged_results = list(previous_results.values()) + results
     merged_results.sort(key=lambda x: x["line"])
 
@@ -336,9 +312,6 @@ async def run_batch(
                 continue
             if item.get("ok"):
                 ok_count += 1
-            else:
-                # fail_count was already tracked in the concurrent collection loop
-                pass
             attempts = int(item.get("attempts", 1))
             if attempts > 1:
                 retry_count += attempts - 1
@@ -388,7 +361,6 @@ def main() -> int:
     if not input_path.exists():
         raise SystemExit(f"Input file not found: {input_path}")
 
-    # If --only-failed-from-output is set, extract failed items and create temp input file
     effective_input_path = input_path
     temp_input_path: Path | None = None
     if args.only_failed_from_output:

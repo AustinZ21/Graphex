@@ -61,9 +61,9 @@ node src/scripts/mcp_query_example_node.mjs --base-url http://127.0.0.1:8011 --n
 ```
 
 The script:
-1. Opens SSE stream at `/mcp/sse`.
-2. Reads first endpoint payload (with session context).
-3. Sends `tools/call` for `find_symbol`.
+1. Opens and keeps the SSE stream at `/mcp/sse`.
+2. Initializes the MCP session.
+3. Sends `tools/call` for `find_symbol` and reads the result from the SSE stream.
 
 Use `--token` and `--project-id` to override the environment variables for one run.
 
