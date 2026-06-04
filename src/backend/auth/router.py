@@ -146,18 +146,10 @@ def _resolve_repo_path(project_name: str) -> str | None:
 
 
 def _resolve_project_repo_path(project: dict) -> str | None:
-    """Resolve repo path for a project, preferring the stored repo_path column.
-
-    Falls back to name-based directory scanning for backward compatibility
-    with projects created before the repo_path column was added.
-    """
+    """Resolve repo path for a project, preferring the stored repo_path column."""
     stored = (project.get("repo_path") or "").strip()
     if stored:
-        try:
-            if Path(stored).exists():
-                return stored
-        except Exception:
-            pass
+        return stored
     return _resolve_repo_path(project["project_name"])
 
 

@@ -19,7 +19,7 @@ async def _seed_project(
     project_external_id: str = "OESIJQWHXY",
     repo_path: str | None = None,
 ) -> None:
-    resolved_repo_path = repo_path or f"D:/Repos/{project_name}"
+    resolved_repo_path = f"D:/Repos/{project_name}" if repo_path is None else repo_path
     await db.execute(
         "INSERT INTO projects(id, project_name, project_id, repo_path, is_active) "
         "VALUES (?, ?, ?, ?, 1)",
@@ -83,6 +83,25 @@ def test_candidate_repo_paths_uses_configured_indexing_repos_root(
     candidates = auth_router._candidate_repo_paths("browser-agent")
 
     assert candidates[0] == str(configured_root / "BrowserAgent")
+
+
+def test_resolve_project_repo_path_uses_stored_value_without_exists_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        auth_router,
+        "_resolve_repo_path",
+        lambda project_name: f"D:/Repos/{project_name}",
+    )
+
+    repo_path = auth_router._resolve_project_repo_path(
+        {
+            "project_name": "DisplayName",
+            "repo_path": "Z:/saved/path/ContextGraphAdmin",
+        }
+    )
+
+    assert repo_path == "Z:/saved/path/ContextGraphAdmin"
 
 
 def test_build_index_job_status_marks_stale_processing(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -202,11 +221,92 @@ async def test_trigger_project_index_calls_mcp_server_with_resolved_repo_path(
 
 
 @pytest.mark.asyncio
+async def test_trigger_project_index_uses_stored_repo_path_when_name_differs(
+    auth_pg_pool,
+) -> None:
+    async with auth_pg_pool.acquire() as db:
+        await _seed_project(
+            db,
+            project_name="DisplayName",
+            project_external_id="DISP123456",
+            repo_path="Z:/saved/path/ContextGraphAdmin",
+        )
+
+        with patch.object(
+            auth_router, "_resolve_repo_path", return_value="D:/Repos/DisplayName"
+        ), patch.object(
+            auth_router.mcp_server,
+            "index_repo_changes",
+            AsyncMock(
+                return_value={
+                    "status": "queued",
+                    "mode": "incremental",
+                    "job_id": "job-456",
+                    "stream_id": "501-0",
+                    "changed_count": 1,
+                    "destructive_count": 0,
+                }
+            ),
+        ) as index_repo_changes:
+            result = await auth_router.trigger_project_index(
+                1, _={"role": "admin"}, db=db
+            )
+
+    assert result.project_name == "DisplayName"
+    assert result.repo_path == "Z:/saved/path/ContextGraphAdmin"
+    index_repo_changes.assert_awaited_once_with(
+        repo_path="Z:/saved/path/ContextGraphAdmin", project_name="DisplayName"
+    )
+
+
+@pytest.mark.asyncio
+async def test_trigger_project_full_index_uses_stored_repo_path_when_name_differs(
+    auth_pg_pool,
+) -> None:
+    async with auth_pg_pool.acquire() as db:
+        await _seed_project(
+            db,
+            project_name="DisplayName",
+            project_external_id="DISP123456",
+            repo_path="Z:/saved/path/ContextGraphAdmin",
+        )
+
+        with patch.object(
+            auth_router, "_resolve_repo_path", return_value="D:/Repos/DisplayName"
+        ), patch.object(
+            auth_router.mcp_server,
+            "index_full",
+            AsyncMock(
+                return_value={
+                    "status": "queued",
+                    "job_id": "job-789",
+                    "stream_id": "502-0",
+                }
+            ),
+        ) as index_full:
+            result = await auth_router.trigger_project_full_index(
+                1, _={"role": "admin"}, db=db
+            )
+
+    assert result.project_name == "DisplayName"
+    assert result.repo_path == "Z:/saved/path/ContextGraphAdmin"
+    assert result.mode == "full"
+    index_full.assert_awaited_once_with(
+        repo_path="Z:/saved/path/ContextGraphAdmin", project_name="DisplayName"
+    )
+
+
+@pytest.mark.asyncio
 async def test_trigger_project_index_errors_when_repo_path_missing(
     auth_pg_pool,
 ) -> None:
     async with auth_pg_pool.acquire() as db:
-        await _seed_project(db, project_name="missing", project_external_id="MISS123456")
+        await _seed_project(
+            db,
+            project_name="missing",
+            project_external_id="MISS123456",
+            repo_path="",
+        )
 
         with patch.object(auth_router, "_resolve_repo_path", return_value=None):
             with pytest.raises(Exception) as exc_info:
