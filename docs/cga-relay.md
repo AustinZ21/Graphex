@@ -1,0 +1,79 @@
+# CGA-Relay
+
+`cga-relay` is the Rust desktop relay for CGA. It is designed as one installed relay per developer machine. Project repositories only need a small MCP pointer that launches the installed relay over stdio; they do not run their own long-lived MCP server.
+
+## Build And Test
+
+```powershell
+Push-Location src/cga-relay
+cargo test
+cargo build --release
+Pop-Location
+```
+
+The crate has no third-party Rust dependencies. The release build produces a standalone `cga-relay.exe` at `src/cga-relay/target/release/cga-relay.exe`; install or copy that executable onto the developer machine and launch it directly. Project MCP config must call that installed executable, not `cargo`, Python, PowerShell scripts, or a per-project MCP server.
+
+On Windows MSVC targets, the crate config enables static CRT linking to reduce external runtime requirements for the release executable.
+
+## Safe Config
+
+Use `docs/examples/cga-relay.env.example` as the starting point for a machine-local config file such as `%USERPROFILE%\.cga\relay.env`.
+
+Config files may contain endpoint URLs, stable project identity, local paths, and environment variable names. Do not store token values, API keys, or passwords in config files.
+
+Required identity fields:
+
+- `AGENT_ID`: stable developer-machine relay id.
+- `PROJECT_ID`: stable backend project id.
+- `PROJECT_ROOT`: local checkout path.
+- `API_KEY_ENV`: environment variable name that contains the backend/MCP API key.
+- `ACCOUNT_TOKEN_ENV`: environment variable name that contains the developer token for sync.
+
+## CLI
+
+```powershell
+cga-relay --help
+cga-relay doctor --config %USERPROFILE%\.cga\relay.env --json
+cga-relay login --config %USERPROFILE%\.cga\relay.env --email dev@example.com --token-env CGA_DEVELOPER_TOKEN --json
+cga-relay projects add --config %USERPROFILE%\.cga\relay.env --namespace dev --project-tag example --root C:\Repos\ExampleProject --json
+cga-relay projects list --config %USERPROFILE%\.cga\relay.env --json
+cga-relay scan --config %USERPROFILE%\.cga\relay.env --dry-run --json
+cga-relay sync --config %USERPROFILE%\.cga\relay.env --all --dry-run --json
+cga-relay settings --config %USERPROFILE%\.cga\relay.env --status --json
+cga-relay settings --config %USERPROFILE%\.cga\relay.env --render
+cga-relay tray --config %USERPROFILE%\.cga\relay.env
+cga-relay tray --config %USERPROFILE%\.cga\relay.env --status --json
+cga-relay mcp --config %USERPROFILE%\.cga\relay.env
+```
+
+`login` stores only profile metadata and the token environment variable name. It never writes the token value to disk.
+
+## Settings Page
+
+When `tray` starts, CGA-Relay also starts a loopback-only dark-mode settings page on `127.0.0.1` and records its URL under `STATE_DIR/settings-url.txt`. The tray `Settings` menu item opens this relay settings page, not the CGA admin settings screen.
+
+The settings page lets the developer sign in with a CGA account. After login, CGA-Relay calls `/api/auth/me` and `/api/auth/projects`, caches the account session and project list under `STATE_DIR`, and imports account projects with valid local `repo_path` values into the local registry under the `account` namespace. The cached account session is local machine state and must not be copied into repository files or committed.
+
+After account login, MCP tool calls and `sync` can use the user JWT relay bridge at `/api/auth/cga-relay/mcp-tool` and `/api/auth/cga-relay/sync` when project-token environment variables are not configured. Project-token routes remain supported for deployments that prefer explicit per-project tokens.
+
+## Windows Tray Icon
+
+`tray` runs the same standalone Rust executable as a Windows notification-area relay with a native Shell_NotifyIcon tray icon. The executable icon uses the embedded color `R` resource, while the tray icon uses the embedded gray `R` resource when no CGA account is signed in and switches to the embedded color `R` resource after account login. It does not launch Python, Node, Cargo, PowerShell, or a project-local MCP server.
+
+When `tray` starts successfully, CGA-Relay releases the startup console so the long-running tray process does not leave a blank command window on the desktop. Status and diagnostic commands such as `tray --status --json`, `doctor`, and `settings --render` keep normal terminal output.
+
+Left-clicking the tray icon shows a short running-status message. Right-clicking opens a native menu that first displays `Not signed in` or `Signed in: <username>`, followed by `Settings`, `About`, `Logs`, and `Exit` options. `Settings` opens the CGA-Relay settings page, `About` shows the relay version, author, repository, support link, license, relay id, and project id, `Logs` opens the configured log directory, and `Exit` stops the tray process. Use `tray --status --json` for automation or installers that need to confirm tray support without starting the long-running message loop.
+
+## MCP Pointer
+
+Use `docs/examples/cga-relay.mcp.json` as the project-side pointer. It launches the installed `cga-relay` command with `mcp --config ...` over stdio.
+
+The pointer does not reference `/mcp/sse`, does not launch a per-project MCP server, and does not include secret values.
+
+## Scanner And Sync
+
+`scan` walks the configured root deterministically, applies include/exclude globs, skips oversized and binary files, hashes scanned text files with SHA-256, and reports candidate, excluded, scanned, changed, unchanged, oversized, skipped binary, tombstone, and bytes scanned counts.
+
+`--dry-run` never updates scan state. Normal scan mode writes local state under `STATE_DIR`. `sync` reads the central relay project registry, fails closed if login or token environment is missing, and submits changed text snapshots to the configured control API when not in dry-run mode.
+
+The project-token backend bridge is exposed at `/api/project/cga-relay/mcp-tool` and `/api/project/cga-relay/sync`. These routes are protected by project tokens through the existing `/api/project` middleware and require the authenticated project identity to match the submitted `project_id`. The account-login bridge is exposed at `/api/auth/cga-relay/mcp-tool` and `/api/auth/cga-relay/sync` and is protected by the normal user JWT flow.

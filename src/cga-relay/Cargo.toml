@@ -1,0 +1,12 @@
+[package]
+name = "cga-relay"
+version = "1.30.66"
+edition = "2021"
+
+[dependencies]
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = "symbols"

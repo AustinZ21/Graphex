@@ -268,6 +268,7 @@
       flex: 1 1 420px;
       max-width: 560px;
     }
+    .settings-control.settings-control-narrow { flex-basis: 220px; max-width: 260px; }
     .settings-control input { font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 12px; }
     .settings-status {
       min-height: 16px;
@@ -278,6 +279,66 @@
     }
     .settings-status.ok { color: var(--accent); }
     .settings-status.warn { color: var(--warn); }
+    .settings-strategy-group { margin-top: 14px; }
+    .settings-strategy-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .settings-strategy-head h3 {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .settings-strategy-status {
+      color: var(--info);
+      background: var(--info-soft);
+      border: 1px solid rgba(96,165,250,.24);
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .settings-strategy-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 8px;
+    }
+    .settings-strategy-option {
+      min-height: 112px;
+      padding: 10px;
+      text-align: left;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      transition: border-color .15s, background .15s, box-shadow .15s;
+    }
+    .settings-strategy-option:hover { border-color: var(--border-strong); background: rgba(255,255,255,.03); }
+    .settings-strategy-option.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      box-shadow: 0 0 0 1px rgba(74,222,128,.18) inset;
+    }
+    .settings-strategy-option strong { font-size: 12.5px; line-height: 1.25; }
+    .settings-strategy-option span { color: var(--muted); font-size: 11.5px; line-height: 1.45; }
+    .settings-strategy-option small {
+      width: fit-content;
+      color: var(--info);
+      background: var(--info-soft);
+      border-radius: 999px;
+      padding: 2px 7px;
+      font-size: 10.5px;
+      font-weight: 600;
+    }
+    .settings-actions-indexing { justify-content: flex-start; }
     .settings-copy-value {
       display: inline-flex;
       align-items: center;
@@ -2733,10 +2794,30 @@
                 </span>
               </div>
               <div class="settings-row"><label>Incremental Indexing</label><span class="settings-value">Enabled</span></div>
-              <div class="settings-row"><label>Default Token Budget</label><span class="settings-value">1500</span></div>
-              <div class="settings-actions">
-                <button class="btn btn-primary" onclick="saveIndexingSettings()">Save Settings</button>
+              <div class="settings-row settings-form-row">
+                <label for="settings-indexing-token-budget">Default Token Budget</label>
+                <span class="settings-control settings-control-narrow">
+                  <input id="settings-indexing-token-budget" type="number" min="200" max="200000" step="100" inputmode="numeric" />
+                  <span id="settings-indexing-token-budget-status" class="settings-status">Default: 1500</span>
+                </span>
               </div>
+            </div>
+            <div class="settings-strategy-group" aria-labelledby="settings-indexing-intelligence-title">
+              <div class="settings-strategy-head">
+                <h3 id="settings-indexing-intelligence-title">Code Intelligence Strategy</h3>
+                <span id="settings-indexing-intelligence-status" class="settings-strategy-status">Selected: Auto Mode</span>
+              </div>
+              <div id="settings-indexing-intelligence-options" class="settings-strategy-grid"></div>
+            </div>
+            <div class="settings-strategy-group" aria-labelledby="settings-indexing-parsing-title">
+              <div class="settings-strategy-head">
+                <h3 id="settings-indexing-parsing-title">Parsing Strategy</h3>
+                <span id="settings-indexing-parsing-status" class="settings-strategy-status">Selected: Auto Mode</span>
+              </div>
+              <div id="settings-indexing-parsing-options" class="settings-strategy-grid"></div>
+            </div>
+            <div class="settings-actions settings-actions-indexing">
+              <button class="btn btn-primary" onclick="saveIndexingSettings()">Save Settings</button>
             </div>
           </section>
 
@@ -2994,6 +3075,68 @@ const BRIEFING_COLLAPSE_STORAGE_KEY = 'cga_work_dashboard_collapsed_sections';
 let _briefingCollapsedSections = loadBriefingCollapsedSections();
 const LOGIN_REMEMBER_USERNAME_KEY = 'cga_login_remember_username';
 const LOGIN_USERNAME_KEY = 'cga_login_username';
+const INDEXING_INTELLIGENCE_STRATEGY_OPTIONS = Object.freeze([
+  {
+    value: 'auto',
+    label: 'Auto Mode',
+    recommended: true,
+    description: 'MCP structure scan selects the best profile from repository signals before indexing.',
+  },
+  {
+    value: 'graph_data',
+    label: 'Graph Data',
+    description: 'Git-driven incremental updates with delete and rename cleanup for day-to-day work.',
+  },
+  {
+    value: 'hybrid_semantic',
+    label: 'Hybrid Semantic',
+    description: 'Combine graph context, lexical search, embeddings, metadata filters, and reranking.',
+  },
+  {
+    value: 'large_monorepo',
+    label: 'Large Monorepo',
+    description: 'Shard scans by directory and language, excluding heavy build output and binary commits.',
+  },
+  {
+    value: 'documentation_heavy',
+    label: 'Documentation-heavy',
+    description: 'Prioritize Markdown, PDF, Office, and HTML parsing alongside source graph extraction.',
+  },
+]);
+const INDEXING_PARSING_STRATEGY_OPTIONS = Object.freeze([
+  {
+    value: 'auto',
+    label: 'Auto Mode',
+    recommended: true,
+    description: 'Route each file family to the strongest available parser in the local indexer.',
+  },
+  {
+    value: 'tree_sitter_ast',
+    label: 'Tree-sitter AST',
+    description: 'Fast syntax trees for source code with resilient parsing across incomplete files.',
+  },
+  {
+    value: 'scip_lsp_semantic',
+    label: 'SCIP/LSP Semantic',
+    description: 'Prefer definitions, references, implementations, type edges, and IDE-grade language data.',
+  },
+  {
+    value: 'ctags_symbols',
+    label: 'Ctags Symbols',
+    description: 'Use broad fallback symbol extraction when AST or semantic indexers are unavailable.',
+  },
+  {
+    value: 'document_parser',
+    label: 'Document Parser',
+    description: 'Extract text, tables, metadata, and layout from non-source project documents.',
+  },
+  {
+    value: 'config_metadata',
+    label: 'Config Metadata',
+    description: 'Parse manifests, lockfiles, CI/CD, Docker Compose, and IaC files for operational context.',
+  },
+]);
+let _indexingStrategyDraft = { intelligence_strategy: 'auto', parsing_strategy: 'auto' };
 
 const ADMIN_TAB_ROUTES = Object.freeze({
   projects: '/admin/projects',
@@ -3503,7 +3646,31 @@ function renderIndexingSettings(cfg) {
   const indexing = cfg?.indexing || {};
   const input = document.getElementById('settings-indexing-repos-root');
   const status = document.getElementById('settings-indexing-repos-root-status');
+  const tokenBudgetInput = document.getElementById('settings-indexing-token-budget');
+  const tokenBudgetStatus = document.getElementById('settings-indexing-token-budget-status');
+  const intelligenceStrategy = indexing.intelligence_strategy || indexing.default_intelligence_strategy || 'auto';
+  const parsingStrategy = indexing.parsing_strategy || indexing.default_parsing_strategy || 'auto';
+  const tokenBudget = Number(indexing.default_token_budget || 1500);
+  const tokenBudgetDefault = Number(indexing.default_token_budget_default || 1500);
+  const tokenBudgetMin = Number(indexing.default_token_budget_min || 200);
+  const tokenBudgetMax = Number(indexing.default_token_budget_max || 200000);
+  _indexingStrategyDraft = {
+    intelligence_strategy: intelligenceStrategy,
+    parsing_strategy: parsingStrategy,
+  };
   if (input && document.activeElement !== input) input.value = indexing.repos_root || '';
+  if (tokenBudgetInput) {
+    tokenBudgetInput.min = String(tokenBudgetMin);
+    tokenBudgetInput.max = String(tokenBudgetMax);
+    if (document.activeElement !== tokenBudgetInput) tokenBudgetInput.value = String(tokenBudget);
+  }
+  if (tokenBudgetStatus) {
+    tokenBudgetStatus.textContent = `Allowed: ${tokenBudgetMin}-${tokenBudgetMax} tokens · Built-in default: ${tokenBudgetDefault}`;
+    tokenBudgetStatus.classList.add('ok');
+    tokenBudgetStatus.classList.remove('warn');
+  }
+  renderIndexingStrategyCards('intelligence_strategy', intelligenceStrategy);
+  renderIndexingStrategyCards('parsing_strategy', parsingStrategy);
   if (!status) return;
   const sourceLabel = indexing.repos_root_source === 'saved'
     ? 'Saved'
@@ -3517,12 +3684,78 @@ function renderIndexingSettings(cfg) {
   status.classList.toggle('warn', !indexing.repos_root_exists);
 }
 
+function indexingStrategyOptions(field) {
+  return field === 'parsing_strategy'
+    ? INDEXING_PARSING_STRATEGY_OPTIONS
+    : INDEXING_INTELLIGENCE_STRATEGY_OPTIONS;
+}
+
+function indexingStrategyTargets(field) {
+  if (field === 'parsing_strategy') {
+    return {
+      optionsId: 'settings-indexing-parsing-options',
+      statusId: 'settings-indexing-parsing-status',
+    };
+  }
+  return {
+    optionsId: 'settings-indexing-intelligence-options',
+    statusId: 'settings-indexing-intelligence-status',
+  };
+}
+
+function indexingStrategyLabel(field, value) {
+  const option = indexingStrategyOptions(field).find(item => item.value === value);
+  return option?.label || 'Auto Mode';
+}
+
+function renderIndexingStrategyCards(field, selectedValue) {
+  const options = indexingStrategyOptions(field);
+  const selected = options.some(item => item.value === selectedValue) ? selectedValue : 'auto';
+  const targets = indexingStrategyTargets(field);
+  const root = document.getElementById(targets.optionsId);
+  const status = document.getElementById(targets.statusId);
+  if (status) status.textContent = `Selected: ${indexingStrategyLabel(field, selected)}`;
+  if (!root) return;
+  root.innerHTML = options.map(option => {
+    const active = option.value === selected;
+    const recommended = option.recommended ? '<small>Recommended</small>' : '';
+    return `
+      <button type="button" class="settings-strategy-option${active ? ' active' : ''}" aria-pressed="${active ? 'true' : 'false'}" onclick="selectIndexingStrategy(${jsArg(field)}, ${jsArg(option.value)})">
+        <strong>${esc(option.label)}</strong>
+        <span>${esc(option.description)}</span>
+        ${recommended}
+      </button>`;
+  }).join('');
+}
+
+function selectIndexingStrategy(field, value) {
+  const options = indexingStrategyOptions(field);
+  if (!options.some(item => item.value === value)) return;
+  _indexingStrategyDraft = { ..._indexingStrategyDraft, [field]: value };
+  renderIndexingStrategyCards(field, value);
+}
+
 async function saveIndexingSettings() {
   const input = document.getElementById('settings-indexing-repos-root');
+  const tokenBudgetInput = document.getElementById('settings-indexing-token-budget');
   const reposRoot = (input?.value || '').trim();
+  const tokenBudgetMin = Number(tokenBudgetInput?.min || 200);
+  const tokenBudgetMax = Number(tokenBudgetInput?.max || 200000);
+  const tokenBudget = Number(tokenBudgetInput?.value || 0);
   if (!reposRoot) { toast('Repos Folder is required', 'error'); return; }
+  if (!Number.isInteger(tokenBudget) || tokenBudget < tokenBudgetMin || tokenBudget > tokenBudgetMax) {
+    toast(`Default Token Budget must be an integer from ${tokenBudgetMin} to ${tokenBudgetMax}`, 'error');
+    return;
+  }
   try {
-    const cfg = await api('PATCH', '/admin/runtime-config', { indexing: { repos_root: reposRoot } });
+    const cfg = await api('PATCH', '/admin/runtime-config', {
+      indexing: {
+        repos_root: reposRoot,
+        default_token_budget: tokenBudget,
+        intelligence_strategy: _indexingStrategyDraft.intelligence_strategy || 'auto',
+        parsing_strategy: _indexingStrategyDraft.parsing_strategy || 'auto',
+      },
+    });
     _runtimeConfig = cfg;
     renderIndexingSettings(cfg);
     toast('Indexing settings saved');

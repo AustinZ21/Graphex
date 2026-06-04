@@ -1,0 +1,18 @@
+{
+  "servers": {
+    "cga-relay": {
+      "type": "stdio",
+      "transport": "stdio",
+      "command": "cga-relay",
+      "args": [
+        "mcp",
+        "--config",
+        "%USERPROFILE%\\.cga\\agent.env"
+      ],
+      "env": {
+        "CGA_API_KEY_ENV": "CGA_API_KEY",
+        "CGA_DEVELOPER_TOKEN_ENV": "CGA_DEVELOPER_TOKEN"
+      }
+    }
+  }
+}
