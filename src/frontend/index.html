@@ -217,6 +217,14 @@
     .tab-btn:hover:not(.active) { color: var(--text); }
 
     .tab-content { padding: 24px; padding-bottom: 72px; flex: 1; }
+    .tab-content.viewer-active {
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+      padding-bottom: 0;
+      overflow: hidden;
+    }
+    #app.viewer-active > .footer { display: none; }
     .pane { display: none; }
     .pane.active { display: block; }
 
@@ -361,6 +369,15 @@
       min-height: 660px;
       border: 0;
       background: #151922;
+    }
+    .tab-content.viewer-active #pane-viewer {
+      flex: 1 1 auto;
+      height: calc(100vh - 55px);
+      min-height: 0;
+    }
+    .tab-content.viewer-active .viewer-frame {
+      height: calc(100vh - 55px);
+      min-height: 0;
     }
 
     .briefing-filters {
@@ -4185,6 +4202,8 @@ function switchTab(name, btn, options = {}) {
   document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   pane.classList.add('active');
+  document.querySelector('.tab-content')?.classList.toggle('viewer-active', nextName === 'viewer');
+  document.getElementById('app')?.classList.toggle('viewer-active', nextName === 'viewer');
   const activeBtn = nextName === requestedName && btn ? btn : document.getElementById('tab-' + nextName + '-btn');
   if (activeBtn) activeBtn.classList.add('active');
   if (options.updateUrl !== false) {
