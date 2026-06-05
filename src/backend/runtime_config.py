@@ -12,6 +12,8 @@ class RuntimeConfigError(ValueError):
 
 
 MAX_REPOS_ROOT_LENGTH = 1024
+MIN_INDEXING_TOKEN_BUDGET = 200
+MAX_INDEXING_TOKEN_BUDGET = 200000
 MAX_SMTP_HOST_LENGTH = 255
 MAX_SMTP_TEXT_LENGTH = 1024
 MAX_SMTP_SECRET_LENGTH = 4096
@@ -22,6 +24,24 @@ RUNTIME_MODULE_DEFAULTS = {
     "schedule_worker": True,
     "backup_scheduler": True,
 }
+INDEXING_INTELLIGENCE_STRATEGIES = {
+    "auto",
+    "graph_data",
+    "hybrid_semantic",
+    "large_monorepo",
+    "documentation_heavy",
+}
+INDEXING_PARSING_STRATEGIES = {
+    "auto",
+    "tree_sitter_ast",
+    "scip_lsp_semantic",
+    "ctags_symbols",
+    "document_parser",
+    "config_metadata",
+}
+DEFAULT_INDEXING_INTELLIGENCE_STRATEGY = "auto"
+DEFAULT_INDEXING_PARSING_STRATEGY = "auto"
+DEFAULT_INDEXING_TOKEN_BUDGET = 1500
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _LOCAL_REPOS_ROOT = _REPO_ROOT.parent
 
@@ -55,6 +75,33 @@ def _normalize_repos_root(value: Any) -> str:
     if len(cleaned) > MAX_REPOS_ROOT_LENGTH:
         raise RuntimeConfigError(f"indexing.repos_root must be <= {MAX_REPOS_ROOT_LENGTH} characters")
     return cleaned
+
+
+def _normalize_indexing_strategy(value: Any, field: str, allowed_values: set[str]) -> str:
+    if not isinstance(value, str):
+        raise RuntimeConfigError(f"{field} must be a string")
+    cleaned = value.strip().lower()
+    if cleaned not in allowed_values:
+        choices = ", ".join(sorted(allowed_values))
+        raise RuntimeConfigError(f"{field} must be one of: {choices}")
+    return cleaned
+
+
+def _normalize_indexing_token_budget(value: Any) -> int:
+    if isinstance(value, bool):
+        raise RuntimeConfigError("indexing.default_token_budget must be an integer")
+    if isinstance(value, int):
+        budget = value
+    elif isinstance(value, str) and value.strip().isdigit():
+        budget = int(value.strip())
+    else:
+        raise RuntimeConfigError("indexing.default_token_budget must be an integer")
+    if budget < MIN_INDEXING_TOKEN_BUDGET or budget > MAX_INDEXING_TOKEN_BUDGET:
+        raise RuntimeConfigError(
+            "indexing.default_token_budget must be between "
+            f"{MIN_INDEXING_TOKEN_BUDGET} and {MAX_INDEXING_TOKEN_BUDGET}"
+        )
+    return budget
 
 
 def _normalize_bool(value: Any, field: str) -> bool:
@@ -263,15 +310,35 @@ def _normalize_smtp_patch(value: Any, existing: dict[str, Any]) -> dict[str, Any
 
 def get_runtime_config(default_repos_root: str | Path | None = None) -> dict[str, Any]:
     raw = _read_raw_config()
+    indexing = raw.get("indexing") if isinstance(raw.get("indexing"), dict) else {}
     configured_root, source = _configured_repos_root(raw)
     default_root = str(default_repos_root or _default_indexing_repos_root())
     repos_root = configured_root or default_root
+    intelligence_strategy = _normalize_indexing_strategy(
+        indexing.get("intelligence_strategy", DEFAULT_INDEXING_INTELLIGENCE_STRATEGY),
+        "indexing.intelligence_strategy",
+        INDEXING_INTELLIGENCE_STRATEGIES,
+    )
+    parsing_strategy = _normalize_indexing_strategy(
+        indexing.get("parsing_strategy", DEFAULT_INDEXING_PARSING_STRATEGY),
+        "indexing.parsing_strategy",
+        INDEXING_PARSING_STRATEGIES,
+    )
+    default_token_budget = get_indexing_token_budget(raw)
     return {
         "indexing": {
             "repos_root": repos_root,
             "repos_root_source": source,
             "default_repos_root": default_root,
             "repos_root_exists": Path(repos_root).exists(),
+            "intelligence_strategy": intelligence_strategy,
+            "default_intelligence_strategy": DEFAULT_INDEXING_INTELLIGENCE_STRATEGY,
+            "parsing_strategy": parsing_strategy,
+            "default_parsing_strategy": DEFAULT_INDEXING_PARSING_STRATEGY,
+            "default_token_budget": default_token_budget,
+            "default_token_budget_default": DEFAULT_INDEXING_TOKEN_BUDGET,
+            "default_token_budget_min": MIN_INDEXING_TOKEN_BUDGET,
+            "default_token_budget_max": MAX_INDEXING_TOKEN_BUDGET,
         },
         "modules": get_module_config(raw),
         "smtp": _public_smtp_config(raw),
@@ -293,6 +360,22 @@ def update_runtime_config(patch: dict[str, Any] | None) -> dict[str, Any]:
         indexing = raw.get("indexing") if isinstance(raw.get("indexing"), dict) else {}
         if "repos_root" in indexing_patch:
             indexing["repos_root"] = _normalize_repos_root(indexing_patch.get("repos_root"))
+        if "intelligence_strategy" in indexing_patch:
+            indexing["intelligence_strategy"] = _normalize_indexing_strategy(
+                indexing_patch.get("intelligence_strategy"),
+                "indexing.intelligence_strategy",
+                INDEXING_INTELLIGENCE_STRATEGIES,
+            )
+        if "parsing_strategy" in indexing_patch:
+            indexing["parsing_strategy"] = _normalize_indexing_strategy(
+                indexing_patch.get("parsing_strategy"),
+                "indexing.parsing_strategy",
+                INDEXING_PARSING_STRATEGIES,
+            )
+        if "default_token_budget" in indexing_patch:
+            indexing["default_token_budget"] = _normalize_indexing_token_budget(
+                indexing_patch.get("default_token_budget")
+            )
         raw["indexing"] = indexing
 
     if "modules" in patch:
@@ -307,6 +390,12 @@ def update_runtime_config(patch: dict[str, Any] | None) -> dict[str, Any]:
 
     _write_raw_config(raw)
     return get_runtime_config()
+
+
+def get_indexing_token_budget(raw: dict[str, Any] | None = None) -> int:
+    data = raw if raw is not None else _read_raw_config()
+    indexing = data.get("indexing") if isinstance(data.get("indexing"), dict) else {}
+    return _normalize_indexing_token_budget(indexing.get("default_token_budget", DEFAULT_INDEXING_TOKEN_BUDGET))
 
 
 def get_indexing_repo_search_roots(default_roots: Iterable[Path] | None = None) -> list[Path]:

@@ -5,6 +5,7 @@ from fastapi import FastAPI, Request
 from httpx import ASGITransport, AsyncClient
 
 from backend.auth.middleware import ProjectTokenMiddleware
+from backend.auth.crystals import crystal_suite_headers
 from backend.auth.security import hash_token
 
 
@@ -60,6 +61,13 @@ def _client(app: FastAPI) -> AsyncClient:
     return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
 
 
+def _crystal_headers(extra: dict[str, str] | None = None) -> dict[str, str]:
+    headers = crystal_suite_headers()
+    if extra:
+        headers.update(extra)
+    return headers
+
+
 @pytest.mark.asyncio
 async def test_mcp_discovery_is_public(auth_pg_pool):
     await _seed_db(auth_pg_pool)
@@ -75,11 +83,27 @@ async def test_mcp_rejects_missing_project_id(auth_pg_pool):
     await _seed_db(auth_pg_pool)
     async with _client(_build_app()) as client:
         resp = await client.get(
-            "/mcp/ping", headers={"Authorization": "Bearer good-token"}
+            "/mcp/ping", headers=_crystal_headers({"Authorization": "Bearer good-token"})
         )
 
     assert resp.status_code == 401
     assert "Missing project_id" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_mcp_rejects_missing_crystals_profile(auth_pg_pool):
+    await _seed_db(auth_pg_pool)
+    async with _client(_build_app()) as client:
+        resp = await client.get(
+            "/mcp/ping",
+            headers={
+                "Authorization": "Bearer good-token",
+                "X-Project-ID": "P1",
+            },
+        )
+
+    assert resp.status_code == 426
+    assert "CRYSTALS" in resp.json()["detail"]
 
 
 @pytest.mark.asyncio
@@ -88,10 +112,10 @@ async def test_mcp_rejects_non_mcp_token_type(auth_pg_pool):
     async with _client(_build_app()) as client:
         resp = await client.get(
             "/mcp/ping",
-            headers={
+            headers=_crystal_headers({
                 "Authorization": "Bearer edge-token",
                 "X-Project-ID": "P1",
-            },
+            }),
         )
 
     assert resp.status_code == 403
@@ -104,10 +128,10 @@ async def test_mcp_rejects_project_mismatch(auth_pg_pool):
     async with _client(_build_app()) as client:
         resp = await client.get(
             "/mcp/ping",
-            headers={
+            headers=_crystal_headers({
                 "Authorization": "Bearer good-token",
                 "X-Project-ID": "P2",
-            },
+            }),
         )
 
     assert resp.status_code == 403
@@ -120,10 +144,10 @@ async def test_mcp_accepts_matching_mcp_token(auth_pg_pool):
     async with _client(_build_app()) as client:
         resp = await client.get(
             "/mcp/ping",
-            headers={
+            headers=_crystal_headers({
                 "Authorization": "Bearer good-token",
                 "X-Project-ID": "P1",
-            },
+            }),
         )
 
     assert resp.status_code == 200
@@ -138,7 +162,7 @@ async def test_project_api_accepts_edge_agent_token_without_explicit_project_id(
     async with _client(_build_app()) as client:
         resp = await client.get(
             "/api/project/ping",
-            headers={"Authorization": "Bearer edge-token"},
+            headers=_crystal_headers({"Authorization": "Bearer edge-token"}),
         )
 
     assert resp.status_code == 200

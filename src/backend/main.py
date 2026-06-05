@@ -48,6 +48,8 @@ from backend.backup import BackupError, BackupService
 from backend.graph.registry import GraphRegistry
 from backend.integrations.azure_devops import AzureDevOpsEnricher, AZURE_DEVOPS_RESOURCE_SCOPE
 from backend.indexer.consumer import IndexerConsumer
+from backend.cga_relay.router import account_router as cga_relay_account_router
+from backend.cga_relay.router import router as cga_relay_router
 from backend.tools.producer import MCPProducer
 from backend.tools import server as mcp_server
 from backend.perf.context_quality import benchmark_context_quality, ContextQualityInputError
@@ -60,7 +62,7 @@ from backend.workbriefing.store import PgVectorActivityStore, resolve_dsn
 
 log = structlog.get_logger()
 
-APP_VERSION = "1.30.56"
+APP_VERSION = "1.30.78"
 
 FALKORDB_HOST = os.getenv("FALKORDB_HOST", "localhost")
 FALKORDB_PORT = int(os.getenv("FALKORDB_PORT", "6379"))
@@ -220,6 +222,8 @@ app.add_middleware(ProjectTokenMiddleware)
 
 # ── Auth API ───────────────────────────────────────────────────────────────
 app.include_router(auth_router, prefix="/api")
+app.include_router(cga_relay_router, prefix="/api")
+app.include_router(cga_relay_account_router, prefix="/api")
 app.include_router(viewer_router, prefix="/api")
 app.include_router(schedules_router, prefix="/api")
 
@@ -526,8 +530,21 @@ async def mcp_info() -> dict:
         "message_endpoint": "/mcp/messages",
         "auth": {
             "type": "Bearer",
-            "required_headers": ["Authorization", "X-Project-ID"],
-            "notes": "MCP transport routes require an active mcp token bound to the provided project_id",
+            "required_headers": [
+                "Authorization",
+                "X-Project-ID",
+                "X-CGA-Communication-Profile",
+                "X-CGA-Key-Establishment",
+                "X-CGA-Signature",
+                "X-CGA-Transport-Scope",
+            ],
+            "crystals_profile": {
+                "profile": "CRYSTALS-CNSA-2.0",
+                "key_establishment": "ML-KEM-1024",
+                "signature": "ML-DSA-87",
+                "local_transport_scope": "local-ipc",
+            },
+            "notes": "MCP transport routes require an active mcp token bound to the provided project_id and CRYSTALS/CNSA 2.0 communication profile headers",
         },
     }
 

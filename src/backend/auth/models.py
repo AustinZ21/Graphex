@@ -34,6 +34,27 @@ class UserCreate(BaseModel):
         return v
 
 
+def _unique_positive_ids(values: list[int]) -> list[int]:
+    seen: set[int] = set()
+    unique_values: list[int] = []
+    for value in values:
+        if value <= 0:
+            raise ValueError("ids must be positive integers")
+        if value in seen:
+            continue
+        seen.add(value)
+        unique_values.append(value)
+    return unique_values
+
+
+class UserGroupSummary(BaseModel):
+    id: int
+    group_name: str
+    description: str = ""
+    created_at: str = ""
+    is_active: bool = True
+
+
 class UserOut(BaseModel):
     id: int
     username: str
@@ -41,6 +62,72 @@ class UserOut(BaseModel):
     role: str
     created_at: str
     is_active: bool
+    groups: list[UserGroupSummary] = Field(default_factory=list)
+
+
+class UserGroupCreate(BaseModel):
+    group_name: str = Field(min_length=3, max_length=64)
+    description: str = Field(default="", max_length=1000)
+
+    @field_validator("group_name")
+    @classmethod
+    def validate_group_name(cls, v: str) -> str:
+        if not _IDENT_RE.fullmatch(v):
+            raise ValueError("group_name may only contain letters, digits, dot, underscore, and hyphen")
+        return v
+
+
+class UserGroupUpdate(BaseModel):
+    group_name: str | None = Field(default=None, min_length=3, max_length=64)
+    description: str | None = Field(default=None, max_length=1000)
+    is_active: bool | None = None
+
+    @field_validator("group_name")
+    @classmethod
+    def validate_optional_group_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if not _IDENT_RE.fullmatch(v):
+            raise ValueError("group_name may only contain letters, digits, dot, underscore, and hyphen")
+        return v
+
+
+class UserGroupOut(BaseModel):
+    id: int
+    group_name: str
+    description: str = ""
+    created_at: str
+    is_active: bool
+    member_count: int = 0
+    project_count: int = 0
+    project_ids: list[int] = Field(default_factory=list)
+
+
+class UserGroupIdsUpdate(BaseModel):
+    group_ids: list[int] = Field(default_factory=list)
+
+    @field_validator("group_ids")
+    @classmethod
+    def validate_group_ids(cls, values: list[int]) -> list[int]:
+        return _unique_positive_ids(values)
+
+
+class UserGroupProjectIdsUpdate(BaseModel):
+    project_ids: list[int] = Field(default_factory=list)
+
+    @field_validator("project_ids")
+    @classmethod
+    def validate_project_ids(cls, values: list[int]) -> list[int]:
+        return _unique_positive_ids(values)
+
+
+class UserGroupUserIdsUpdate(BaseModel):
+    user_ids: list[int] = Field(default_factory=list)
+
+    @field_validator("user_ids")
+    @classmethod
+    def validate_user_ids(cls, values: list[int]) -> list[int]:
+        return _unique_positive_ids(values)
 
 
 class UserProfileUpdate(BaseModel):
@@ -69,6 +156,10 @@ class AdminUserUpdate(BaseModel):
         if not _IDENT_RE.fullmatch(v):
             raise ValueError("username may only contain letters, digits, dot, underscore, and hyphen")
         return v
+
+
+class AdminUserUpdateResponse(UserOut):
+    access_token: str | None = None
 
 
 class ProjectCreate(BaseModel):
@@ -128,6 +219,15 @@ class ProjectOut(BaseModel):
     repo_path: str = ""
     created_at: str
     is_active: bool
+
+
+class UserAccessGroupOut(BaseModel):
+    id: int
+    group_name: str
+    description: str = ""
+    created_at: str
+    is_active: bool
+    projects: list[ProjectOut] = Field(default_factory=list)
 
 
 class ProjectTokenOut(BaseModel):

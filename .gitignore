@@ -31,6 +31,7 @@ yarn.log
 src/dist/
 src/viewer/dist/
 build/
+target/
 coverage/
 .nyc_output/
 .eslintcache

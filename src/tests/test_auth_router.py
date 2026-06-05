@@ -5,10 +5,12 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from fastapi import HTTPException
 
 from backend.auth import pgshim
 from backend import runtime_config
 from backend.auth import router as auth_router
+from backend.cga_relay import router as relay_router
 
 
 async def _seed_project(
@@ -19,11 +21,24 @@ async def _seed_project(
     project_external_id: str = "OESIJQWHXY",
     repo_path: str | None = None,
 ) -> None:
-    resolved_repo_path = repo_path or f"D:/Repos/{project_name}"
+    resolved_repo_path = f"D:/Repos/{project_name}" if repo_path is None else repo_path
     await db.execute(
         "INSERT INTO projects(id, project_name, project_id, repo_path, is_active) "
         "VALUES (?, ?, ?, ?, 1)",
         (project_id, project_name, project_external_id, resolved_repo_path),
+    )
+
+
+async def _seed_user(
+    db: pgshim.Connection,
+    *,
+    user_id: int = 10,
+    username: str = "developer",
+    role: str = "developer",
+) -> None:
+    await db.execute(
+        "INSERT INTO users(id, username, password_hash, role, is_active) VALUES(?,?,?,?,1)",
+        (user_id, username, "hashed", role),
     )
 
 
@@ -83,6 +98,25 @@ def test_candidate_repo_paths_uses_configured_indexing_repos_root(
     candidates = auth_router._candidate_repo_paths("browser-agent")
 
     assert candidates[0] == str(configured_root / "BrowserAgent")
+
+
+def test_resolve_project_repo_path_uses_stored_value_without_exists_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        auth_router,
+        "_resolve_repo_path",
+        lambda project_name: f"D:/Repos/{project_name}",
+    )
+
+    repo_path = auth_router._resolve_project_repo_path(
+        {
+            "project_name": "DisplayName",
+            "repo_path": "Z:/saved/path/ContextGraphAdmin",
+        }
+    )
+
+    assert repo_path == "Z:/saved/path/ContextGraphAdmin"
 
 
 def test_build_index_job_status_marks_stale_processing(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -167,6 +201,162 @@ async def test_rotate_token_preserves_type_and_prefixes_new_token(auth_pg_pool) 
 
 
 @pytest.mark.asyncio
+async def test_admin_can_update_own_user_and_receives_fresh_token(auth_pg_pool) -> None:
+    async with auth_pg_pool.acquire() as db:
+        await _seed_user(db, user_id=40, username="self-admin", role="admin")
+
+        updated = await auth_router.update_user(
+            40,
+            auth_router.AdminUserUpdate(username="self-renamed", role="developer"),
+            current={"id": 40, "role": "admin"},
+            db=db,
+        )
+
+    assert updated.username == "self-renamed"
+    assert updated.role == "developer"
+    assert updated.access_token is not None
+
+
+@pytest.mark.asyncio
+async def test_admin_cannot_deactivate_own_user(auth_pg_pool) -> None:
+    async with auth_pg_pool.acquire() as db:
+        await _seed_user(db, user_id=41, username="self-admin", role="admin")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await auth_router.delete_user(
+                41,
+                current={"id": 41, "role": "admin"},
+                db=db,
+            )
+
+    assert exc_info.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_group_mapping_admin_endpoints_assign_users_and_projects(auth_pg_pool) -> None:
+    async with auth_pg_pool.acquire() as db:
+        await _seed_user(db, user_id=20, username="member")
+        await _seed_project(db, project_id=1, project_name="alpha", project_external_id="ALPHA12345")
+        await _seed_project(db, project_id=2, project_name="beta", project_external_id="BETA123456")
+
+        group = await auth_router.create_user_group(
+            auth_router.UserGroupCreate(group_name="team-alpha", description="Alpha team"),
+            _={"role": "admin"},
+            db=db,
+        )
+        group = await auth_router.set_user_group_projects(
+            group.id,
+            auth_router.UserGroupProjectIdsUpdate(project_ids=[1]),
+            _={"role": "admin"},
+            db=db,
+        )
+        group = await auth_router.set_user_group_users(
+            group.id,
+            auth_router.UserGroupUserIdsUpdate(user_ids=[20]),
+            _={"role": "admin"},
+            db=db,
+        )
+        assigned = await auth_router.set_user_groups(
+            20,
+            auth_router.UserGroupIdsUpdate(group_ids=[group.id]),
+            _={"role": "admin"},
+            db=db,
+        )
+        users = await auth_router.list_users(_={"role": "admin"}, db=db)
+        visible_projects = await auth_router.list_projects(
+            user={"id": 20, "role": "developer"},
+            db=db,
+        )
+
+    assert assigned == [auth_router.UserGroupSummary(id=group.id, group_name="team-alpha", description="Alpha team", created_at=assigned[0].created_at, is_active=True)]
+    assert group.project_ids == [1]
+    assert group.project_count == 1
+    assert group.member_count == 1
+    member = next(user for user in users if user.id == 20)
+    assert [item.group_name for item in member.groups] == ["team-alpha"]
+    assert [project.id for project in visible_projects] == [1]
+
+
+@pytest.mark.asyncio
+async def test_me_groups_returns_current_user_groups_with_projects(auth_pg_pool) -> None:
+    async with auth_pg_pool.acquire() as db:
+        await _seed_user(db, user_id=50, username="member")
+        await _seed_user(db, user_id=51, username="other")
+        await _seed_project(db, project_id=1, project_name="alpha", project_external_id="ALPHA12345")
+        await _seed_project(db, project_id=2, project_name="beta", project_external_id="BETA123456")
+        group = await auth_router.create_user_group(
+            auth_router.UserGroupCreate(group_name="team-alpha", description="Alpha team"),
+            _={"role": "admin"},
+            db=db,
+        )
+        await auth_router.set_user_group_projects(
+            group.id,
+            auth_router.UserGroupProjectIdsUpdate(project_ids=[1]),
+            _={"role": "admin"},
+            db=db,
+        )
+        await auth_router.set_user_group_users(
+            group.id,
+            auth_router.UserGroupUserIdsUpdate(user_ids=[50]),
+            _={"role": "admin"},
+            db=db,
+        )
+
+        groups = await auth_router.me_groups(
+            user={"id": 50, "role": "developer"},
+            db=db,
+        )
+        other_groups = await auth_router.me_groups(
+            user={"id": 51, "role": "developer"},
+            db=db,
+        )
+
+    assert [group.group_name for group in groups] == ["team-alpha"]
+    assert [project.project_name for project in groups[0].projects] == ["alpha"]
+    assert other_groups == []
+
+
+@pytest.mark.asyncio
+async def test_list_projects_preserves_legacy_access_until_groups_are_configured(auth_pg_pool) -> None:
+    async with auth_pg_pool.acquire() as db:
+        await _seed_project(db, project_id=1, project_name="alpha", project_external_id="ALPHA12345")
+        await _seed_project(db, project_id=2, project_name="beta", project_external_id="BETA123456")
+
+        visible_projects = await auth_router.list_projects(
+            user={"id": 99, "role": "developer"},
+            db=db,
+        )
+
+    assert [project.id for project in visible_projects] == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_account_relay_rejects_project_outside_user_group(auth_pg_pool) -> None:
+    async with auth_pg_pool.acquire() as db:
+        await _seed_user(db, user_id=30, username="relay-user")
+        await _seed_project(db, project_id=1, project_name="alpha", project_external_id="ALPHA12345")
+        await _seed_project(db, project_id=2, project_name="beta", project_external_id="BETA123456")
+        await db.execute("INSERT INTO user_groups(id, group_name) VALUES (?,?)", (70, "team-alpha"))
+        await db.execute("INSERT INTO user_group_members(user_id, group_id) VALUES(?,?)", (30, 70))
+        await db.execute("INSERT INTO project_group_access(group_id, project_id) VALUES(?,?)", (70, 1))
+
+        context = await relay_router._account_project_context(
+            db,
+            "ALPHA12345",
+            {"id": 30, "role": "developer"},
+        )
+        with pytest.raises(HTTPException) as exc_info:
+            await relay_router._account_project_context(
+                db,
+                "BETA123456",
+                {"id": 30, "role": "developer"},
+            )
+
+    assert context["project_db_id"] == 1
+    assert exc_info.value.status_code == 403
+
+
+@pytest.mark.asyncio
 async def test_trigger_project_index_calls_mcp_server_with_resolved_repo_path(
     auth_pg_pool,
 ) -> None:
@@ -202,11 +392,92 @@ async def test_trigger_project_index_calls_mcp_server_with_resolved_repo_path(
 
 
 @pytest.mark.asyncio
+async def test_trigger_project_index_uses_stored_repo_path_when_name_differs(
+    auth_pg_pool,
+) -> None:
+    async with auth_pg_pool.acquire() as db:
+        await _seed_project(
+            db,
+            project_name="DisplayName",
+            project_external_id="DISP123456",
+            repo_path="Z:/saved/path/ContextGraphAdmin",
+        )
+
+        with patch.object(
+            auth_router, "_resolve_repo_path", return_value="D:/Repos/DisplayName"
+        ), patch.object(
+            auth_router.mcp_server,
+            "index_repo_changes",
+            AsyncMock(
+                return_value={
+                    "status": "queued",
+                    "mode": "incremental",
+                    "job_id": "job-456",
+                    "stream_id": "501-0",
+                    "changed_count": 1,
+                    "destructive_count": 0,
+                }
+            ),
+        ) as index_repo_changes:
+            result = await auth_router.trigger_project_index(
+                1, _={"role": "admin"}, db=db
+            )
+
+    assert result.project_name == "DisplayName"
+    assert result.repo_path == "Z:/saved/path/ContextGraphAdmin"
+    index_repo_changes.assert_awaited_once_with(
+        repo_path="Z:/saved/path/ContextGraphAdmin", project_name="DisplayName"
+    )
+
+
+@pytest.mark.asyncio
+async def test_trigger_project_full_index_uses_stored_repo_path_when_name_differs(
+    auth_pg_pool,
+) -> None:
+    async with auth_pg_pool.acquire() as db:
+        await _seed_project(
+            db,
+            project_name="DisplayName",
+            project_external_id="DISP123456",
+            repo_path="Z:/saved/path/ContextGraphAdmin",
+        )
+
+        with patch.object(
+            auth_router, "_resolve_repo_path", return_value="D:/Repos/DisplayName"
+        ), patch.object(
+            auth_router.mcp_server,
+            "index_full",
+            AsyncMock(
+                return_value={
+                    "status": "queued",
+                    "job_id": "job-789",
+                    "stream_id": "502-0",
+                }
+            ),
+        ) as index_full:
+            result = await auth_router.trigger_project_full_index(
+                1, _={"role": "admin"}, db=db
+            )
+
+    assert result.project_name == "DisplayName"
+    assert result.repo_path == "Z:/saved/path/ContextGraphAdmin"
+    assert result.mode == "full"
+    index_full.assert_awaited_once_with(
+        repo_path="Z:/saved/path/ContextGraphAdmin", project_name="DisplayName"
+    )
+
+
+@pytest.mark.asyncio
 async def test_trigger_project_index_errors_when_repo_path_missing(
     auth_pg_pool,
 ) -> None:
     async with auth_pg_pool.acquire() as db:
-        await _seed_project(db, project_name="missing", project_external_id="MISS123456")
+        await _seed_project(
+            db,
+            project_name="missing",
+            project_external_id="MISS123456",
+            repo_path="",
+        )
 
         with patch.object(auth_router, "_resolve_repo_path", return_value=None):
             with pytest.raises(Exception) as exc_info:
@@ -256,7 +527,7 @@ async def test_list_projects_index_status_includes_queue_position_and_eta(
             auth_router, "_candidate_repo_paths", return_value=["D:/Repos/OSAgent"]
         ):
             result = await auth_router.list_projects_index_status(
-                _={"username": "admin", "role": "admin"},
+                user={"username": "admin", "role": "admin"},
                 db=db,
                 consumer=consumer,
             )
@@ -314,7 +585,7 @@ async def test_list_projects_index_status_uses_latest_job_across_repo_path_varia
             return_value=["D:/Repos/BrowserAgent", "/repos/browseragent"],
         ):
             result = await auth_router.list_projects_index_status(
-                _={"username": "admin", "role": "admin"},
+                user={"username": "admin", "role": "admin"},
                 db=db,
                 consumer=consumer,
             )
@@ -365,7 +636,7 @@ async def test_list_projects_index_status_uses_stored_repo_path_when_name_differ
             return_value=["/repos/echo-ops"],
         ):
             result = await auth_router.list_projects_index_status(
-                _={"username": "admin", "role": "admin"},
+                user={"username": "admin", "role": "admin"},
                 db=db,
                 consumer=consumer,
             )

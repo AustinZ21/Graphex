@@ -29,6 +29,7 @@ from pathlib import Path
 import structlog
 from mcp.server.fastmcp import FastMCP
 
+from backend import runtime_config
 from backend.auth.context import _current_project_external_id
 from backend.agent.query_strategy import run_cg_first_strategy
 from backend.graph.registry import GraphRegistry
@@ -1171,13 +1172,14 @@ def strategy_query(
     query: str,
     graph_top_k: int = 8,
     min_graph_hits: int = 3,
-    token_budget: int = 1800,
+    token_budget: int | None = None,
     relation_depth: int = 1,
     fallback_max_files: int = 3,
 ) -> dict:
     """Run the default CG-first agent routing strategy through MCP itself."""
     if not _graph:
         raise RuntimeError("MCP server not initialized")
+    resolved_token_budget = runtime_config.get_indexing_token_budget() if token_budget is None else token_budget
     return run_cg_first_strategy(
         query=query,
         repo_root=_repo_root,
@@ -1185,7 +1187,7 @@ def strategy_query(
         get_call_graph=find_call_graph,
         graph_top_k=max(1, graph_top_k),
         min_graph_hits=max(1, min_graph_hits),
-        token_budget=max(200, token_budget),
+        token_budget=max(runtime_config.MIN_INDEXING_TOKEN_BUDGET, resolved_token_budget),
         relation_depth=max(1, relation_depth),
         fallback_max_files=max(1, fallback_max_files),
         source_label="contextgraph-server",

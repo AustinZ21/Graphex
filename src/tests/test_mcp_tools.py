@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from backend import runtime_config
 from backend.auth.context import _current_project_external_id
 import backend.tools.server as mcp_srv
 from backend.workbriefing.service import WorkBriefingService
@@ -640,7 +641,9 @@ def test_clear_cache_with_cache():
     assert result["status"] == "ok"
 
 
-def test_strategy_query_uses_server_strategy():
+def test_strategy_query_uses_server_strategy(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime_config, "RUNTIME_CONFIG_PATH", tmp_path / "runtime-config.json")
+    runtime_config.update_runtime_config({"indexing": {"default_token_budget": 2400}})
     mcp_srv._graph = MagicMock()
     with patch("backend.tools.server.run_cg_first_strategy") as mocked:
         mocked.return_value = {
@@ -653,6 +656,7 @@ def test_strategy_query_uses_server_strategy():
 
     assert result["strategy"] == "cg-first"
     mocked.assert_called_once()
+    assert mocked.call_args.kwargs["token_budget"] == 2400
 
 
 # ---------------------------------------------------------------------------

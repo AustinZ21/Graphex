@@ -20,11 +20,26 @@ def test_runtime_config_persists_indexing_repos_root(
 
     monkeypatch.setattr(runtime_config, "RUNTIME_CONFIG_PATH", config_path)
 
-    saved = runtime_config.update_runtime_config({"indexing": {"repos_root": str(repos_root)}})
+    saved = runtime_config.update_runtime_config(
+        {
+            "indexing": {
+                "repos_root": str(repos_root),
+                "default_token_budget": 4096,
+                "intelligence_strategy": "hybrid_semantic",
+                "parsing_strategy": "config_metadata",
+            }
+        }
+    )
     loaded = runtime_config.get_runtime_config()
 
     assert saved["indexing"]["repos_root"] == str(repos_root)
+    assert saved["indexing"]["default_token_budget"] == 4096
+    assert saved["indexing"]["intelligence_strategy"] == "hybrid_semantic"
+    assert saved["indexing"]["parsing_strategy"] == "config_metadata"
     assert loaded["indexing"]["repos_root"] == str(repos_root)
+    assert loaded["indexing"]["default_token_budget"] == 4096
+    assert loaded["indexing"]["intelligence_strategy"] == "hybrid_semantic"
+    assert loaded["indexing"]["parsing_strategy"] == "config_metadata"
     assert loaded["indexing"]["repos_root_exists"] is False
 
 
@@ -35,6 +50,33 @@ def test_runtime_config_rejects_blank_indexing_repos_root(
 
     with pytest.raises(runtime_config.RuntimeConfigError):
         runtime_config.update_runtime_config({"indexing": {"repos_root": "   "}})
+
+
+def test_runtime_config_rejects_invalid_indexing_strategy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(runtime_config, "RUNTIME_CONFIG_PATH", tmp_path / "runtime-config.json")
+
+    with pytest.raises(runtime_config.RuntimeConfigError):
+        runtime_config.update_runtime_config({"indexing": {"intelligence_strategy": "unsupported"}})
+
+    with pytest.raises(runtime_config.RuntimeConfigError):
+        runtime_config.update_runtime_config({"indexing": {"parsing_strategy": "unsupported"}})
+
+
+def test_runtime_config_rejects_invalid_default_token_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(runtime_config, "RUNTIME_CONFIG_PATH", tmp_path / "runtime-config.json")
+
+    with pytest.raises(runtime_config.RuntimeConfigError):
+        runtime_config.update_runtime_config({"indexing": {"default_token_budget": 199}})
+
+    with pytest.raises(runtime_config.RuntimeConfigError):
+        runtime_config.update_runtime_config({"indexing": {"default_token_budget": 200001}})
+
+    with pytest.raises(runtime_config.RuntimeConfigError):
+        runtime_config.update_runtime_config({"indexing": {"default_token_budget": True}})
 
 
 def test_runtime_config_persists_modules_and_smtp_without_exposing_password(
@@ -109,7 +151,14 @@ def test_admin_runtime_config_endpoint_updates_indexing_repos_root(
         client = TestClient(app)
         response = client.patch(
             "/api/admin/runtime-config",
-            json={"indexing": {"repos_root": str(repos_root)}},
+            json={
+                "indexing": {
+                    "repos_root": str(repos_root),
+                    "default_token_budget": 2600,
+                    "intelligence_strategy": "large_monorepo",
+                    "parsing_strategy": "tree_sitter_ast",
+                }
+            },
         )
         reload_response = client.get("/api/admin/runtime-config")
     finally:
@@ -117,5 +166,11 @@ def test_admin_runtime_config_endpoint_updates_indexing_repos_root(
 
     assert response.status_code == 200
     assert response.json()["indexing"]["repos_root"] == str(repos_root)
+    assert response.json()["indexing"]["default_token_budget"] == 2600
+    assert response.json()["indexing"]["intelligence_strategy"] == "large_monorepo"
+    assert response.json()["indexing"]["parsing_strategy"] == "tree_sitter_ast"
     assert reload_response.status_code == 200
     assert reload_response.json()["indexing"]["repos_root"] == str(repos_root)
+    assert reload_response.json()["indexing"]["default_token_budget"] == 2600
+    assert reload_response.json()["indexing"]["intelligence_strategy"] == "large_monorepo"
+    assert reload_response.json()["indexing"]["parsing_strategy"] == "tree_sitter_ast"
