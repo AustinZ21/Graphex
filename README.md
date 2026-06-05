@@ -1,9 +1,9 @@
 # CGA (Context Graph Agent)
 
-- **Version:** 1.30.66
+- **Version:** 1.30.78
 - **Status:** Published
 - **Author:** Nate Scott
-- **Date:** 2026-06-04 (CGA-Relay tray console suppression)
+- **Date:** 2026-06-04 (Relay Settings project summary removal)
 
 CGA, aka Context Graph Agent, is a local-first graph context service that gives AI coding agents focused code evidence instead of dumping whole files or broad search results into prompts.
 
@@ -66,7 +66,7 @@ That stack opens the Admin UI at `http://localhost:18001/admin`.
 
 ## What You Get
 
-- **Admin Dashboard:** project registration, indexing status, settings, schedules, and operational views.
+- **Admin Dashboard:** project registration, user access groups, indexing status, settings, schedules, and operational views.
 - **3D Graph Viewer:** visual exploration of repository relationships and graph layout controls.
 - **MCP-compatible API:** agent-facing retrieval tools for symbols, files, dependencies, imports, variable flow, and architecture queries.
 - **CGA-Relay:** one developer-machine `cga-relay` with stdio MCP gateway, local scan/sync, and safe config examples. See [docs/cga-relay.md](docs/cga-relay.md).

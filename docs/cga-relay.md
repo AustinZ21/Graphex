@@ -52,7 +52,7 @@ cga-relay mcp --config %USERPROFILE%\.cga\relay.env
 
 When `tray` starts, CGA-Relay also starts a loopback-only dark-mode settings page on `127.0.0.1` and records its URL under `STATE_DIR/settings-url.txt`. The tray `Settings` menu item opens this relay settings page, not the CGA admin settings screen.
 
-The settings page lets the developer sign in with a CGA account. After login, CGA-Relay calls `/api/auth/me` and `/api/auth/projects`, caches the account session and project list under `STATE_DIR`, and imports account projects with valid local `repo_path` values into the local registry under the `account` namespace. The cached account session is local machine state and must not be copied into repository files or committed.
+The settings page lets the developer sign in with a CGA account and review current user groups. After login, CGA-Relay calls `/api/auth/me` and `/api/auth/me/groups`, caches the account session and current user's group-to-project mappings under `STATE_DIR`, derives local relay project access only from those group mappings, and imports group-authorized projects with valid local `repo_path` values into the local registry under the `account` namespace. Use the Settings page `Refresh access` button after CGA admin group or project membership changes to reload the current account's group-authorized project access without signing out. The cached account session is local machine state and must not be copied into repository files or committed.
 
 After account login, MCP tool calls and `sync` can use the user JWT relay bridge at `/api/auth/cga-relay/mcp-tool` and `/api/auth/cga-relay/sync` when project-token environment variables are not configured. Project-token routes remain supported for deployments that prefer explicit per-project tokens.
 
@@ -62,13 +62,26 @@ After account login, MCP tool calls and `sync` can use the user JWT relay bridge
 
 When `tray` starts successfully, CGA-Relay releases the startup console so the long-running tray process does not leave a blank command window on the desktop. Status and diagnostic commands such as `tray --status --json`, `doctor`, and `settings --render` keep normal terminal output.
 
-Left-clicking the tray icon shows a short running-status message. Right-clicking opens a native menu that first displays `Not signed in` or `Signed in: <username>`, followed by `Settings`, `About`, `Logs`, and `Exit` options. `Settings` opens the CGA-Relay settings page, `About` shows the relay version, author, repository, support link, license, relay id, and project id, `Logs` opens the configured log directory, and `Exit` stops the tray process. Use `tray --status --json` for automation or installers that need to confirm tray support without starting the long-running message loop.
+Left-clicking the tray icon shows a short running-status message. Right-clicking opens a native menu that first displays `Not signed in` or `Signed in: <username>`, followed by `Settings`, `Logs`, `About`, and `Exit` options. `Settings` opens the CGA-Relay settings page, `Logs` opens the configured log directory, `About` shows the relay version, author, repository, support link, license, relay id, and current account user groups, and `Exit` stops the tray process. Use `tray --status --json` for automation or installers that need to confirm tray support without starting the long-running message loop.
+
+Relay communication logs are written under `LOG_DIR` as hourly UTC timestamped `.log` files named `YYYYMMDD-HH.log`. The relay records MCP stdin/stdout, local settings requests, outbound CGA HTTP requests, and CGA HTTP responses. Authorization headers, bearer values, token fields, password fields, API key fields, secret fields, cookies, and form-style sensitive values are redacted before anything is appended to disk.
 
 ## MCP Pointer
 
 Use `docs/examples/cga-relay.mcp.json` as the project-side pointer. It launches the installed `cga-relay` command with `mcp --config ...` over stdio.
 
 The pointer does not reference `/mcp/sse`, does not launch a per-project MCP server, and does not include secret values.
+
+## CRYSTALS/CNSA 2.0 Communication Profile
+
+VSCodeAgent-to-Relay communication uses local stdio IPC. Relay-to-CGA communication uses the CRYSTALS/CNSA 2.0 profile on every HTTP request:
+
+- `X-CGA-Communication-Profile: CRYSTALS-CNSA-2.0`
+- `X-CGA-Key-Establishment: ML-KEM-1024`
+- `X-CGA-Signature: ML-DSA-87`
+- `X-CGA-Transport-Scope: local-ipc` for local loopback development.
+
+The relay allows plaintext HTTP only for loopback hosts such as `127.0.0.1` and `localhost`. Remote CGA deployments must be reached through a PQC-capable TLS endpoint or approved hybrid-PQC local proxy before being used with CGA-Relay.
 
 ## Scanner And Sync
 

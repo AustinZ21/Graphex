@@ -62,7 +62,7 @@ from backend.workbriefing.store import PgVectorActivityStore, resolve_dsn
 
 log = structlog.get_logger()
 
-APP_VERSION = "1.30.66"
+APP_VERSION = "1.30.78"
 
 FALKORDB_HOST = os.getenv("FALKORDB_HOST", "localhost")
 FALKORDB_PORT = int(os.getenv("FALKORDB_PORT", "6379"))
@@ -530,8 +530,21 @@ async def mcp_info() -> dict:
         "message_endpoint": "/mcp/messages",
         "auth": {
             "type": "Bearer",
-            "required_headers": ["Authorization", "X-Project-ID"],
-            "notes": "MCP transport routes require an active mcp token bound to the provided project_id",
+            "required_headers": [
+                "Authorization",
+                "X-Project-ID",
+                "X-CGA-Communication-Profile",
+                "X-CGA-Key-Establishment",
+                "X-CGA-Signature",
+                "X-CGA-Transport-Scope",
+            ],
+            "crystals_profile": {
+                "profile": "CRYSTALS-CNSA-2.0",
+                "key_establishment": "ML-KEM-1024",
+                "signature": "ML-DSA-87",
+                "local_transport_scope": "local-ipc",
+            },
+            "notes": "MCP transport routes require an active mcp token bound to the provided project_id and CRYSTALS/CNSA 2.0 communication profile headers",
         },
     }
 

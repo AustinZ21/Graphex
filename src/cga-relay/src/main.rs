@@ -6,8 +6,9 @@ use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process;
 use std::thread;
+use std::time::{SystemTime, UNIX_EPOCH};
 
-const VERSION: &str = "1.30.66";
+const VERSION: &str = "1.30.78";
 const SERVER_NAME: &str = "cga-relay";
 const TRAY_ICON_LOGGED_IN_RESOURCE_ID: u16 = 1;
 const TRAY_ICON_LOGGED_OUT_RESOURCE_ID: u16 = 4;
@@ -16,6 +17,10 @@ const PROJECT_AUTHOR: &str = "Nate Scott";
 const PROJECT_REPOSITORY: &str = "https://github.com/nascousa/cga";
 const PROJECT_SUPPORT: &str = "https://github.com/nascousa/cga/issues";
 const PROJECT_LICENSE: &str = "Apache License 2.0";
+const CRYSTALS_PROFILE: &str = "CRYSTALS-CNSA-2.0";
+const CRYSTALS_KEM: &str = "ML-KEM-1024";
+const CRYSTALS_SIGNATURE: &str = "ML-DSA-87";
+const CRYSTALS_TRANSPORT_SCOPE: &str = "local-ipc";
 
 #[derive(Debug)]
 struct AgentError(String);
@@ -61,6 +66,15 @@ struct AccountProject {
     project_id: String,
     repo_path: String,
     is_active: bool,
+}
+
+#[derive(Clone, Debug)]
+struct AccountGroup {
+    id: String,
+    name: String,
+    description: String,
+    is_active: bool,
+    projects: Vec<AccountProject>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -301,15 +315,18 @@ fn cmd_mcp(args: &[String]) -> AgentResult<()> {
     std::io::stdin()
         .read_to_string(&mut input)
         .map_err(|err| AgentError(format!("failed to read stdin: {err}")))?;
+    log_communication(&config, "mcp.stdin", &input);
     let responses = handle_mcp_session(&config, &input)?;
+    log_communication(&config, "mcp.stdout", &responses);
     print!("{responses}");
     Ok(())
 }
 
 fn tray_status_json(config: &AgentConfig) -> String {
     let login = tray_login_status(config);
+    let user_groups = tray_user_group_labels(config, &login);
     format!(
-        "{{\"supported\":{},\"agent_id\":\"{}\",\"project_id\":\"{}\",\"mode\":\"{}\",\"tooltip\":\"{}\",\"icon\":\"embedded-resource:{}\",\"icon_variant\":\"{}\",\"icon_loaded\":{},\"logged_in\":{},\"username\":\"{}\",\"menu\":{},\"about\":{{\"project\":\"{}\",\"author\":\"{}\",\"repository\":\"{}\",\"support\":\"{}\",\"license\":\"{}\"}},\"menu_events\":[\"WM_CONTEXTMENU\",\"WM_RBUTTONUP\",\"WM_TIMER\"]}}",
+        "{{\"supported\":{},\"agent_id\":\"{}\",\"project_id\":\"{}\",\"mode\":\"{}\",\"tooltip\":\"{}\",\"icon\":\"embedded-resource:{}\",\"icon_variant\":\"{}\",\"icon_loaded\":{},\"logged_in\":{},\"username\":\"{}\",\"menu\":{},\"about\":{{\"name\":\"{}\",\"user_groups\":{},\"user_group_count\":{},\"author\":\"{}\",\"repository\":\"{}\",\"support\":\"{}\",\"license\":\"{}\"}},\"menu_events\":[\"WM_CONTEXTMENU\",\"WM_RBUTTONUP\",\"WM_TIMER\"]}}",
         tray_supported(),
         json_escape(&config.agent_id),
         json_escape(&config.project_id),
@@ -326,6 +343,8 @@ fn tray_status_json(config: &AgentConfig) -> String {
         json_escape(&login.username),
         tray_menu_json(&login),
         json_escape(PROJECT_DISPLAY_NAME),
+        string_array_json(&user_groups),
+        user_groups.len(),
         json_escape(PROJECT_AUTHOR),
         json_escape(PROJECT_REPOSITORY),
         json_escape(PROJECT_SUPPORT),
@@ -363,6 +382,38 @@ fn tray_login_menu_label(login: &TrayLoginStatus) -> String {
     }
 }
 
+fn tray_user_group_labels(config: &AgentConfig, login: &TrayLoginStatus) -> Vec<String> {
+    if !login.logged_in {
+        return Vec::new();
+    }
+    load_account_groups(config)
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|group| {
+            let name = group.name.trim();
+            if name.is_empty() {
+                None
+            } else if group.is_active {
+                Some(name.to_string())
+            } else {
+                Some(format!("{name} (inactive)"))
+            }
+        })
+        .collect()
+}
+
+fn tray_user_group_summary(config: &AgentConfig, login: &TrayLoginStatus) -> String {
+    if !login.logged_in {
+        return "Not signed in".to_string();
+    }
+    let user_groups = tray_user_group_labels(config, login);
+    if user_groups.is_empty() {
+        "No user groups loaded".to_string()
+    } else {
+        user_groups.join(", ")
+    }
+}
+
 fn tray_icon_resource_id(login: &TrayLoginStatus) -> u16 {
     if login.logged_in {
         TRAY_ICON_LOGGED_IN_RESOURCE_ID
@@ -381,7 +432,7 @@ fn tray_icon_variant(login: &TrayLoginStatus) -> &'static str {
 
 fn tray_menu_json(login: &TrayLoginStatus) -> String {
     format!(
-        "[\"{}\",\"Settings\",\"About\",\"Logs\",\"Exit\"]",
+        "[\"{}\",\"Settings\",\"Logs\",\"About\",\"Exit\"]",
         json_escape(&tray_login_menu_label(login))
     )
 }
@@ -544,6 +595,214 @@ fn ensure_state_dirs(config: &AgentConfig) -> AgentResult<()> {
     Ok(())
 }
 
+fn log_communication(config: &AgentConfig, event: &str, detail: &str) {
+    let now = unix_timestamp_seconds();
+    let timestamp = utc_timestamp(now);
+    let file_name = hourly_log_file_name(now);
+    let sanitized = redact_sensitive_text(detail);
+    let line = format!("[{timestamp}] {event}\n{sanitized}\n\n");
+    if fs::create_dir_all(&config.log_dir).is_err() {
+        return;
+    }
+    let path = config.log_dir.join(file_name);
+    if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+        let _ = file.write_all(line.as_bytes());
+    }
+}
+
+fn unix_timestamp_seconds() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_secs())
+        .unwrap_or(0)
+}
+
+fn hourly_log_file_name(seconds: u64) -> String {
+    let (year, month, day, hour, _, _) = utc_time_parts(seconds);
+    format!("{year:04}{month:02}{day:02}-{hour:02}.log")
+}
+
+fn utc_timestamp(seconds: u64) -> String {
+    let (year, month, day, hour, minute, second) = utc_time_parts(seconds);
+    format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}Z")
+}
+
+fn utc_time_parts(seconds: u64) -> (i32, u32, u32, u32, u32, u32) {
+    let days = (seconds / 86_400) as i64;
+    let seconds_of_day = seconds % 86_400;
+    let (year, month, day) = civil_from_days(days);
+    let hour = (seconds_of_day / 3_600) as u32;
+    let minute = ((seconds_of_day % 3_600) / 60) as u32;
+    let second = (seconds_of_day % 60) as u32;
+    (year, month, day, hour, minute, second)
+}
+
+fn civil_from_days(days_since_unix_epoch: i64) -> (i32, u32, u32) {
+    let z = days_since_unix_epoch + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let day_of_era = z - era * 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_prime = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_prime + 2) / 5 + 1;
+    let month = month_prime + if month_prime < 10 { 3 } else { -9 };
+    let year = year + if month <= 2 { 1 } else { 0 };
+    (year as i32, month as u32, day as u32)
+}
+
+fn redact_sensitive_text(detail: &str) -> String {
+    let mut sanitized = redact_sensitive_header_lines(detail);
+    sanitized = redact_bearer_tokens(&sanitized);
+    for field in [
+        "access_token",
+        "refresh_token",
+        "password",
+        "token",
+        "api_key",
+        "apikey",
+        "secret",
+        "client_secret",
+        "authorization",
+        "cookie",
+        "set_cookie",
+    ] {
+        sanitized = redact_json_field(&sanitized, field);
+        sanitized = redact_form_field(&sanitized, field);
+    }
+    sanitized
+}
+
+fn redact_sensitive_header_lines(detail: &str) -> String {
+    detail
+        .lines()
+        .map(|line| {
+            if let Some((name, _value)) = line.split_once(':') {
+                if is_sensitive_header_name(name.trim()) {
+                    return format!("{}: <redacted>", name.trim());
+                }
+            }
+            line.to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn is_sensitive_header_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    matches!(
+        lower.as_str(),
+        "authorization" | "cookie" | "set-cookie" | "x-api-key"
+    ) || lower.contains("token")
+        || lower.contains("password")
+        || lower.contains("secret")
+        || lower.contains("api-key")
+        || lower.contains("api_key")
+}
+
+fn redact_bearer_tokens(detail: &str) -> String {
+    let mut output = String::new();
+    let mut cursor = 0;
+    while let Some(relative) = find_ascii_case_insensitive(&detail[cursor..], "Bearer ") {
+        let marker_start = cursor + relative;
+        let value_start = marker_start + "Bearer ".len();
+        output.push_str(&detail[cursor..value_start]);
+        output.push_str("<redacted>");
+        let value_end = detail[value_start..]
+            .find(|ch: char| ch.is_ascii_whitespace() || matches!(ch, '"' | '\'' | ',' | ';'))
+            .map_or(detail.len(), |offset| value_start + offset);
+        cursor = value_end;
+    }
+    output.push_str(&detail[cursor..]);
+    output
+}
+
+fn redact_json_field(detail: &str, field: &str) -> String {
+    let marker = format!("\"{field}\"");
+    let mut output = String::new();
+    let mut cursor = 0;
+    while let Some(relative) = find_ascii_case_insensitive(&detail[cursor..], &marker) {
+        let marker_start = cursor + relative;
+        let mut value_start = marker_start + marker.len();
+        let bytes = detail.as_bytes();
+        while value_start < detail.len() && bytes[value_start].is_ascii_whitespace() {
+            value_start += 1;
+        }
+        if value_start >= detail.len() || bytes[value_start] != b':' {
+            output.push_str(&detail[cursor..value_start]);
+            cursor = value_start;
+            continue;
+        }
+        value_start += 1;
+        while value_start < detail.len() && bytes[value_start].is_ascii_whitespace() {
+            value_start += 1;
+        }
+        output.push_str(&detail[cursor..value_start]);
+        if value_start < detail.len() && bytes[value_start] == b'"' {
+            output.push_str("\"<redacted>\"");
+            cursor = skip_json_string(detail, value_start).unwrap_or(detail.len());
+        } else {
+            output.push_str("<redacted>");
+            cursor = detail[value_start..]
+                .find(|ch| matches!(ch, ',' | '}' | ']' | '\n' | '\r'))
+                .map_or(detail.len(), |offset| value_start + offset);
+        }
+    }
+    output.push_str(&detail[cursor..]);
+    output
+}
+
+fn skip_json_string(detail: &str, quote_start: usize) -> Option<usize> {
+    let mut escaped = false;
+    for (offset, ch) in detail[quote_start + 1..].char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        if ch == '"' {
+            return Some(quote_start + 1 + offset + ch.len_utf8());
+        }
+    }
+    None
+}
+
+fn redact_form_field(detail: &str, field: &str) -> String {
+    let marker = format!("{field}=");
+    let mut output = String::new();
+    let mut cursor = 0;
+    while let Some(relative) = find_ascii_case_insensitive(&detail[cursor..], &marker) {
+        let marker_start = cursor + relative;
+        if marker_start > 0 {
+            let previous = detail.as_bytes()[marker_start - 1] as char;
+            if !matches!(previous, '&' | '?' | ' ' | '\n' | '\r' | '\t') {
+                let next = marker_start + marker.len();
+                output.push_str(&detail[cursor..next]);
+                cursor = next;
+                continue;
+            }
+        }
+        let value_start = marker_start + marker.len();
+        output.push_str(&detail[cursor..value_start]);
+        output.push_str("<redacted>");
+        cursor = detail[value_start..]
+            .find(|ch: char| matches!(ch, '&' | ' ' | '\n' | '\r' | '\t'))
+            .map_or(detail.len(), |offset| value_start + offset);
+    }
+    output.push_str(&detail[cursor..]);
+    output
+}
+
+fn find_ascii_case_insensitive(haystack: &str, needle: &str) -> Option<usize> {
+    haystack
+        .to_ascii_lowercase()
+        .find(&needle.to_ascii_lowercase())
+}
+
 fn profile_path(config: &AgentConfig) -> PathBuf {
     config.state_dir.join("profile.json")
 }
@@ -554,6 +813,10 @@ fn account_session_path(config: &AgentConfig) -> PathBuf {
 
 fn account_projects_path(config: &AgentConfig) -> PathBuf {
     config.state_dir.join("account-projects.tsv")
+}
+
+fn account_groups_path(config: &AgentConfig) -> PathBuf {
+    config.state_dir.join("account-groups.tsv")
 }
 
 fn settings_url_path(config: &AgentConfig) -> PathBuf {
@@ -621,10 +884,11 @@ fn doctor_json(config: &AgentConfig) -> String {
 
 fn settings_status_json(config: &AgentConfig) -> String {
     let session = read_account_session(config).unwrap_or_default();
-    let projects = load_account_projects(config).unwrap_or_default();
+    let groups = load_account_groups(config).unwrap_or_default();
+    let projects = projects_from_account_groups(&groups);
     let settings_url = fs::read_to_string(settings_url_path(config)).unwrap_or_default();
     format!(
-        "{{\"enabled\":true,\"page\":\"local-account-settings\",\"login_endpoint\":\"/login\",\"projects_endpoint\":\"/api/auth/projects\",\"session_configured\":{},\"username\":\"{}\",\"project_count\":{},\"settings_url\":\"{}\"}}",
+        "{{\"enabled\":true,\"page\":\"local-account-settings\",\"login_endpoint\":\"/login\",\"projects_endpoint\":\"/api/auth/me/groups\",\"session_configured\":{},\"username\":\"{}\",\"project_count\":{},\"settings_url\":\"{}\"}}",
         session.contains_key("access_token"),
         json_escape(session.get("username").map(String::as_str).unwrap_or("")),
         projects.len(),
@@ -656,14 +920,28 @@ fn start_settings_server(config: AgentConfig) -> AgentResult<String> {
 
 fn handle_settings_connection(config: &AgentConfig, mut stream: TcpStream) -> AgentResult<()> {
     let request = read_http_request(&mut stream)?;
+    log_communication(
+        config,
+        "settings.request",
+        &format!(
+            "method={}\npath={}\nbody:\n{}",
+            request.method, request.path, request.body
+        ),
+    );
     let response = match (request.method.as_str(), request.path.as_str()) {
         ("GET", "/") | ("GET", "/settings") => html_response(&settings_page_html(config, None)),
         ("POST", "/login") => match handle_settings_login(config, &request.body) {
             Ok(message) => html_response(&settings_page_html(config, Some(&message))),
             Err(error) => html_response(&settings_page_html(config, Some(&error.0))),
         },
+        ("POST", "/refresh") => match handle_settings_refresh(config) {
+            Ok(message) => html_response(&settings_page_html(config, Some(&message))),
+            Err(error) => html_response(&settings_page_html(config, Some(&error.0))),
+        },
         ("POST", "/logout") => {
             let _ = fs::remove_file(account_session_path(config));
+            let _ = fs::remove_file(account_projects_path(config));
+            let _ = fs::remove_file(account_groups_path(config));
             html_response(&settings_page_html(config, Some("Signed out.")))
         }
         ("GET", "/status.json") => json_response(&settings_status_json(config)),
@@ -752,6 +1030,7 @@ fn handle_settings_login(config: &AgentConfig, body: &str) -> AgentResult<String
         json_escape(password)
     );
     let token_json = http_post_json(
+        config,
         &format!("{}/api/auth/login", config.api_base_url),
         &[],
         &login_body,
@@ -761,63 +1040,63 @@ fn handle_settings_login(config: &AgentConfig, body: &str) -> AgentResult<String
         AgentError("CGA login response did not include an access token.".to_string())
     })?;
     let auth = [("Authorization", format!("Bearer {access_token}"))];
-    let me_json =
-        http_get_json_with_headers(&format!("{}/api/auth/me", config.api_base_url), &auth)
-            .map_err(|_| AgentError("Could not load CGA account profile.".to_string()))?;
-    let projects_json =
-        http_get_json_with_headers(&format!("{}/api/auth/projects", config.api_base_url), &auth)
-            .map_err(|_| AgentError("Could not load CGA account projects.".to_string()))?;
+    let me_json = http_get_json_with_headers(
+        config,
+        &format!("{}/api/auth/me", config.api_base_url),
+        &auth,
+    )
+    .map_err(|_| AgentError("Could not load CGA account profile.".to_string()))?;
+    let groups_json = http_get_json_with_headers(
+        config,
+        &format!("{}/api/auth/me/groups", config.api_base_url),
+        &auth,
+    )
+    .map_err(|_| AgentError("Could not load CGA account user groups.".to_string()))?;
     let account_username =
         json_string_field(&me_json, "username").unwrap_or_else(|| username.to_string());
     let role = json_string_field(&me_json, "role").unwrap_or_default();
-    let projects = parse_account_projects_json(&projects_json);
+    let groups = parse_account_groups_json(&groups_json);
+    let projects = projects_from_account_groups(&groups);
     write_account_session(config, &account_username, &role, &access_token)?;
     write_account_projects(config, &projects)?;
+    write_account_groups(config, &groups)?;
     let local_count = sync_account_projects_to_registry(config, &projects)?;
     Ok(format!(
-        "Signed in as {}. Loaded {} CGA projects; {} have local repo paths and are available to CGA-Relay.",
+        "Signed in as {}. Loaded {} group-authorized CGA projects; {} have local repo paths and are available to CGA-Relay.",
         account_username,
         projects.len(),
         local_count
     ))
 }
 
+fn handle_settings_refresh(config: &AgentConfig) -> AgentResult<String> {
+    let session = read_account_session(config)?;
+    if !session.contains_key("access_token") {
+        return Err(AgentError("Sign in before refreshing access.".to_string()));
+    }
+    let groups = refresh_account_groups(config, &session)?;
+    let projects = projects_from_account_groups(&groups);
+    Ok(format!(
+        "Access refreshed. Loaded {} user groups and {} group-authorized CGA projects.",
+        groups.len(),
+        projects.len()
+    ))
+}
+
 fn settings_page_html(config: &AgentConfig, message: Option<&str>) -> String {
     let session = read_account_session(config).unwrap_or_default();
-    let projects = load_account_projects(config).unwrap_or_default();
+    let groups = refresh_account_groups(config, &session)
+        .or_else(|_| load_account_groups(config))
+        .unwrap_or_default();
     let signed_in = session.contains_key("access_token");
     let username = session.get("username").map(String::as_str).unwrap_or("");
-    let rows = if projects.is_empty() {
-        "<tr><td colspan=\"4\" class=\"empty-state\">No account projects loaded.</td></tr>"
-            .to_string()
-    } else {
-        projects
-            .iter()
-            .map(|project| {
-                let local =
-                    !project.repo_path.trim().is_empty() && Path::new(&project.repo_path).is_dir();
-                let status = if local {
-                    "<span class=\"status ready\">Ready</span>"
-                } else {
-                    "<span class=\"status pending\">Needs local repo path</span>"
-                };
-                format!(
-                    "<tr><td><span class=\"project-name\">{}</span></td><td><code>{}</code></td><td>{}</td><td>{}</td></tr>",
-                    html_escape(&project.name),
-                    html_escape(&project.project_id),
-                    html_escape(&project.repo_path),
-                    status
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("")
-    };
     let message_html = message
         .map(|text| format!("<div class=\"notice\">{}</div>", html_escape(text)))
         .unwrap_or_default();
+    let group_html = render_account_groups(&groups, signed_in);
     let account_html = if signed_in {
         format!(
-            "<section class=\"panel account-panel\"><div><p class=\"eyebrow\">Account</p><h2>Signed in</h2><p class=\"muted\">Connected as <strong>{}</strong>.</p></div><form method=\"post\" action=\"/logout\"><button class=\"secondary\" type=\"submit\">Sign out</button></form></section>",
+            "<section class=\"panel account-panel\"><div><p class=\"eyebrow\">Account</p><h2>Signed in</h2><p class=\"muted\">Connected as <strong>{}</strong>.</p></div><div class=\"account-actions\"><form method=\"post\" action=\"/refresh\"><button type=\"submit\">Refresh access</button></form><form method=\"post\" action=\"/logout\"><button class=\"secondary\" type=\"submit\">Sign out</button></form></div></section>",
             html_escape(username)
         )
     } else {
@@ -825,14 +1104,85 @@ fn settings_page_html(config: &AgentConfig, message: Option<&str>) -> String {
     };
     let stylesheet = r#"
 :root{color-scheme:dark;--bg:#070b0e;--panel:#11181d;--panel-2:#0d1317;--line:#27343b;--text:#e8f4f1;--muted:#8ea19d;--accent:#2ee6a6;--accent-2:#ffcc66;--danger:#ff7a90;--shadow:0 24px 70px rgba(0,0,0,.42)}
-*{box-sizing:border-box}html{min-height:100%}body{min-height:100%;margin:0;font-family:Segoe UI,Arial,sans-serif;background:#070b0e;color:var(--text);letter-spacing:0}body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:44px 44px;mask-image:linear-gradient(to bottom,#000,transparent 82%)}main{width:min(1120px,calc(100vw - 40px));margin:0 auto;padding:36px 0 44px}.topbar{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:18px}.eyebrow{margin:0 0 8px;color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}h1,h2{margin:0;letter-spacing:0}h1{font-size:34px;line-height:1.08}h2{font-size:20px}.muted{color:var(--muted);line-height:1.55}.version-pill{border:1px solid var(--line);background:#0b1115;border-radius:999px;color:var(--accent-2);padding:8px 12px;white-space:nowrap}.notice{border:1px solid rgba(46,230,166,.38);background:rgba(46,230,166,.1);color:#d8fff2;border-radius:8px;padding:12px 14px;margin:18px 0}.status-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:20px 0}.metric{background:rgba(17,24,29,.82);border:1px solid var(--line);border-radius:8px;padding:12px}.metric span{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}.metric strong{font-size:14px;word-break:break-word}.panel{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);padding:22px;margin:16px 0}.account-panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,420px);gap:22px;align-items:start}.login-form{display:grid;gap:14px}label span{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}input{width:100%;height:40px;border:1px solid #31434a;border-radius:8px;background:#080d10;color:var(--text);padding:0 12px;outline:none}input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(46,230,166,.14)}button{height:40px;border:0;border-radius:8px;background:var(--accent);color:#03110c;font-weight:800;padding:0 16px;cursor:pointer}button.secondary{border:1px solid #34444a;background:#0a1014;color:var(--text)}table{width:100%;border-collapse:collapse;margin-top:16px;overflow:hidden}th,td{border-bottom:1px solid var(--line);text-align:left;padding:12px 10px;vertical-align:top}th{color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase}code{color:#b5fff0;background:#07100e;border:1px solid #1a3b34;border-radius:6px;padding:3px 6px;font-size:12px}.project-name{font-weight:700}.status{display:inline-flex;align-items:center;border-radius:999px;padding:4px 9px;font-size:12px;font-weight:800;white-space:nowrap}.ready{background:rgba(46,230,166,.14);color:#7dffd3;border:1px solid rgba(46,230,166,.35)}.pending{background:rgba(255,204,102,.13);color:#ffe0a3;border:1px solid rgba(255,204,102,.36)}.empty-state{color:var(--muted);padding:28px 10px}@media(max-width:760px){main{width:min(100vw - 24px,1120px);padding-top:24px}.topbar,.account-panel{display:block}.version-pill{display:inline-block;margin-top:14px}.status-grid{grid-template-columns:1fr}h1{font-size:28px}td,th{padding:10px 8px}}
+*{box-sizing:border-box}html{min-height:100%}body{min-height:100%;margin:0;font-family:Segoe UI,Arial,sans-serif;background:#070b0e;color:var(--text);letter-spacing:0}body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:44px 44px;mask-image:linear-gradient(to bottom,#000,transparent 82%)}main{width:min(1120px,calc(100vw - 40px));margin:0 auto;padding:36px 0 44px}.topbar{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:18px}.eyebrow{margin:0 0 8px;color:var(--accent);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}h1,h2{margin:0;letter-spacing:0}h1{font-size:34px;line-height:1.08}h2{font-size:20px}h3{margin:0;font-size:16px}.muted{color:var(--muted);line-height:1.55}.version-pill{border:1px solid var(--line);background:#0b1115;border-radius:999px;color:var(--accent-2);padding:8px 12px;white-space:nowrap}.notice{border:1px solid rgba(46,230,166,.38);background:rgba(46,230,166,.1);color:#d8fff2;border-radius:8px;padding:12px 14px;margin:18px 0}.status-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:20px 0}.metric{background:rgba(17,24,29,.82);border:1px solid var(--line);border-radius:8px;padding:12px}.metric span{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}.metric strong{font-size:14px;word-break:break-word}.panel{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);padding:22px;margin:16px 0}.account-panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,420px);gap:22px;align-items:start}.account-actions{display:flex;justify-content:flex-end;align-items:flex-start;gap:10px;flex-wrap:wrap}.account-actions form{margin:0}.group-list{display:grid;gap:16px;margin-top:14px}.group-card{border:1px solid rgba(39,52,59,.78);border-radius:8px;background:rgba(8,13,16,.42);padding:14px}.group-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.login-form{display:grid;gap:14px}label span{display:block;color:var(--muted);font-size:13px;margin-bottom:6px}input{width:100%;height:40px;border:1px solid #31434a;border-radius:8px;background:#080d10;color:var(--text);padding:0 12px;outline:none}input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(46,230,166,.14)}button{height:40px;border:0;border-radius:8px;background:var(--accent);color:#03110c;font-weight:800;padding:0 16px;cursor:pointer}button.secondary{border:1px solid #34444a;background:#0a1014;color:var(--text)}table{width:100%;border-collapse:collapse;margin-top:16px;overflow:hidden}th,td{border-bottom:1px solid var(--line);text-align:left;padding:12px 10px;vertical-align:top}th{color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase}code{color:#b5fff0;background:#07100e;border:1px solid #1a3b34;border-radius:6px;padding:3px 6px;font-size:12px}.project-name{font-weight:700}.status{display:inline-flex;align-items:center;border-radius:999px;padding:4px 9px;font-size:12px;font-weight:800;white-space:nowrap}.ready{background:rgba(46,230,166,.14);color:#7dffd3;border:1px solid rgba(46,230,166,.35)}.pending{background:rgba(255,204,102,.13);color:#ffe0a3;border:1px solid rgba(255,204,102,.36)}.empty-state{color:var(--muted);padding:28px 10px}@media(max-width:760px){main{width:min(100vw - 24px,1120px);padding-top:24px}.topbar,.account-panel{display:block}.account-actions{justify-content:flex-start;margin-top:16px}.version-pill{display:inline-block;margin-top:14px}.status-grid{grid-template-columns:1fr}h1{font-size:28px}td,th{padding:10px 8px}}
 "#;
     format!(
-        "<!doctype html><html data-theme=\"dark\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>CGA-Relay Settings</title><style>{stylesheet}</style></head><body><main><header class=\"topbar\"><div><p class=\"eyebrow\">CGA-Relay</p><h1>CGA-Relay Settings</h1><p class=\"muted\">Secure relay access for CGA account projects.</p></div><div class=\"version-pill\">v{VERSION}</div></header><div class=\"status-grid\"><div class=\"metric\"><span>Relay</span><strong>{}</strong></div><div class=\"metric\"><span>Project</span><strong>{}</strong></div><div class=\"metric\"><span>API</span><strong>{}</strong></div></div>{message_html}{account_html}<section class=\"panel\"><p class=\"eyebrow\">Projects</p><h2>Account Projects</h2><table><thead><tr><th>Project</th><th>Project ID</th><th>Local Path</th><th>Status</th></tr></thead><tbody>{rows}</tbody></table></section></main></body></html>",
+        "<!doctype html><html data-theme=\"dark\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>CGA-Relay Settings</title><style>{stylesheet}</style></head><body><main><header class=\"topbar\"><div><p class=\"eyebrow\">CGA-Relay</p><h1>CGA-Relay Settings</h1><p class=\"muted\">Secure relay access for your CGA account.</p></div><div class=\"version-pill\">v{VERSION}</div></header><div class=\"status-grid\"><div class=\"metric\"><span>Relay</span><strong>{}</strong></div><div class=\"metric\"><span>API</span><strong>{}</strong></div></div>{message_html}{account_html}{group_html}</main></body></html>",
         html_escape(&config.agent_id),
-        html_escape(&config.project_id),
         html_escape(&config.api_base_url)
     )
+}
+
+fn render_account_groups(groups: &[AccountGroup], signed_in: bool) -> String {
+    if !signed_in {
+        return String::new();
+    }
+    let body = if groups.is_empty() {
+        "<div class=\"empty-state\">No user groups loaded for this account.</div>".to_string()
+    } else {
+        groups
+            .iter()
+            .map(|group| {
+                let project_rows = if group.projects.is_empty() {
+                    "<tr><td colspan=\"4\" class=\"empty-state\">No projects mapped to this group.</td></tr>".to_string()
+                } else {
+                    group
+                        .projects
+                        .iter()
+                        .map(|project| {
+                            let state = if project.is_active { "Active" } else { "Inactive" };
+                            format!(
+                                "<tr><td><span class=\"project-name\">{}</span></td><td><code>{}</code></td><td>{}</td><td>{}</td></tr>",
+                                html_escape(&project.name),
+                                html_escape(&project.project_id),
+                                html_escape(&project.repo_path),
+                                state
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join("")
+                };
+                let state = if group.is_active { "Active" } else { "Inactive" };
+                let description = if group.description.trim().is_empty() {
+                    String::new()
+                } else {
+                    format!("<p class=\"muted\">{}</p>", html_escape(&group.description))
+                };
+                format!(
+                    "<div class=\"group-card\"><div class=\"group-head\"><h3>{}</h3><span class=\"status ready\">{}</span></div>{}<table><thead><tr><th>Project</th><th>Project ID</th><th>Local Path</th><th>Status</th></tr></thead><tbody>{}</tbody></table></div>",
+                    html_escape(&group.name),
+                    state,
+                    description,
+                    project_rows
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("")
+    };
+    format!(
+        "<section class=\"panel\"><p class=\"eyebrow\">Access</p><h2>User Groups</h2><div class=\"group-list\">{body}</div></section>"
+    )
+}
+
+fn refresh_account_groups(
+    config: &AgentConfig,
+    session: &BTreeMap<String, String>,
+) -> AgentResult<Vec<AccountGroup>> {
+    let access_token = session
+        .get("access_token")
+        .ok_or_else(|| AgentError("not signed in".to_string()))?;
+    let auth = [("Authorization", format!("Bearer {access_token}"))];
+    let groups_json = http_get_json_with_headers(
+        config,
+        &format!("{}/api/auth/me/groups", config.api_base_url),
+        &auth,
+    )?;
+    let groups = parse_account_groups_json(&groups_json);
+    write_account_groups(config, &groups)?;
+    let projects = projects_from_account_groups(&groups);
+    write_account_projects(config, &projects)?;
+    let _ = sync_account_projects_to_registry(config, &projects)?;
+    Ok(groups)
 }
 
 fn parse_account_projects_json(text: &str) -> Vec<AccountProject> {
@@ -853,6 +1203,48 @@ fn parse_account_projects_json(text: &str) -> Vec<AccountProject> {
             })
         })
         .collect()
+}
+
+fn parse_account_groups_json(text: &str) -> Vec<AccountGroup> {
+    json_object_slices(text)
+        .into_iter()
+        .filter_map(|object| {
+            let id = json_field(&object, "id").unwrap_or_default();
+            let name = json_string_field(&object, "group_name")?;
+            let description = json_string_field(&object, "description").unwrap_or_default();
+            let is_active = json_field(&object, "is_active")
+                .map(|value| value == "true")
+                .unwrap_or(true);
+            let projects = json_array_field(&object, "projects")
+                .map(|value| parse_account_projects_json(&value))
+                .unwrap_or_default();
+            Some(AccountGroup {
+                id,
+                name,
+                description,
+                is_active,
+                projects,
+            })
+        })
+        .collect()
+}
+
+fn projects_from_account_groups(groups: &[AccountGroup]) -> Vec<AccountProject> {
+    let mut seen_project_ids = BTreeSet::new();
+    let mut projects = Vec::new();
+    for group in groups.iter().filter(|group| group.is_active) {
+        for project in &group.projects {
+            let project_key = if project.project_id.trim().is_empty() {
+                format!("{}|{}", project.name, project.repo_path)
+            } else {
+                project.project_id.clone()
+            };
+            if seen_project_ids.insert(project_key) {
+                projects.push(project.clone());
+            }
+        }
+    }
+    projects
 }
 
 fn json_object_slices(text: &str) -> Vec<String> {
@@ -1391,29 +1783,6 @@ fn write_account_session(
     write_file(&account_session_path(config), &body)
 }
 
-fn load_account_projects(config: &AgentConfig) -> AgentResult<Vec<AccountProject>> {
-    let path = account_projects_path(config);
-    if !path.exists() {
-        return Ok(Vec::new());
-    }
-    let text = fs::read_to_string(&path)
-        .map_err(|err| AgentError(format!("cannot read account projects: {err}")))?;
-    let mut projects = Vec::new();
-    for line in text.lines().filter(|line| line.starts_with("project\t")) {
-        let parts: Vec<&str> = line.split('\t').collect();
-        if parts.len() != 5 {
-            continue;
-        }
-        projects.push(AccountProject {
-            name: unescape_field(parts[1]),
-            project_id: unescape_field(parts[2]),
-            repo_path: unescape_field(parts[3]),
-            is_active: parts[4] == "1",
-        });
-    }
-    Ok(projects)
-}
-
 fn write_account_projects(config: &AgentConfig, projects: &[AccountProject]) -> AgentResult<()> {
     let mut text = String::from("version\t1\n");
     for project in projects {
@@ -1426,6 +1795,63 @@ fn write_account_projects(config: &AgentConfig, projects: &[AccountProject]) -> 
         ));
     }
     write_file(&account_projects_path(config), &text)
+}
+
+fn load_account_groups(config: &AgentConfig) -> AgentResult<Vec<AccountGroup>> {
+    let path = account_groups_path(config);
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let text = fs::read_to_string(&path)
+        .map_err(|err| AgentError(format!("cannot read account groups: {err}")))?;
+    let mut groups: Vec<AccountGroup> = Vec::new();
+    for line in text.lines() {
+        let parts: Vec<&str> = line.split('\t').collect();
+        if parts.first() == Some(&"group") && parts.len() == 5 {
+            groups.push(AccountGroup {
+                id: unescape_field(parts[1]),
+                name: unescape_field(parts[2]),
+                description: unescape_field(parts[3]),
+                is_active: parts[4] == "1",
+                projects: Vec::new(),
+            });
+        } else if parts.first() == Some(&"project") && parts.len() == 6 {
+            let group_id = unescape_field(parts[1]);
+            if let Some(group) = groups.iter_mut().find(|group| group.id == group_id) {
+                group.projects.push(AccountProject {
+                    name: unescape_field(parts[2]),
+                    project_id: unescape_field(parts[3]),
+                    repo_path: unescape_field(parts[4]),
+                    is_active: parts[5] == "1",
+                });
+            }
+        }
+    }
+    Ok(groups)
+}
+
+fn write_account_groups(config: &AgentConfig, groups: &[AccountGroup]) -> AgentResult<()> {
+    let mut text = String::from("version\t1\n");
+    for group in groups {
+        text.push_str(&format!(
+            "group\t{}\t{}\t{}\t{}\n",
+            escape_field(&group.id),
+            escape_field(&group.name),
+            escape_field(&group.description),
+            if group.is_active { "1" } else { "0" }
+        ));
+        for project in &group.projects {
+            text.push_str(&format!(
+                "project\t{}\t{}\t{}\t{}\t{}\n",
+                escape_field(&group.id),
+                escape_field(&project.name),
+                escape_field(&project.project_id),
+                escape_field(&project.repo_path),
+                if project.is_active { "1" } else { "0" }
+            ));
+        }
+    }
+    write_file(&account_groups_path(config), &text)
 }
 
 fn sync_account_projects_to_registry(
@@ -1483,6 +1909,7 @@ fn submit_sync(
     );
     if let Some(developer_token) = developer_token {
         http_post_json(
+            config,
             &format!("{}/api/project/cga-relay/sync", config.control_api_base_url),
             &[
                 ("Authorization", format!("Bearer {developer_token}")),
@@ -1492,6 +1919,7 @@ fn submit_sync(
         )
     } else if let Some(account_token) = account_token {
         http_post_json(
+            config,
             &format!("{}/api/auth/cga-relay/sync", config.control_api_base_url),
             &[("Authorization", format!("Bearer {account_token}"))],
             &body,
@@ -1630,7 +2058,7 @@ fn handle_mcp_tool_call(config: &AgentConfig, message: &str, id: &str) -> String
     };
     let mut arguments = json_object_field(message, "arguments").unwrap_or_else(|| "{}".to_string());
     if tool_name == "health_check" {
-        return match http_get_json(&format!("{}/health", config.api_base_url)) {
+        return match http_get_json(config, &format!("{}/health", config.api_base_url)) {
             Ok(body) => rpc_text_result(id, &body),
             Err(_) => rpc_error(id, -32000, "health check failed"),
         };
@@ -1671,6 +2099,7 @@ fn handle_mcp_tool_call(config: &AgentConfig, message: &str, id: &str) -> String
     );
     let call = if let Ok(api_key) = env::var(&config.api_key_env) {
         http_post_json(
+            config,
             &format!("{}/api/project/cga-relay/mcp-tool", config.api_base_url),
             &[
                 ("Authorization", format!("Bearer {api_key}")),
@@ -1681,6 +2110,7 @@ fn handle_mcp_tool_call(config: &AgentConfig, message: &str, id: &str) -> String
     } else if let Ok(session) = read_account_session(config) {
         if let Some(access_token) = session.get("access_token") {
             http_post_json(
+                config,
                 &format!("{}/api/auth/cga-relay/mcp-tool", config.api_base_url),
                 &[("Authorization", format!("Bearer {access_token}"))],
                 &request_body,
@@ -1697,7 +2127,7 @@ fn handle_mcp_tool_call(config: &AgentConfig, message: &str, id: &str) -> String
     };
     match call {
         Ok(body) => rpc_text_result(id, &body),
-        Err(_) => rpc_error(id, -32000, "backend tool call failed"),
+        Err(error) => rpc_error(id, -32000, &error.0),
     }
 }
 
@@ -1719,38 +2149,44 @@ fn rpc_error(id: &str, code: i32, message: &str) -> String {
     )
 }
 
-fn http_get_json(url: &str) -> AgentResult<String> {
-    http_get_json_with_headers(url, &[])
+fn http_get_json(config: &AgentConfig, url: &str) -> AgentResult<String> {
+    http_get_json_with_headers(config, url, &[])
 }
 
-fn http_get_json_with_headers(url: &str, headers: &[(&str, String)]) -> AgentResult<String> {
+fn http_get_json_with_headers(
+    config: &AgentConfig,
+    url: &str,
+    headers: &[(&str, String)],
+) -> AgentResult<String> {
     let parsed = parse_http_url(url)?;
     let mut stream = TcpStream::connect((parsed.host.as_str(), parsed.port))
         .map_err(|err| AgentError(format!("connect failed: {err}")))?;
+    let crystals = crystals_headers();
+    log_http_request(config, "GET", url, headers, &crystals, "");
     let mut request = format!(
-        "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
+        "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n",
         parsed.path, parsed.host
     );
-    if !headers.is_empty() {
-        request = format!(
-            "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n",
-            parsed.path, parsed.host
-        );
-        for (name, value) in headers {
-            request.push_str(&format!("{}: {}\r\n", name, value));
-        }
-        request.push_str("\r\n");
-    }
+    append_request_headers(&mut request, headers);
+    append_request_headers(&mut request, &crystals);
+    request.push_str("\r\n");
     stream
         .write_all(request.as_bytes())
         .map_err(|err| AgentError(format!("request failed: {err}")))?;
-    read_http_response(stream)
+    read_http_response(config, "GET", url, stream)
 }
 
-fn http_post_json(url: &str, headers: &[(&str, String)], body: &str) -> AgentResult<String> {
+fn http_post_json(
+    config: &AgentConfig,
+    url: &str,
+    headers: &[(&str, String)],
+    body: &str,
+) -> AgentResult<String> {
     let parsed = parse_http_url(url)?;
     let mut stream = TcpStream::connect((parsed.host.as_str(), parsed.port))
         .map_err(|err| AgentError(format!("connect failed: {err}")))?;
+    let crystals = crystals_headers();
+    log_http_request(config, "POST", url, headers, &crystals, body);
     let mut request = format!(
         "POST {} HTTP/1.1\r\nHost: {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n",
         parsed.path,
@@ -1760,12 +2196,65 @@ fn http_post_json(url: &str, headers: &[(&str, String)], body: &str) -> AgentRes
     for (name, value) in headers {
         request.push_str(&format!("{}: {}\r\n", name, value));
     }
+    append_request_headers(&mut request, &crystals);
     request.push_str("\r\n");
     request.push_str(body);
     stream
         .write_all(request.as_bytes())
         .map_err(|err| AgentError(format!("request failed: {err}")))?;
-    read_http_response(stream)
+    read_http_response(config, "POST", url, stream)
+}
+
+fn log_http_request(
+    config: &AgentConfig,
+    method: &str,
+    url: &str,
+    headers: &[(&str, String)],
+    crystals: &[(String, String)],
+    body: &str,
+) {
+    let mut detail = format!(
+        "method={method}\nurl={}\nheaders:\n",
+        redact_sensitive_text(url)
+    );
+    for (name, value) in headers {
+        detail.push_str(&format!("{name}: {value}\n"));
+    }
+    for (name, value) in crystals {
+        detail.push_str(&format!("{name}: {value}\n"));
+    }
+    if !body.is_empty() {
+        detail.push_str("body:\n");
+        detail.push_str(body);
+    }
+    log_communication(config, "http.request", &detail);
+}
+
+fn crystals_headers() -> [(String, String); 4] {
+    [
+        (
+            "X-CGA-Communication-Profile".to_string(),
+            CRYSTALS_PROFILE.to_string(),
+        ),
+        (
+            "X-CGA-Key-Establishment".to_string(),
+            CRYSTALS_KEM.to_string(),
+        ),
+        (
+            "X-CGA-Signature".to_string(),
+            CRYSTALS_SIGNATURE.to_string(),
+        ),
+        (
+            "X-CGA-Transport-Scope".to_string(),
+            CRYSTALS_TRANSPORT_SCOPE.to_string(),
+        ),
+    ]
+}
+
+fn append_request_headers(request: &mut String, headers: &[(impl AsRef<str>, impl AsRef<str>)]) {
+    for (name, value) in headers {
+        request.push_str(&format!("{}: {}\r\n", name.as_ref(), value.as_ref()));
+    }
 }
 
 struct ParsedUrl {
@@ -1792,18 +2281,43 @@ fn parse_http_url(url: &str) -> AgentResult<ParsedUrl> {
         ),
         None => (authority.to_string(), 80),
     };
+    if !is_loopback_host(&host) {
+        return Err(AgentError(
+            "CRYSTALS/CNSA 2.0 policy allows CGA-Relay plaintext HTTP only on loopback; use a PQC-capable TLS endpoint or local proxy for remote CGA URLs".to_string(),
+        ));
+    }
     Ok(ParsedUrl { host, port, path })
 }
 
-fn read_http_response(mut stream: TcpStream) -> AgentResult<String> {
+fn is_loopback_host(host: &str) -> bool {
+    matches!(host, "localhost" | "127.0.0.1" | "::1" | "[::1]")
+}
+
+fn read_http_response(
+    config: &AgentConfig,
+    method: &str,
+    url: &str,
+    mut stream: TcpStream,
+) -> AgentResult<String> {
     let mut response = Vec::new();
     stream
         .read_to_end(&mut response)
         .map_err(|err| AgentError(format!("response failed: {err}")))?;
     let text = String::from_utf8_lossy(&response);
     let Some((head, body)) = text.split_once("\r\n\r\n") else {
+        log_communication(
+            config,
+            "http.response",
+            &format!("method={method}\nurl={url}\ninvalid_response:\n{text}"),
+        );
         return Err(AgentError("invalid HTTP response".to_string()));
     };
+    let status = head.lines().next().unwrap_or("HTTP response");
+    log_communication(
+        config,
+        "http.response",
+        &format!("method={method}\nurl={url}\nstatus={status}\nheaders:\n{head}\nbody:\n{body}"),
+    );
     if !head.starts_with("HTTP/1.1 2") && !head.starts_with("HTTP/1.0 2") {
         return Err(AgentError("HTTP request failed".to_string()));
     }
@@ -1885,6 +2399,44 @@ fn json_object_field(text: &str, field: &str) -> Option<String> {
             '"' => in_string = true,
             '{' => depth += 1,
             '}' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(tail[..=index].to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn json_array_field(text: &str, field: &str) -> Option<String> {
+    let marker = format!("\"{}\":", field);
+    let start = text.find(&marker)? + marker.len();
+    let tail = text[start..].trim_start();
+    if !tail.starts_with('[') {
+        return None;
+    }
+    let mut depth = 0_i32;
+    let mut in_string = false;
+    let mut escaped = false;
+    for (index, ch) in tail.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if in_string {
+            if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match ch {
+            '"' => in_string = true,
+            '[' => depth += 1,
+            ']' => {
                 depth -= 1;
                 if depth == 0 {
                     return Some(tail[..=index].to_string());
@@ -1980,10 +2532,10 @@ fn unescape_field(value: &str) -> String {
 #[cfg(windows)]
 mod windows_tray {
     use super::{
-        tray_icon_resource_id, tray_login_menu_label, tray_login_status, tray_tooltip, AgentConfig,
-        AgentError, AgentResult, TrayLoginStatus, PROJECT_AUTHOR, PROJECT_DISPLAY_NAME,
-        PROJECT_LICENSE, PROJECT_REPOSITORY, PROJECT_SUPPORT, SERVER_NAME,
-        TRAY_ICON_LOGGED_IN_RESOURCE_ID, VERSION,
+        tray_icon_resource_id, tray_login_menu_label, tray_login_status, tray_tooltip,
+        tray_user_group_summary, AgentConfig, AgentError, AgentResult, TrayLoginStatus,
+        PROJECT_AUTHOR, PROJECT_DISPLAY_NAME, PROJECT_LICENSE, PROJECT_REPOSITORY, PROJECT_SUPPORT,
+        SERVER_NAME, TRAY_ICON_LOGGED_IN_RESOURCE_ID, VERSION,
     };
     use std::ffi::c_void;
     use std::mem::{size_of, zeroed};
@@ -2282,9 +2834,10 @@ mod windows_tray {
         } else {
             "Not signed in".to_string()
         };
+        let user_groups = tray_user_group_summary(config, login);
         format!(
-            "CGA-Relay is running.\nRelay: {}\nProject: {}\nAccount: {}\nRight-click for Settings, About, Logs, or Exit.",
-            config.agent_id, config.project_id, account
+            "CGA-Relay is running.\nRelay: {}\nUser Groups: {}\nAccount: {}\nRight-click for Settings, Logs, About, or Exit.",
+            config.agent_id, user_groups, account
         )
     }
 
@@ -2294,9 +2847,10 @@ mod windows_tray {
         } else {
             "Not signed in".to_string()
         };
+        let user_groups = tray_user_group_summary(config, login);
         format!(
-            "{PROJECT_DISPLAY_NAME}\nCommand: {SERVER_NAME}\nVersion: {VERSION}\n\nAuthor: {PROJECT_AUTHOR}\nRepository: {PROJECT_REPOSITORY}\nSupport: {PROJECT_SUPPORT}\nLicense: {PROJECT_LICENSE}\n\nRelay: {}\nProject: {}\nAccount: {}",
-            config.agent_id, config.project_id, account
+            "{PROJECT_DISPLAY_NAME}\nCommand: {SERVER_NAME}\nVersion: {VERSION}\n\nAuthor: {PROJECT_AUTHOR}\nRepository: {PROJECT_REPOSITORY}\nSupport: {PROJECT_SUPPORT}\nLicense: {PROJECT_LICENSE}\n\nRelay: {}\nUser Groups: {}\nAccount: {}",
+            config.agent_id, user_groups, account
         )
     }
 
@@ -2360,8 +2914,8 @@ mod windows_tray {
             AppendMenuW(menu, MF_SEPARATOR, 0, null());
         }
         append_menu_item(menu, ID_MENU_SETTINGS, "Settings");
-        append_menu_item(menu, ID_MENU_ABOUT, "About");
         append_menu_item(menu, ID_MENU_LOGS, "Logs");
+        append_menu_item(menu, ID_MENU_ABOUT, "About");
         append_menu_item(menu, ID_MENU_EXIT, "Exit");
 
         let mut point = Point { x: 0, y: 0 };

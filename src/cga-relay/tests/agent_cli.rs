@@ -89,6 +89,23 @@ fn stderr(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).into_owned()
 }
 
+fn read_log_files(base: &Path) -> (Vec<String>, String) {
+    let mut names = Vec::new();
+    let mut combined = String::new();
+    let log_dir = base.join("logs");
+    for entry in fs::read_dir(log_dir).expect("log directory should exist") {
+        let entry = entry.expect("log entry should be readable");
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("log") {
+            continue;
+        }
+        names.push(path.file_name().unwrap().to_string_lossy().into_owned());
+        combined.push_str(&fs::read_to_string(path).expect("log file should be readable"));
+    }
+    names.sort();
+    (names, combined)
+}
+
 #[test]
 fn help_output_lists_required_commands() {
     let output = run_agent(&["--help"]);
@@ -204,7 +221,11 @@ fn tray_status_reports_notification_area_mode_without_starting_loop() {
     assert!(out.contains("\"icon_variant\":\"gray\""));
     assert!(out.contains("\"logged_in\":false"));
     assert!(out.contains("\"username\":\"\""));
-    assert!(out.contains("\"menu\":[\"Not signed in\",\"Settings\",\"About\",\"Logs\",\"Exit\"]"));
+    assert!(out.contains("\"menu\":[\"Not signed in\",\"Settings\",\"Logs\",\"About\",\"Exit\"]"));
+    assert!(out.contains("\"name\":\"CGA-Relay\""));
+    assert!(out.contains("\"user_groups\":[]"));
+    assert!(out.contains("\"user_group_count\":0"));
+    assert!(!out.contains("\"project\":\"CGA-Relay\""));
     assert!(out.contains("\"author\":\"Nate Scott\""));
     assert!(out.contains("\"repository\":\"https://github.com/nascousa/cga\""));
     assert!(out.contains("\"support\":\"https://github.com/nascousa/cga/issues\""));
@@ -233,6 +254,11 @@ fn tray_status_uses_color_icon_and_username_when_signed_in() {
         ),
     )
     .unwrap();
+    fs::write(
+        state.join("account-groups.tsv"),
+        "version\t1\ngroup\t1\tTeam Alpha\tPrimary access\t1\nproject\t1\tAlpha Project\tALPHA12345\tC:/repo\t1\n",
+    )
+    .unwrap();
     let config = write_safe_config(tmp.path(), &repo, &[]);
 
     let output = Command::new(agent_bin())
@@ -253,8 +279,10 @@ fn tray_status_uses_color_icon_and_username_when_signed_in() {
     assert!(out.contains("\"logged_in\":true"));
     assert!(out.contains("\"username\":\"dev@example.com\""));
     assert!(out.contains(
-        "\"menu\":[\"Signed in: dev@example.com\",\"Settings\",\"About\",\"Logs\",\"Exit\"]"
+        "\"menu\":[\"Signed in: dev@example.com\",\"Settings\",\"Logs\",\"About\",\"Exit\"]"
     ));
+    assert!(out.contains("\"user_groups\":[\"Team Alpha\"]"));
+    assert!(out.contains("\"user_group_count\":1"));
     assert!(out.contains("signed in as dev@example.com"));
     assert!(!out.contains(TEST_SECRET));
     assert!(!stderr(&output).contains(TEST_SECRET));
@@ -266,6 +294,23 @@ fn settings_render_shows_local_account_login_page() {
     let repo = tmp.path().join("repo");
     fs::create_dir_all(&repo).unwrap();
     let config = write_safe_config(tmp.path(), &repo, &[]);
+    let state = tmp.path().join("state");
+    fs::create_dir_all(&state).unwrap();
+    fs::write(
+        state.join("account-session.json"),
+        "{\"username\":\"dev@example.com\",\"role\":\"developer\",\"token_type\":\"bearer\",\"access_token\":\"test-token\"}\n",
+    )
+    .unwrap();
+    fs::write(
+        state.join("account-groups.tsv"),
+        "version\t1\ngroup\t1\tTeam Alpha\tPrimary access\t1\nproject\t1\tAlpha Project\tALPHA12345\tC:/repo\t1\n",
+    )
+    .unwrap();
+    fs::write(
+        state.join("account-projects.tsv"),
+        "version\t1\nproject\tAlpha Project\tALPHA12345\tC:/repo\t1\nproject\tBeta Project\tBETA123456\tC:/other\t1\n",
+    )
+    .unwrap();
 
     let output = run_agent(&["settings", "--config", config.to_str().unwrap(), "--render"]);
 
@@ -276,8 +321,17 @@ fn settings_render_shows_local_account_login_page() {
     assert!(out.contains("color-scheme:dark"));
     assert!(out.contains("status-grid"));
     assert!(out.contains("version-pill"));
-    assert!(out.contains("action=\"/login\""));
-    assert!(out.contains("Account Projects"));
+    assert!(!out.contains("<span>Project</span>"));
+    assert!(out.contains("User Groups"));
+    assert!(out.contains("Team Alpha"));
+    assert!(out.contains("Alpha Project"));
+    assert!(!out.contains("Beta Project"));
+    assert!(!out.contains("<p class=\"eyebrow\">Projects</p>"));
+    assert!(!out.contains("Account Projects"));
+    assert!(out.contains("Signed in"));
+    assert!(out.contains("dev@example.com"));
+    assert!(out.contains("action=\"/refresh\""));
+    assert!(out.contains("Refresh access"));
     assert!(!out.contains(TEST_SECRET));
 
     let status = run_agent(&[
@@ -290,7 +344,10 @@ fn settings_render_shows_local_account_login_page() {
     assert!(status.status.success(), "stderr: {}", stderr(&status));
     let status_out = stdout(&status);
     assert!(status_out.contains("\"page\":\"local-account-settings\""));
-    assert!(status_out.contains("\"session_configured\":false"));
+    assert!(status_out.contains("\"projects_endpoint\":\"/api/auth/me/groups\""));
+    assert!(status_out.contains("\"project_count\":1"));
+    assert!(status_out.contains("\"session_configured\":true"));
+    assert!(status_out.contains("\"username\":\"dev@example.com\""));
 }
 
 #[test]
@@ -623,6 +680,10 @@ fn mcp_tools_call_forwards_authenticated_project_request_with_project_id() {
         assert!(request.contains("POST /api/project/cga-relay/mcp-tool HTTP/1.1"));
         assert!(request.contains("Authorization: Bearer TEST_SECRET_VALUE_SHOULD_NEVER_LEAK"));
         assert!(request.contains("X-Project-ID: PROJECT123"));
+        assert!(request.contains("X-CGA-Communication-Profile: CRYSTALS-CNSA-2.0"));
+        assert!(request.contains("X-CGA-Key-Establishment: ML-KEM-1024"));
+        assert!(request.contains("X-CGA-Signature: ML-DSA-87"));
+        assert!(request.contains("X-CGA-Transport-Scope: local-ipc"));
         assert!(request.contains("query_impact_graph"));
         assert!(request.contains("PROJECT123"));
         let body = "{\"ok\":true,\"project_id\":\"PROJECT123\"}";
@@ -646,6 +707,31 @@ fn mcp_tools_call_forwards_authenticated_project_request_with_project_id() {
     assert!(out.contains("\"project_id\":\"PROJECT123\""));
     assert!(!out.contains(TEST_SECRET));
     server.join().unwrap();
+
+    let (log_names, log_text) = read_log_files(tmp.path());
+    assert!(
+        !log_names.is_empty(),
+        "expected at least one communication log"
+    );
+    for name in log_names {
+        assert_eq!(name.len(), "20260604-15.log".len(), "log name: {name}");
+        assert!(name.ends_with(".log"), "log name: {name}");
+        assert_eq!(name.as_bytes()[8], b'-', "log name: {name}");
+        assert!(
+            name[..8].chars().all(|ch| ch.is_ascii_digit()),
+            "log name: {name}"
+        );
+        assert!(
+            name[9..11].chars().all(|ch| ch.is_ascii_digit()),
+            "log name: {name}"
+        );
+    }
+    assert!(log_text.contains("mcp.stdin"));
+    assert!(log_text.contains("mcp.stdout"));
+    assert!(log_text.contains("http.request"));
+    assert!(log_text.contains("http.response"));
+    assert!(log_text.contains("Authorization: <redacted>"));
+    assert!(!log_text.contains(TEST_SECRET));
 }
 
 #[test]
@@ -659,6 +745,10 @@ fn mcp_tools_call_uses_account_session_when_project_token_env_is_missing() {
         let request = String::from_utf8_lossy(&buffer[..read]).into_owned();
         assert!(request.contains("POST /api/auth/cga-relay/mcp-tool HTTP/1.1"));
         assert!(request.contains("Authorization: Bearer TEST_SECRET_VALUE_SHOULD_NEVER_LEAK"));
+        assert!(request.contains("X-CGA-Communication-Profile: CRYSTALS-CNSA-2.0"));
+        assert!(request.contains("X-CGA-Key-Establishment: ML-KEM-1024"));
+        assert!(request.contains("X-CGA-Signature: ML-DSA-87"));
+        assert!(request.contains("X-CGA-Transport-Scope: local-ipc"));
         assert!(request.contains("query_impact_graph"));
         assert!(request.contains("PROJECT123"));
         let body = "{\"ok\":true,\"actor_type\":\"account\",\"project_id\":\"PROJECT123\"}";
@@ -695,6 +785,25 @@ fn mcp_tools_call_uses_account_session_when_project_token_env_is_missing() {
 }
 
 #[test]
+fn mcp_tools_call_rejects_non_loopback_plaintext_cga_url() {
+    let tmp = TestDir::new("mcp-remote-http");
+    let repo = tmp.path().join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    let config = write_safe_config(
+        tmp.path(),
+        &repo,
+        &[("API_BASE_URL", "http://example.com:18001".to_string())],
+    );
+    let input = "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"query_impact_graph\",\"arguments\":{\"query\":\"scanner\"}}}\n";
+    let output = run_mcp(&config, input, &[("CGA_TEST_API_KEY", TEST_SECRET)]);
+
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    let out = stdout(&output);
+    assert!(out.contains("CRYSTALS/CNSA 2.0 policy"), "stdout: {out}");
+    assert!(!out.contains(TEST_SECRET));
+}
+
+#[test]
 fn mcp_accepts_content_length_framing() {
     let tmp = TestDir::new("mcp-content-length");
     let repo = tmp.path().join("repo");
@@ -705,6 +814,34 @@ fn mcp_accepts_content_length_framing() {
     let output = run_mcp(&config, &framed, &[]);
     assert!(output.status.success(), "stderr: {}", stderr(&output));
     assert!(stdout(&output).contains("\"status\":\"ok\""));
+}
+
+#[test]
+fn communication_logs_redact_sensitive_mcp_payloads() {
+    let tmp = TestDir::new("comm-log-redaction");
+    let repo = tmp.path().join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    let config = write_safe_config(tmp.path(), &repo, &[]);
+    let input = format!(
+        "{{\"jsonrpc\":\"2.0\",\"id\":44,\"method\":\"ping\",\"params\":{{\"password\":\"{}\",\"access_token\":\"{}\",\"form\":\"username=dev&password={}&access_token={}\"}}}}\n",
+        TEST_SECRET, TEST_SECRET, TEST_SECRET, TEST_SECRET
+    );
+
+    let output = run_mcp(&config, &input, &[]);
+    assert!(output.status.success(), "stderr: {}", stderr(&output));
+    assert!(stdout(&output).contains("\"status\":\"ok\""));
+
+    let (log_names, log_text) = read_log_files(tmp.path());
+    assert!(
+        !log_names.is_empty(),
+        "expected at least one communication log"
+    );
+    assert!(log_text.contains("mcp.stdin"));
+    assert!(log_text.contains("\"password\":\"<redacted>\""));
+    assert!(log_text.contains("\"access_token\":\"<redacted>\""));
+    assert!(log_text.contains("password=<redacted>"));
+    assert!(log_text.contains("access_token=<redacted>"));
+    assert!(!log_text.contains(TEST_SECRET));
 }
 
 #[test]
