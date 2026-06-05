@@ -26,10 +26,14 @@ If the preferred port is occupied, the script automatically selects the next fre
 Invoke-RestMethod http://127.0.0.1:8011/mcp | ConvertTo-Json
 ```
 
-The discovery endpoint is public. MCP transport routes remain project-scoped and require both headers:
+The discovery endpoint is public. MCP transport routes remain project-scoped and require the auth/project headers plus the CRYSTALS/CNSA 2.0 communication profile headers:
 
 - `Authorization: Bearer <CONTEXTGRAPH_MCP_TOKEN>`
 - `X-Project-ID: <CONTEXTGRAPH_PROJECT_ID>`
+- `X-CGA-Communication-Profile: CRYSTALS-CNSA-2.0`
+- `X-CGA-Key-Establishment: ML-KEM-1024`
+- `X-CGA-Signature: ML-DSA-87`
+- `X-CGA-Transport-Scope: local-ipc` for local VS Code / Relay loopback traffic, or a deployment-approved `pqc-tls` / `hybrid-pqc-tls` scope for remote CGA endpoints.
 
 For CLI examples, keep credentials in environment variables:
 
@@ -46,7 +50,7 @@ Current transport:
 
 The repository includes `.vscode/mcp.json` with placeholder inputs for the CGA token and project id. After starting the desktop stack on port `18001`, use the `cga-mcp-server` entry in VS Code and provide those two values when prompted.
 
-The shared config does not store secrets. It sends the same protected transport headers used by the CLI examples.
+The shared config does not store secrets. It sends the same protected transport headers used by the CLI examples. When VS Code launches `cga-relay` over stdio, that hop is local IPC; relay-to-CGA HTTP requests add the CRYSTALS/CNSA 2.0 profile headers automatically and reject non-loopback plaintext HTTP.
 
 ## 4) Run minimal query client
 

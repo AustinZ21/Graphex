@@ -12,6 +12,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from backend.auth.context import _current_project_db_id, _current_project_external_id
 from backend.auth import pgshim
+from backend.auth.crystals import validate_crystal_suite_headers
 from backend.auth.security import hash_token
 
 if TYPE_CHECKING:
@@ -87,6 +88,10 @@ class ProjectTokenMiddleware:
         raw_headers: dict[bytes, bytes] = {}
         for name, value in scope.get("headers", []):
             raw_headers[name.lower()] = value
+
+        if crystal_error := validate_crystal_suite_headers(raw_headers):
+            await _send_error(send, {"detail": crystal_error}, 426)
+            return
 
         auth = raw_headers.get(b"authorization", b"").decode()
         if not auth.startswith("Bearer "):

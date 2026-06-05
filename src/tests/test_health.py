@@ -11,3 +11,17 @@ def test_health_endpoint_returns_ok() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "service": "cga", "name": "Context Graph Agent", "version": APP_VERSION}
+
+
+def test_mcp_discovery_advertises_crystals_profile_headers() -> None:
+    response = client.get("/mcp")
+
+    assert response.status_code == 200
+    auth = response.json()["auth"]
+    assert auth["crystals_profile"] == {
+        "profile": "CRYSTALS-CNSA-2.0",
+        "key_establishment": "ML-KEM-1024",
+        "signature": "ML-DSA-87",
+        "local_transport_scope": "local-ipc",
+    }
+    assert "X-CGA-Communication-Profile" in auth["required_headers"]

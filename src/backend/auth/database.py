@@ -68,6 +68,37 @@ CREATE TABLE IF NOT EXISTS projects (
     is_active    INTEGER NOT NULL DEFAULT 1
 );
 
+CREATE TABLE IF NOT EXISTS user_groups (
+    id           BIGSERIAL PRIMARY KEY,
+    group_name   TEXT    UNIQUE NOT NULL,
+    description  TEXT    NOT NULL DEFAULT '',
+    created_at   TEXT    NOT NULL DEFAULT to_char((now() at time zone 'utc'), 'YYYY-MM-DD"T"HH24:MI:SS'),
+    is_active    INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS user_group_members (
+    user_id    BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    group_id   BIGINT NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
+    created_at TEXT   NOT NULL DEFAULT to_char((now() at time zone 'utc'), 'YYYY-MM-DD"T"HH24:MI:SS'),
+    PRIMARY KEY(user_id, group_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_group_members_user
+    ON user_group_members(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_user_group_members_group
+    ON user_group_members(group_id);
+
+CREATE TABLE IF NOT EXISTS project_group_access (
+    group_id   BIGINT NOT NULL REFERENCES user_groups(id) ON DELETE CASCADE,
+    project_id BIGINT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    created_at TEXT   NOT NULL DEFAULT to_char((now() at time zone 'utc'), 'YYYY-MM-DD"T"HH24:MI:SS'),
+    PRIMARY KEY(group_id, project_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_group_access_project
+    ON project_group_access(project_id);
+
 CREATE TABLE IF NOT EXISTS project_tokens (
     id          BIGSERIAL PRIMARY KEY,
     project_id  BIGINT  NOT NULL REFERENCES projects(id) ON DELETE CASCADE,

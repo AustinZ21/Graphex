@@ -11,7 +11,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from backend.auth import pgshim as aiosqlite
+from backend.auth.access import require_project_access
 from backend.auth.context import _current_project_db_id, _current_project_external_id
+from backend.auth.crystals import require_crystal_suite
 from backend.auth.database import get_db, insert_audit_log
 from backend.auth.dependencies import get_current_user
 from backend.graph.registry import _current_project_name
@@ -63,7 +65,11 @@ def _require_project_match(bound_project_id: str, payload_project_id: str | None
     return cleaned
 
 
-async def _account_project_context(db: aiosqlite.Connection, project_id: str | None) -> dict[str, Any]:
+async def _account_project_context(
+    db: aiosqlite.Connection,
+    project_id: str | None,
+    user: dict,
+) -> dict[str, Any]:
     cleaned = (project_id or "").strip()
     if not cleaned:
         raise HTTPException(status_code=400, detail="project_id is required")
@@ -74,6 +80,7 @@ async def _account_project_context(db: aiosqlite.Connection, project_id: str | N
         row = await cur.fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="Project not found")
+    await require_project_access(db, user, int(row["id"]))
     return {
         "project_id": str(row["project_id"]),
         "project_name": str(row["project_name"]),
@@ -246,11 +253,12 @@ async def receive_cga_relay_sync(payload: CgaRelaySync, request: Request) -> dic
 @account_router.post("/mcp-tool")
 async def call_account_cga_relay_tool(
     payload: CgaRelayToolCall,
-    _: dict = Depends(get_current_user),
+    _: None = Depends(require_crystal_suite),
+    user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ) -> dict[str, Any]:
     project_id = payload.project_id or str(payload.arguments.get("project_id") or "")
-    context = await _account_project_context(db, project_id)
+    context = await _account_project_context(db, project_id, user)
     result = await _dispatch_with_project_context(payload.tool, payload.arguments, context)
     result["actor_type"] = "account"
     return result
@@ -259,11 +267,12 @@ async def call_account_cga_relay_tool(
 @account_router.post("/sync")
 async def receive_account_cga_relay_sync(
     payload: CgaRelaySync,
+    _: None = Depends(require_crystal_suite),
     user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ) -> dict[str, Any]:
     started = time.perf_counter()
-    context = await _account_project_context(db, payload.project_id)
+    context = await _account_project_context(db, payload.project_id, user)
     if len(payload.snapshots) > 500:
         raise HTTPException(status_code=413, detail="too many snapshots in one sync request")
 

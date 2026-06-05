@@ -590,6 +590,130 @@
       text-align: center;
     }
 
+    .access-panel {
+      margin-top: 18px;
+    }
+    .access-panel .section-header {
+      margin-bottom: 8px;
+    }
+    .access-panel h3 {
+      font-size: 14px;
+      margin: 0;
+    }
+    .group-chip-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      justify-content: flex-start;
+      min-width: 140px;
+    }
+    .group-chip {
+      display: inline-flex;
+      align-items: center;
+      max-width: 180px;
+      padding: 2px 7px;
+      border: 1px solid rgba(96,165,250,.26);
+      border-radius: 999px;
+      background: rgba(96,165,250,.10);
+      color: #9cc9ff;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .group-chip.inactive {
+      color: var(--muted);
+      background: rgba(138,147,166,.08);
+      border-color: rgba(138,147,166,.20);
+    }
+    .mapping-list {
+      display: grid;
+      gap: 8px;
+      max-height: 360px;
+      overflow: auto;
+      padding-right: 4px;
+    }
+    .mapping-toolbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      margin: 10px 0 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .mapping-toolbar-main {
+      display: grid;
+      gap: 6px;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .mapping-search {
+      min-height: 30px;
+      padding: 6px 9px !important;
+      font-size: 12px !important;
+    }
+    .mapping-toolbar-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .mapping-row {
+      display: grid;
+      grid-template-columns: 18px minmax(0,1fr) auto;
+      gap: 8px;
+      align-items: start;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(21,28,43,.55);
+    }
+    .mapping-row input {
+      width: 15px;
+      height: 15px;
+      margin-top: 2px;
+    }
+    .mapping-row strong {
+      display: block;
+      color: var(--text);
+      font-size: 12.5px;
+      line-height: 1.35;
+    }
+    .mapping-row span {
+      display: block;
+      color: var(--muted);
+      font-size: 11.5px;
+      line-height: 1.35;
+      margin-top: 2px;
+      overflow-wrap: anywhere;
+    }
+    .mapping-actions {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .access-groups-table {
+      min-width: 1180px;
+      table-layout: fixed;
+    }
+    .access-groups-users-col { width: 88px; }
+    .access-groups-projects-col { width: 480px; }
+    .access-groups-status-col { width: 112px; }
+    .access-groups-actions-col { width: 340px; }
+    .access-groups-table .group-chip-list {
+      min-width: 0;
+    }
+    .access-groups-table .mapping-actions {
+      flex-wrap: nowrap;
+      white-space: nowrap;
+    }
+    .access-groups-table .mapping-actions .btn {
+      flex: 0 0 auto;
+    }
+
     /* ── Token sub-panel ── */
     .tokens-panel {
       margin-top: 12px; background: var(--panel-elevated);
@@ -2445,6 +2569,7 @@
             <th class="sortable" onclick="setUsersSort('id')">ID <span id="sort-user-id"></span></th>
             <th class="sortable" onclick="setUsersSort('username')">Username <span id="sort-user-username"></span></th>
             <th class="sortable center-col-header" onclick="setUsersSort('role')">Role <span id="sort-user-role"></span></th>
+            <th>Groups</th>
             <th class="sortable center-col-header" onclick="setUsersSort('is_active')">Status <span id="sort-user-is_active"></span></th>
             <th class="sortable center-col-header" onclick="setUsersSort('created_at')">Created <span id="sort-user-created_at"></span></th>
             <th class="actions-col-header">Actions</th>
@@ -2453,6 +2578,31 @@
         </table>
       </div>
       <div class="pagination-wrap" id="users-pagination"></div>
+      <section class="access-panel">
+        <div class="section-header">
+          <h3>Access Groups</h3>
+          <button class="btn btn-primary btn-sm" onclick="openUserGroupModal()">+ New Group</button>
+        </div>
+        <div class="table-wrap">
+          <table class="access-groups-table">
+            <colgroup>
+              <col>
+              <col class="access-groups-users-col">
+              <col class="access-groups-projects-col">
+              <col class="access-groups-status-col">
+              <col class="access-groups-actions-col">
+            </colgroup>
+            <thead><tr>
+              <th>Group</th>
+              <th class="center-col-header">Users</th>
+              <th>Projects</th>
+              <th class="center-col-header">Status</th>
+              <th class="actions-col-header">Actions</th>
+            </tr></thead>
+            <tbody id="user-groups-body"></tbody>
+          </table>
+        </div>
+      </section>
     </div>
 
     <!-- AUDIT -->
@@ -2985,6 +3135,82 @@
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
       <button class="btn btn-ghost" onclick="closeModal('modal-edit-username')">Cancel</button>
       <button class="btn btn-primary" onclick="submitEditUsername()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: User Groups -->
+<div class="overlay" id="modal-user-groups">
+  <div class="modal" style="width:min(560px,100%)">
+    <h3 id="modal-user-groups-title">User Groups</h3>
+    <div id="user-groups-list" class="mapping-list"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost" onclick="closeModal('modal-user-groups')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitUserGroups()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Access Group -->
+<div class="overlay" id="modal-user-group">
+  <div class="modal" style="width:min(520px,100%)">
+    <h3 id="modal-user-group-title">New Group</h3>
+    <div class="form-group"><label>Group Name</label><input id="ug-name" autocomplete="off" /></div>
+    <div class="form-group"><label>Description</label><textarea id="ug-desc" rows="3" style="resize:vertical"></textarea></div>
+    <div class="form-group" id="ug-status-wrap">
+      <label>Status</label>
+      <select id="ug-status">
+        <option value="1">Active</option>
+        <option value="0">Inactive</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <button class="btn btn-ghost" onclick="closeModal('modal-user-group')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitUserGroupModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Group Projects -->
+<div class="overlay" id="modal-group-projects">
+  <div class="modal" style="width:min(620px,100%)">
+    <h3 id="modal-group-projects-title">Group Projects</h3>
+    <div class="mapping-toolbar">
+      <div class="mapping-toolbar-main">
+        <span id="group-projects-count">Select project access</span>
+        <input id="group-projects-search" class="mapping-search" type="search" placeholder="Search projects..." oninput="filterMappingRows('group-projects-list', this.value, 'group-projects-count', 'projects')" />
+      </div>
+      <div class="mapping-toolbar-actions">
+        <button class="btn btn-sm btn-ghost" type="button" onclick="setGroupProjectsChecked(true)">Select All</button>
+        <button class="btn btn-sm btn-ghost" type="button" onclick="setGroupProjectsChecked(false)">Clear</button>
+      </div>
+    </div>
+    <div id="group-projects-list" class="mapping-list"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost" onclick="closeModal('modal-group-projects')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitGroupProjects()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Group Users -->
+<div class="overlay" id="modal-group-users">
+  <div class="modal" style="width:min(620px,100%)">
+    <h3 id="modal-group-users-title">Group Users</h3>
+    <div class="mapping-toolbar">
+      <div class="mapping-toolbar-main">
+        <span id="group-users-count">Select group users</span>
+        <input id="group-users-search" class="mapping-search" type="search" placeholder="Search users..." oninput="filterMappingRows('group-users-list', this.value, 'group-users-count', 'users')" />
+      </div>
+      <div class="mapping-toolbar-actions">
+        <button class="btn btn-sm btn-ghost" type="button" onclick="setGroupUsersChecked(true)">Select All</button>
+        <button class="btn btn-sm btn-ghost" type="button" onclick="setGroupUsersChecked(false)">Clear</button>
+      </div>
+    </div>
+    <div id="group-users-list" class="mapping-list"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-ghost" onclick="closeModal('modal-group-users')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitGroupUsers()">Save</button>
     </div>
   </div>
 </div>
@@ -4010,6 +4236,7 @@ function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
 let _allProjects = [];
+let _allUserGroups = [];
 let _showDeletedProjects = false;
 let _tokensCache = {};  // projectId -> tokens[]
 let _indexStatusCache = {};  // projectId -> ProjectIndexStatus
@@ -4026,6 +4253,10 @@ let _auditPollInterval = null;
 let _briefingPollInterval = null;
 let _schedulePollInterval = null;
 let _auditLoading = false;
+let _editingUserGroupsUserId = null;
+let _editingUserGroupId = null;
+let _editingGroupProjectsGroupId = null;
+let _editingGroupUsersGroupId = null;
 
 function mergeIndexStatusCache(statuses) {
   const nextCache = {};
@@ -5140,8 +5371,63 @@ async function rotateToken(tokenId,projectId) {
 }
 
 async function loadUsers() {
-  _allUsers = await api('GET','/auth/users');
+  const [users, groups] = await Promise.all([
+    api('GET','/auth/users'),
+    api('GET','/auth/groups'),
+  ]);
+  _allUsers = users;
+  _allUserGroups = groups;
   renderUsers();
+  renderUserGroups();
+}
+
+function renderGroupChips(groups) {
+  const items = Array.isArray(groups) ? groups : [];
+  if (!items.length) return '<span style="color:var(--muted);font-size:12px">None</span>';
+  return `<div class="group-chip-list">${items.map(group => `
+    <span class="group-chip${group.is_active ? '' : ' inactive'}" title="${esc(group.description || group.group_name)}">${esc(group.group_name)}</span>
+  `).join('')}</div>`;
+}
+
+function projectNameForId(projectId) {
+  const project = _allProjects.find(item => Number(item.id) === Number(projectId));
+  return project ? project.project_name : `#${projectId}`;
+}
+
+function renderProjectChips(projectIds) {
+  const ids = Array.isArray(projectIds) ? projectIds : [];
+  if (!ids.length) return '<span style="color:var(--muted);font-size:12px">None</span>';
+  return `<div class="group-chip-list">${ids.map(projectId => `
+    <span class="group-chip" title="${esc(projectNameForId(projectId))}">${esc(projectNameForId(projectId))}</span>
+  `).join('')}</div>`;
+}
+
+function renderUserGroups() {
+  const body = document.getElementById('user-groups-body');
+  if (!body) return;
+  if (!_allUserGroups.length) {
+    body.innerHTML = `<tr><td colspan="5"><div class="empty-state">No access groups yet</div></td></tr>`;
+    return;
+  }
+  body.innerHTML = _allUserGroups.map(group => `
+    <tr>
+      <td>
+        <strong style="color:${group.is_active ? 'var(--accent)' : 'var(--danger)'}">${esc(group.group_name)}</strong>
+        ${group.description ? `<div style="color:var(--muted);font-size:12px;margin-top:2px">${esc(group.description)}</div>` : ''}
+      </td>
+      <td style="text-align:center">${esc(String(group.member_count || 0))}</td>
+      <td>${renderProjectChips(group.project_ids)}</td>
+      <td style="text-align:center"><span class="pill ${group.is_active ? 'pill-green' : 'pill-red'}">${group.is_active ? 'Active' : 'Inactive'}</span></td>
+      <td>
+        <div class="mapping-actions">
+          <button class="btn btn-sm" onclick="openGroupUsers(${group.id})">Users</button>
+          <button class="btn btn-sm" onclick="openGroupProjects(${group.id})">Projects</button>
+          <button class="btn btn-sm btn-ghost" onclick="openUserGroupModal(${group.id})">Edit</button>
+          <button class="btn btn-sm ${group.is_active ? 'btn-danger' : 'btn-accent'}" onclick="toggleUserGroup(${group.id}, ${group.is_active ? 'false' : 'true'})">${group.is_active ? 'Deactivate' : 'Activate'}</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
 }
 
 function renderUsers() {
@@ -5162,7 +5448,7 @@ function renderUsers() {
   });
 
   if (!displayRows.length) {
-    document.getElementById('users-body').innerHTML = `<tr><td colspan="6"><div class="empty-state">No users yet</div></td></tr>`;
+    document.getElementById('users-body').innerHTML = `<tr><td colspan="7"><div class="empty-state">No users yet</div></td></tr>`;
     return;
   }
 
@@ -5171,17 +5457,184 @@ function renderUsers() {
       <td>${u.id}</td>
       <td>${esc(u.username)}</td>
       <td style="text-align:center"><span class="role-tag${u.role==='admin'?'':' developer'}">${u.role}</span></td>
+      <td>${renderGroupChips(u.groups)}</td>
       <td style="text-align:center"><span class="pill ${u.is_active?'pill-green':'pill-red'}">${u.is_active?'Active':'Inactive'}</span></td>
       <td style="text-align:center;color:var(--muted);font-size:12px;font-family:monospace">${u.created_at}</td>
-      <td style="text-align:center">${u.id!==_me?.id
-        ? `${u.role!=='admin'
-            ? `<button class="btn btn-sm" style="margin-right:4px" onclick='editUsername(${u.id}, ${JSON.stringify(u.username)}, ${JSON.stringify(u.role)})'>Edit</button>`
-            : ''}
-           ${u.is_active
-             ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">Deactivate</button>`
-             : `<button class="btn btn-sm" onclick="activateUser(${u.id})">Activate</button>`}`
-        : '<span style="color:var(--muted);font-size:12px">You</span>'}</td>
+      <td style="text-align:center">${renderUserActions(u)}</td>
     </tr>`).join('');
+}
+
+function renderUserActions(user) {
+  const isSelf = Number(user.id) === Number(_me?.id);
+  const editButton = (isSelf || user.role !== 'admin')
+    ? `<button class="btn btn-sm" onclick='editUsername(${user.id}, ${JSON.stringify(user.username)}, ${JSON.stringify(user.role)})'>Edit</button>`
+    : '';
+  const lifecycleButton = isSelf
+    ? '<span class="pill pill-gray">You</span>'
+    : (user.is_active
+      ? `<button class="btn btn-sm btn-danger" onclick="deleteUser(${user.id})">Deactivate</button>`
+      : `<button class="btn btn-sm" onclick="activateUser(${user.id})">Activate</button>`);
+  return `<div class="mapping-actions">
+    <button class="btn btn-sm btn-ghost" onclick="openUserGroups(${user.id}, ${jsArg(user.username)})">Access</button>
+    ${editButton}
+    ${lifecycleButton}
+  </div>`;
+}
+
+function openUserGroups(userId, username) {
+  _editingUserGroupsUserId = Number(userId);
+  const user = _allUsers.find(item => Number(item.id) === Number(userId));
+  const selectedIds = new Set((user?.groups || []).map(group => Number(group.id)));
+  document.getElementById('modal-user-groups-title').textContent = `Groups for ${username}`;
+  const list = document.getElementById('user-groups-list');
+  list.innerHTML = _allUserGroups.length ? _allUserGroups.map(group => `
+    <label class="mapping-row">
+      <input class="user-group-checkbox" type="checkbox" value="${group.id}" ${selectedIds.has(Number(group.id)) ? 'checked' : ''} />
+      <span><strong>${esc(group.group_name)}</strong><span>${esc(group.description || 'No description')}</span></span>
+      <span class="pill ${group.is_active ? 'pill-green' : 'pill-red'}">${group.is_active ? 'Active' : 'Inactive'}</span>
+    </label>
+  `).join('') : '<div class="empty-state">No access groups yet</div>';
+  openModal('modal-user-groups');
+}
+
+async function submitUserGroups() {
+  const groupIds = [...document.querySelectorAll('#user-groups-list .user-group-checkbox:checked')]
+    .map(input => Number(input.value));
+  try {
+    await api('PUT', `/auth/users/${_editingUserGroupsUserId}/groups`, { group_ids: groupIds });
+    closeModal('modal-user-groups');
+    toast('User groups updated');
+    await loadUsers();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+function openUserGroupModal(groupId = null) {
+  _editingUserGroupId = groupId === null ? null : Number(groupId);
+  const group = _allUserGroups.find(item => Number(item.id) === Number(groupId));
+  document.getElementById('modal-user-group-title').textContent = group ? 'Edit Group' : 'New Group';
+  document.getElementById('ug-name').value = group?.group_name || '';
+  document.getElementById('ug-desc').value = group?.description || '';
+  document.getElementById('ug-status').value = group?.is_active === false ? '0' : '1';
+  document.getElementById('ug-status-wrap').style.display = group ? '' : 'none';
+  openModal('modal-user-group');
+  setTimeout(() => document.getElementById('ug-name').focus(), 80);
+}
+
+async function submitUserGroupModal() {
+  const groupName = document.getElementById('ug-name').value.trim();
+  const description = document.getElementById('ug-desc').value.trim();
+  if (!groupName) { toast('Group name required', 'error'); return; }
+  try {
+    if (_editingUserGroupId) {
+      await api('PATCH', `/auth/groups/${_editingUserGroupId}`, {
+        group_name: groupName,
+        description,
+        is_active: document.getElementById('ug-status').value === '1',
+      });
+      toast('Group updated');
+    } else {
+      await api('POST', '/auth/groups', { group_name: groupName, description });
+      toast('Group created');
+    }
+    closeModal('modal-user-group');
+    await loadUsers();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+async function toggleUserGroup(groupId, isActive) {
+  try {
+    await api('PATCH', `/auth/groups/${groupId}`, { is_active: Boolean(isActive) });
+    toast(Boolean(isActive) ? 'Group activated' : 'Group deactivated');
+    await loadUsers();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+function openGroupUsers(groupId) {
+  _editingGroupUsersGroupId = Number(groupId);
+  const group = _allUserGroups.find(item => Number(item.id) === Number(groupId));
+  document.getElementById('modal-group-users-title').textContent = `Users for ${group?.group_name || 'Group'}`;
+  document.getElementById('group-users-search').value = '';
+  const list = document.getElementById('group-users-list');
+  list.innerHTML = _allUsers.length ? _allUsers.map(user => {
+    const selected = (user.groups || []).some(item => Number(item.id) === Number(groupId));
+    return `
+    <label class="mapping-row">
+      <input class="group-user-checkbox" type="checkbox" value="${user.id}" ${selected ? 'checked' : ''} />
+      <span><strong>${esc(user.username)}</strong><span>${esc(user.role)} · ${user.is_active ? 'Active' : 'Inactive'}</span></span>
+      <span class="pill ${user.is_active ? 'pill-green' : 'pill-red'}">${user.is_active ? 'Active' : 'Inactive'}</span>
+    </label>`;
+  }).join('') : '<div class="empty-state">No users yet</div>';
+  filterMappingRows('group-users-list', '', 'group-users-count', 'users');
+  openModal('modal-group-users');
+}
+
+function setGroupUsersChecked(checked) {
+  setMappingRowsChecked('group-users-list', '.group-user-checkbox', checked);
+}
+
+async function submitGroupUsers() {
+  const userIds = [...document.querySelectorAll('#group-users-list .group-user-checkbox:checked')]
+    .map(input => Number(input.value));
+  try {
+    await api('PUT', `/auth/groups/${_editingGroupUsersGroupId}/users`, { user_ids: userIds });
+    closeModal('modal-group-users');
+    toast('Group users updated');
+    await loadUsers();
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+function openGroupProjects(groupId) {
+  _editingGroupProjectsGroupId = Number(groupId);
+  const group = _allUserGroups.find(item => Number(item.id) === Number(groupId));
+  const selectedIds = new Set((group?.project_ids || []).map(projectId => Number(projectId)));
+  document.getElementById('modal-group-projects-title').textContent = `Projects for ${group?.group_name || 'Group'}`;
+  document.getElementById('group-projects-search').value = '';
+  const list = document.getElementById('group-projects-list');
+  list.innerHTML = _allProjects.length ? _allProjects.map(project => `
+    <label class="mapping-row">
+      <input class="group-project-checkbox" type="checkbox" value="${project.id}" ${selectedIds.has(Number(project.id)) ? 'checked' : ''} />
+      <span><strong>${esc(project.project_name)}</strong><span>${esc(project.project_id || '')}${project.description ? ' · ' + esc(project.description) : ''}</span></span>
+      <span class="pill ${project.is_active ? 'pill-green' : 'pill-red'}">${project.is_active ? 'Active' : 'Inactive'}</span>
+    </label>
+  `).join('') : '<div class="empty-state">No projects yet</div>';
+  filterMappingRows('group-projects-list', '', 'group-projects-count', 'projects');
+  openModal('modal-group-projects');
+}
+
+function setGroupProjectsChecked(checked) {
+  setMappingRowsChecked('group-projects-list', '.group-project-checkbox', checked);
+}
+
+function filterMappingRows(listId, query, countId, label) {
+  const rows = [...document.querySelectorAll(`#${listId} .mapping-row`)];
+  const needle = String(query || '').trim().toLowerCase();
+  let visible = 0;
+  rows.forEach(row => {
+    const matches = !needle || row.textContent.toLowerCase().includes(needle);
+    row.style.display = matches ? '' : 'none';
+    if (matches) visible += 1;
+  });
+  const countEl = document.getElementById(countId);
+  if (countEl) countEl.textContent = `${visible} of ${rows.length} ${label}`;
+}
+
+function setMappingRowsChecked(listId, checkboxSelector, checked) {
+  document.querySelectorAll(`#${listId} .mapping-row`).forEach(row => {
+    if (row.style.display === 'none') return;
+    const input = row.querySelector(checkboxSelector);
+    if (input) input.checked = Boolean(checked);
+  });
+}
+
+async function submitGroupProjects() {
+  const projectIds = [...document.querySelectorAll('#group-projects-list .group-project-checkbox:checked')]
+    .map(input => Number(input.value));
+  try {
+    await api('PUT', `/auth/groups/${_editingGroupProjectsGroupId}/projects`, { project_ids: projectIds });
+    closeModal('modal-group-projects');
+    toast('Group projects updated');
+    await loadUsers();
+  } catch(e) { toast(e.message, 'error'); }
 }
 
 async function loadAudit() {
@@ -7221,9 +7674,15 @@ async function submitEditUsername() {
   const roleChanged = role !== _editRoleOld;
   if (!usernameChanged && !roleChanged) { closeModal('modal-edit-username'); return; }
   try {
-    await api('PATCH', `/auth/users/${_editUsernameId}`, { username, role });
+    const updated = await api('PATCH', `/auth/users/${_editUsernameId}`, { username, role });
     closeModal('modal-edit-username');
     toast('User updated');
+    if (Number(_editUsernameId) === Number(_me?.id) && updated?.access_token) {
+      _jwt = updated.access_token;
+      localStorage.setItem('cg_jwt', _jwt);
+      location.reload();
+      return;
+    }
     await loadUsers();
   } catch(e) {
     toast(e.message, 'error');

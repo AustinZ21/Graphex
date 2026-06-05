@@ -18,12 +18,15 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from jose import jwt as jose_jwt
 
 from backend import runtime_config
+from backend.auth.access import accessible_project_ids, id_filter_sql, require_project_access
+from backend.auth.crystals import require_crystal_suite
 from backend.auth.database import get_db
 from backend.auth.dependencies import get_current_user, require_admin, get_consumer, get_registry
 from backend.auth import pgshim as aiosqlite  # type: ignore  # asyncpg shim providing aiosqlite-compatible API
 from backend.auth.models import (
     AuditLogOut,
     AdminUserUpdate,
+    AdminUserUpdateResponse,
     GenerateTokenRequest,
     GraphLiveStats,
     IndexJobStatus,
@@ -36,7 +39,15 @@ from backend.auth.models import (
     ProjectTokenOut,
     ProjectUpdate,
     TokenResponse,
+    UserAccessGroupOut,
     UserCreate,
+    UserGroupCreate,
+    UserGroupIdsUpdate,
+    UserGroupOut,
+    UserGroupProjectIdsUpdate,
+    UserGroupSummary,
+    UserGroupUpdate,
+    UserGroupUserIdsUpdate,
     PaginatedAuditOut,
     UserOut,
     UserProfileUpdate,
@@ -394,6 +405,98 @@ async def _get_active_project(project_id: int, db: aiosqlite.Connection) -> dict
     return project
 
 
+async def _user_group_summaries_by_user_id(
+    db: aiosqlite.Connection,
+) -> dict[int, list[UserGroupSummary]]:
+    async with db.execute(
+        """
+        SELECT ugm.user_id, ug.id, ug.group_name, ug.description, ug.created_at, ug.is_active
+        FROM user_group_members ugm
+        JOIN user_groups ug ON ug.id = ugm.group_id
+        ORDER BY ug.group_name, ug.id
+        """
+    ) as cur:
+        rows = await cur.fetchall()
+
+    groups_by_user_id: dict[int, list[UserGroupSummary]] = {}
+    for row in rows:
+        groups_by_user_id.setdefault(int(row["user_id"]), []).append(
+            UserGroupSummary(
+                id=int(row["id"]),
+                group_name=row["group_name"],
+                description=row["description"] or "",
+                created_at=row["created_at"],
+                is_active=bool(row["is_active"]),
+            )
+        )
+    return groups_by_user_id
+
+
+async def _project_ids_by_group_id(db: aiosqlite.Connection) -> dict[int, list[int]]:
+    async with db.execute(
+        "SELECT group_id, project_id FROM project_group_access ORDER BY group_id, project_id"
+    ) as cur:
+        rows = await cur.fetchall()
+    project_ids_by_group_id: dict[int, list[int]] = {}
+    for row in rows:
+        project_ids_by_group_id.setdefault(int(row["group_id"]), []).append(int(row["project_id"]))
+    return project_ids_by_group_id
+
+
+async def _group_out(db: aiosqlite.Connection, group_id: int) -> UserGroupOut:
+    async with db.execute(
+        """
+        SELECT ug.id, ug.group_name, ug.description, ug.created_at, ug.is_active,
+               COUNT(DISTINCT ugm.user_id) AS member_count
+        FROM user_groups ug
+        LEFT JOIN user_group_members ugm ON ugm.group_id = ug.id
+        WHERE ug.id = ?
+        GROUP BY ug.id, ug.group_name, ug.description, ug.created_at, ug.is_active
+        """,
+        (group_id,),
+    ) as cur:
+        row = await cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    async with db.execute(
+        "SELECT project_id FROM project_group_access WHERE group_id = ? ORDER BY project_id",
+        (group_id,),
+    ) as cur:
+        project_rows = await cur.fetchall()
+    project_ids = [int(project_row["project_id"]) for project_row in project_rows]
+    return UserGroupOut(
+        id=int(row["id"]),
+        group_name=row["group_name"],
+        description=row["description"] or "",
+        created_at=row["created_at"],
+        is_active=bool(row["is_active"]),
+        member_count=int(row["member_count"] or 0),
+        project_count=len(project_ids),
+        project_ids=project_ids,
+    )
+
+
+async def _ensure_existing_ids(
+    db: aiosqlite.Connection,
+    table_name: str,
+    ids: list[int],
+    label: str,
+) -> None:
+    if not ids:
+        return
+    placeholders = ",".join("?" for _ in ids)
+    async with db.execute(
+        f"SELECT id FROM {table_name} WHERE id IN ({placeholders})",
+        tuple(ids),
+    ) as cur:
+        rows = await cur.fetchall()
+    found_ids = {int(row["id"]) for row in rows}
+    missing_ids = sorted(set(ids) - found_ids)
+    if missing_ids:
+        raise HTTPException(status_code=404, detail=f"Unknown {label} id(s): {', '.join(map(str, missing_ids))}")
+
+
 # ── Helper ─────────────────────────────────────────────────────────────────
 
 def _random_project_id(length: int = 10) -> str:
@@ -596,6 +699,51 @@ async def me(user: dict = Depends(get_current_user)):
     )
 
 
+@router.get("/me/groups", response_model=list[UserAccessGroupOut])
+async def me_groups(
+    user: dict = Depends(get_current_user),
+    _: None = Depends(require_crystal_suite),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    async with db.execute(
+        """
+        SELECT ug.id, ug.group_name, ug.description, ug.created_at, ug.is_active
+        FROM user_group_members ugm
+        JOIN user_groups ug ON ug.id = ugm.group_id
+        WHERE ugm.user_id = ?
+        ORDER BY ug.group_name, ug.id
+        """,
+        (int(user["id"]),),
+    ) as cur:
+        group_rows = await cur.fetchall()
+
+    groups: list[UserAccessGroupOut] = []
+    for group_row in group_rows:
+        async with db.execute(
+            """
+            SELECT p.id, p.project_name, p.project_id, p.upstream_url, p.description,
+                   p.repo_path, p.created_at, p.is_active
+            FROM project_group_access pga
+            JOIN projects p ON p.id = pga.project_id
+            WHERE pga.group_id = ?
+            ORDER BY p.project_name, p.id
+            """,
+            (int(group_row["id"]),),
+        ) as project_cur:
+            project_rows = await project_cur.fetchall()
+        groups.append(
+            UserAccessGroupOut(
+                id=int(group_row["id"]),
+                group_name=group_row["group_name"],
+                description=group_row["description"] or "",
+                created_at=group_row["created_at"],
+                is_active=bool(group_row["is_active"]),
+                projects=[ProjectOut(**dict(project_row)) for project_row in project_rows],
+            )
+        )
+    return groups
+
+
 @router.get("/microsoft/status")
 async def microsoft_connection_status(
     user: dict = Depends(get_current_user),
@@ -780,10 +928,14 @@ async def list_users(
     db: aiosqlite.Connection = Depends(get_db),
 ):
     async with db.execute(
-        "SELECT id, username, role, created_at, is_active FROM users ORDER BY id"
+        "SELECT id, username, email, role, created_at, is_active FROM users ORDER BY id"
     ) as cur:
         rows = await cur.fetchall()
-    return [UserOut(**dict(r)) for r in rows]
+    groups_by_user_id = await _user_group_summaries_by_user_id(db)
+    return [
+        UserOut(**{**dict(row), "groups": groups_by_user_id.get(int(row["id"]), [])})
+        for row in rows
+    ]
 
 
 @router.post("/users", response_model=UserOut, status_code=201)
@@ -829,7 +981,7 @@ async def activate_user(
     await db.commit()
 
 
-@router.patch("/users/{user_id}", response_model=UserOut)
+@router.patch("/users/{user_id}", response_model=AdminUserUpdateResponse, response_model_exclude_none=True)
 async def update_user(
     user_id: int,
     body: AdminUserUpdate,
@@ -843,12 +995,6 @@ async def update_user(
         row = await cur.fetchone()
     if not row:
         raise HTTPException(status_code=404, detail="User not found")
-
-    if row["id"] == current["id"] and body.username != row["username"]:
-        raise HTTPException(status_code=400, detail="You cannot change your own username")
-
-    if body.role is not None and row["id"] == current["id"]:
-        raise HTTPException(status_code=400, detail="You cannot change your own role")
 
     if body.username != row["username"]:
         try:
@@ -866,18 +1012,183 @@ async def update_user(
         (user_id,),
     ) as cur:
         updated = await cur.fetchone()
-    return UserOut(**dict(updated))
+    response = AdminUserUpdateResponse(**dict(updated))
+    if int(updated["id"]) == int(current["id"]):
+        response.access_token = create_access_token({"sub": updated["username"], "role": updated["role"]})
+    return response
+
+
+# ── User groups and project access mappings (admin only) ──────────────────
+
+@router.get("/groups", response_model=list[UserGroupOut])
+async def list_user_groups(
+    _: dict = Depends(require_admin),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    async with db.execute(
+        """
+        SELECT ug.id, ug.group_name, ug.description, ug.created_at, ug.is_active,
+               COUNT(DISTINCT ugm.user_id) AS member_count
+        FROM user_groups ug
+        LEFT JOIN user_group_members ugm ON ugm.group_id = ug.id
+        GROUP BY ug.id, ug.group_name, ug.description, ug.created_at, ug.is_active
+        ORDER BY ug.group_name, ug.id
+        """
+    ) as cur:
+        rows = await cur.fetchall()
+    project_ids_by_group_id = await _project_ids_by_group_id(db)
+    return [
+        UserGroupOut(
+            id=int(row["id"]),
+            group_name=row["group_name"],
+            description=row["description"] or "",
+            created_at=row["created_at"],
+            is_active=bool(row["is_active"]),
+            member_count=int(row["member_count"] or 0),
+            project_count=len(project_ids_by_group_id.get(int(row["id"]), [])),
+            project_ids=project_ids_by_group_id.get(int(row["id"]), []),
+        )
+        for row in rows
+    ]
+
+
+@router.post("/groups", response_model=UserGroupOut, status_code=201)
+async def create_user_group(
+    body: UserGroupCreate,
+    _: dict = Depends(require_admin),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    try:
+        async with db.execute(
+            """
+            INSERT INTO user_groups(group_name, description)
+            VALUES(?,?)
+            RETURNING id
+            """,
+            (body.group_name, body.description),
+        ) as cur:
+            row = await cur.fetchone()
+        await db.commit()
+    except aiosqlite.IntegrityError:
+        raise HTTPException(status_code=409, detail="group_name already exists")
+    return await _group_out(db, int(row["id"]))
+
+
+@router.patch("/groups/{group_id}", response_model=UserGroupOut)
+async def update_user_group(
+    group_id: int,
+    body: UserGroupUpdate,
+    _: dict = Depends(require_admin),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    if body.group_name is None and body.description is None and body.is_active is None:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    is_active = None if body.is_active is None else int(body.is_active)
+    try:
+        await db.execute(
+            """
+            UPDATE user_groups
+            SET group_name = COALESCE(?, group_name),
+                description = COALESCE(?, description),
+                is_active = COALESCE(?, is_active)
+            WHERE id = ?
+            """,
+            (body.group_name, body.description, is_active, group_id),
+        )
+        await db.commit()
+    except aiosqlite.IntegrityError:
+        raise HTTPException(status_code=409, detail="group_name already exists")
+    return await _group_out(db, group_id)
+
+
+@router.put("/users/{user_id}/groups", response_model=list[UserGroupSummary])
+async def set_user_groups(
+    user_id: int,
+    body: UserGroupIdsUpdate,
+    _: dict = Depends(require_admin),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    async with db.execute("SELECT id FROM users WHERE id = ?", (user_id,)) as cur:
+        if not await cur.fetchone():
+            raise HTTPException(status_code=404, detail="User not found")
+    await _ensure_existing_ids(db, "user_groups", body.group_ids, "group")
+
+    await db.execute("DELETE FROM user_group_members WHERE user_id = ?", (user_id,))
+    for group_id in body.group_ids:
+        await db.execute(
+            "INSERT INTO user_group_members(user_id, group_id) VALUES(?,?)",
+            (user_id, group_id),
+        )
+    await db.commit()
+    groups_by_user_id = await _user_group_summaries_by_user_id(db)
+    return groups_by_user_id.get(user_id, [])
+
+
+@router.put("/groups/{group_id}/users", response_model=UserGroupOut)
+async def set_user_group_users(
+    group_id: int,
+    body: UserGroupUserIdsUpdate,
+    _: dict = Depends(require_admin),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    async with db.execute("SELECT id FROM user_groups WHERE id = ?", (group_id,)) as cur:
+        if not await cur.fetchone():
+            raise HTTPException(status_code=404, detail="Group not found")
+    await _ensure_existing_ids(db, "users", body.user_ids, "user")
+
+    await db.execute("DELETE FROM user_group_members WHERE group_id = ?", (group_id,))
+    for user_id in body.user_ids:
+        await db.execute(
+            "INSERT INTO user_group_members(user_id, group_id) VALUES(?,?)",
+            (user_id, group_id),
+        )
+    await db.commit()
+    return await _group_out(db, group_id)
+
+
+@router.put("/groups/{group_id}/projects", response_model=UserGroupOut)
+async def set_user_group_projects(
+    group_id: int,
+    body: UserGroupProjectIdsUpdate,
+    _: dict = Depends(require_admin),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    async with db.execute("SELECT id FROM user_groups WHERE id = ?", (group_id,)) as cur:
+        if not await cur.fetchone():
+            raise HTTPException(status_code=404, detail="Group not found")
+    await _ensure_existing_ids(db, "projects", body.project_ids, "project")
+
+    await db.execute("DELETE FROM project_group_access WHERE group_id = ?", (group_id,))
+    for project_id in body.project_ids:
+        await db.execute(
+            "INSERT INTO project_group_access(group_id, project_id) VALUES(?,?)",
+            (group_id, project_id),
+        )
+    await db.commit()
+    return await _group_out(db, group_id)
 
 
 # ── Projects ───────────────────────────────────────────────────────────────
 
 @router.get("/projects", response_model=list[ProjectOut])
 async def list_projects(
-    _: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
+    allowed_project_ids = await accessible_project_ids(db, user)
+    where_sql = ""
+    params: tuple[int, ...] = ()
+    if allowed_project_ids is not None:
+        clause, params = id_filter_sql("id", allowed_project_ids)
+        where_sql = f"WHERE {clause}"
     async with db.execute(
-        "SELECT id, project_name, project_id, upstream_url, description, repo_path, created_at, is_active FROM projects ORDER BY id"
+        f"""
+        SELECT id, project_name, project_id, upstream_url, description, repo_path, created_at, is_active
+        FROM projects
+        {where_sql}
+        ORDER BY id
+        """,
+        params,
     ) as cur:
         rows = await cur.fetchall()
     return [ProjectOut(**dict(r)) for r in rows]
@@ -965,9 +1276,14 @@ async def update_project(
 @router.get("/projects/{project_id}/tokens", response_model=list[ProjectTokenOut])
 async def list_tokens(
     project_id: int,
-    _: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
 ):
+    async with db.execute("SELECT id FROM projects WHERE id = ?", (project_id,)) as cur:
+        row = await cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Project not found")
+    await require_project_access(db, user, project_id)
     async with db.execute(
         "SELECT id, project_id, token_type, token_hint, version, created_at, is_active FROM project_tokens WHERE project_id = ? ORDER BY id",
         (project_id,),
@@ -1056,16 +1372,24 @@ async def revoke_token(
 
 @router.get("/projects/index-status", response_model=list[ProjectIndexStatus])
 async def list_projects_index_status(
-    _: dict = Depends(get_current_user),
+    user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db),
     consumer = Depends(get_consumer),
     registry = Depends(get_registry),
 ):
     """Get indexing status for all projects."""
 
+    allowed_project_ids = await accessible_project_ids(db, user)
+    where_sql = "WHERE is_active = 1"
+    params: tuple[int, ...] = ()
+    if allowed_project_ids is not None:
+        clause, params = id_filter_sql("id", allowed_project_ids)
+        where_sql = f"WHERE is_active = 1 AND {clause}"
+
     # Get all projects
     async with db.execute(
-        "SELECT id, project_name, project_id, repo_path FROM projects WHERE is_active = 1 ORDER BY id"
+        f"SELECT id, project_name, project_id, repo_path FROM projects {where_sql} ORDER BY id",
+        params,
     ) as cur:
         projects = await cur.fetchall()
 

@@ -136,7 +136,7 @@ class _FakeDb:
 async def test_account_project_context_resolves_active_project_by_project_id():
     db = _FakeDb({"id": 7, "project_name": "Demo", "project_id": "PROJECT123"})
 
-    context = await cga_relay_router._account_project_context(db, "PROJECT123")
+    context = await cga_relay_router._account_project_context(db, "PROJECT123", {"role": "admin"})
 
     assert context == {
         "project_id": "PROJECT123",
@@ -151,6 +151,6 @@ async def test_account_project_context_rejects_unknown_project():
     db = _FakeDb(None)
 
     with pytest.raises(HTTPException) as exc:
-        await cga_relay_router._account_project_context(db, "MISSING")
+        await cga_relay_router._account_project_context(db, "MISSING", {"role": "admin"})
 
     assert exc.value.status_code == 404
