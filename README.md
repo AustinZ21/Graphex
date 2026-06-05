@@ -1,9 +1,9 @@
 # CGA (Context Graph Agent)
 
-- **Version:** 1.30.78
+- **Version:** 1.30.79
 - **Status:** Published
 - **Author:** Nate Scott
-- **Date:** 2026-06-04 (Relay Settings project summary removal)
+- **Date:** 2026-06-04 (viewer focus layer limit)
 
 CGA, aka Context Graph Agent, is a local-first graph context service that gives AI coding agents focused code evidence instead of dumping whole files or broad search results into prompts.
 
