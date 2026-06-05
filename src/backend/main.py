@@ -62,7 +62,7 @@ from backend.workbriefing.store import PgVectorActivityStore, resolve_dsn
 
 log = structlog.get_logger()
 
-APP_VERSION = "1.30.78"
+APP_VERSION = "1.30.79"
 
 FALKORDB_HOST = os.getenv("FALKORDB_HOST", "localhost")
 FALKORDB_PORT = int(os.getenv("FALKORDB_PORT", "6379"))

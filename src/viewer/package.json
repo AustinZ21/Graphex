@@ -1,6 +1,6 @@
 {
   "name": "cga-viewer",
-  "version": "1.30.44",
+  "version": "1.30.79",
   "private": true,
   "type": "module",
   "scripts": {

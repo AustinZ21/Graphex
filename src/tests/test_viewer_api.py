@@ -225,7 +225,7 @@ def test_viewer_entrypoint_is_served() -> None:
     assert '>CGA</text>' in response.text
     assert '"sigma"' in response.text
     assert '"graphology"' in response.text
-    assert 'src="./main.js?v=1.30.44"' in response.text
+    assert 'src="./main.js?v=1.30.79"' in response.text
     assert 'id="copy-falkor-url"' in response.text
     assert 'aria-label="Copy FalkorDB connection URL"' in response.text
     assert '<label for="chunk-limit">Display Nodes</label>' in response.text
@@ -239,7 +239,7 @@ def test_viewer_entrypoint_is_served() -> None:
     assert 'name="node-type" value="Variable" checked' in response.text
     assert '<div id="fps-counter" class="fps-counter">FPS --</div>' in response.text
     assert '<div id="focus-layer-control" class="focus-layer-control" aria-label="Focused graph layers" hidden>' in response.text
-    assert 'id="focus-layer-slider" type="range" min="1" max="2" step="1" value="1"' in response.text
+    assert 'id="focus-layer-slider" type="range" min="1" max="20" step="1" value="1"' in response.text
     assert '<span>Layer</span><strong id="focus-layer-value">1</strong>' in response.text
     assert 'id="clear-focus" class="focus-clear-button" type="button" aria-label="Clear focused graph"' in response.text
     assert '<div id="layout-settings-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="layout-settings-title">' in response.text
@@ -286,7 +286,9 @@ def test_viewer_static_assets_are_not_cached() -> None:
     assert "function reduceEdge" in response.text
     assert "focusRootNode: null" in response.text
     assert "focusLayerDepth: 1" in response.text
+    assert "MAX_FOCUS_LAYER_DEPTH = 20" in response.text
     assert "function setFocusLayerDepth" in response.text
+    assert "clamp(Math.round(Number(layerDepth) || 1), 1, MAX_FOCUS_LAYER_DEPTH)" in response.text
     assert "function buildFocusScope" in response.text
     assert "function focusNodeNeighborhood" in response.text
     assert "rightClickNode" in response.text
@@ -386,7 +388,7 @@ def test_admin_embeds_versioned_graph_viewer() -> None:
 
     assert response.status_code == 200
     assert '<link rel="icon" href="/favicon.svg" type="image/svg+xml" />' in response.text
-    assert 'data-src="/viewer/?v=1.30.44"' in response.text
+    assert 'data-src="/viewer/?v=1.30.79"' in response.text
     assert '<h1>CONTEXT GRAPH AGENT</h1>' in response.text
     assert '<svg class="brand-logo" width="28" height="28" viewBox="0 0 64 64" aria-hidden="true" focusable="false"' in response.text
     assert '>CGA</text>' in response.text

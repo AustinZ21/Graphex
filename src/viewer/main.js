@@ -1,7 +1,7 @@
 import Graphology from 'graphology'
 import Sigma from 'sigma'
 
-const VIEWER_VERSION = '1.30.43'
+const VIEWER_VERSION = '1.30.79'
 const EDGE_STYLES = {
   CALLS: { label: 'Calls', color: '#4ae387', width: 1.7, priority: 6 },
   IMPORTS: { label: 'Imports', color: '#5badff', width: 1.45, priority: 5 },
@@ -48,6 +48,7 @@ const CAMERA_INTERACTION_IDLE_MS = 160
 const MOTION_LOD_NODE_THRESHOLD = 1600
 const MOTION_EDGE_NODE_THRESHOLD = 1600
 const WORKER_TIMEOUT_MS = 8000
+const MAX_FOCUS_LAYER_DEPTH = 20
 
 const ROTATION_FRAME_MS = 72
 const GOLDEN_ANGLE = 2.399963229728653
@@ -1502,7 +1503,10 @@ function updateFocusLayerControl() {
   if (!elements.focusLayerControl) return
   const hasFocus = Boolean(state.focusRootNode)
   elements.focusLayerControl.hidden = !hasFocus
-  if (elements.focusLayerSlider) elements.focusLayerSlider.value = String(state.focusLayerDepth)
+  if (elements.focusLayerSlider) {
+    elements.focusLayerSlider.max = String(MAX_FOCUS_LAYER_DEPTH)
+    elements.focusLayerSlider.value = String(state.focusLayerDepth)
+  }
   if (elements.focusLayerValue) elements.focusLayerValue.textContent = String(state.focusLayerDepth)
   if (!elements.focusNodeLabel) return
   if (!hasFocus) {
@@ -1542,7 +1546,7 @@ function focusNodeNeighborhood(nodeId, showStatus = false) {
 }
 
 function setFocusLayerDepth(layerDepth, showStatus = false) {
-  state.focusLayerDepth = clamp(Math.round(Number(layerDepth) || 1), 1, 2)
+  state.focusLayerDepth = clamp(Math.round(Number(layerDepth) || 1), 1, MAX_FOCUS_LAYER_DEPTH)
   if (!state.focusRootNode) {
     updateFocusLayerControl()
     return
