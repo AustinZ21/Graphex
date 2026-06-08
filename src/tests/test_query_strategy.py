@@ -193,3 +193,8 @@ def test_cg_first_query_strategy_class_run(monkeypatch, tmp_path: Path):
     assert seen_query == ["pkg fn"]
     assert result["source"] == "contextgraph-client"
     assert result["used_fallback"] is False
+
+
+def test_cg_first_query_strategy_message_endpoint_compat(tmp_path: Path):
+    strategy = CGFirstQueryStrategy(StrategyConfig(repo_root=tmp_path, base_url="http://127.0.0.1:8011/"))
+    assert strategy._read_message_endpoint("http://127.0.0.1:8011/") == "http://127.0.0.1:8011/mcp/sse"
