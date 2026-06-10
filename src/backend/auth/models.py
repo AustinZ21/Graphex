@@ -243,7 +243,7 @@ class ProjectTokenOut(BaseModel):
 
 
 class GenerateTokenRequest(BaseModel):
-    token_type: str = Field(pattern="^(mcp|edge_agent)$")
+    token_type: str = Field(pattern="^mcp$")
 
 
 class IndexJobStatus(BaseModel):

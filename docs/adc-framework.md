@@ -49,7 +49,7 @@ Important boundaries:
 │   ├── amendments.md
 │   ├── adr/
 │   └── diagrams/
-└── contextgraph-edge-agent/
+└── cga-relay/
     ├── tasks/
     ├── scratchpad/
     ├── mcp/
@@ -95,9 +95,9 @@ Conventions are split by domain so agents can load only the relevant rules for a
 
 Knowledge documents preserve terminology, known issues, no-touch zones, architecture decisions, amendments, and living diagrams.
 
-### `contextgraph-edge-agent/`
+### `cga-relay/`
 
-This workspace is for orchestration state, MCP wiring, scratchpad notes, task queues, and specialized skills. Canonical requirements and architecture decisions should remain in planning, standards, and knowledge files.
+This workspace is for relay orchestration state, MCP wiring, scratchpad notes, task queues, and specialized skills. Canonical requirements and architecture decisions should remain in planning, standards, and knowledge files.
 
 ## Agent Initialization Protocol
 
@@ -107,14 +107,14 @@ ADC-aware agents should follow this high-level order before making non-trivial c
 2. Read `.adc/knowledge/known-issues.md` before planning refactors.
 3. Read `.adc/prompt-rules.md` and follow mandatory conventions.
 4. Read `.adc/knowledge/glossary.md` for domain-specific names and acronyms.
-5. Check `.adc/contextgraph-edge-agent/skills/` for project-specific workflows.
-6. Check `.adc/contextgraph-edge-agent/mcp/` for MCP server wiring.
+5. Check `.adc/cga-relay/skills/` for project-specific workflows.
+6. Check `.adc/cga-relay/mcp/` for MCP server wiring.
 7. Complete relevant `.adc/standards/checklists/` before finalizing commits or pull requests.
 8. Update living Mermaid diagrams when architecture, data flow, or schema changes.
 
 ## ContextGraph And MCP Policy
 
-ADC-compliant projects can provide a preconfigured `cga-mcp-server` entry in `.adc/contextgraph-edge-agent/mcp/mcp-servers.json` so agents can load CGA retrieval tools consistently.
+ADC-compliant projects can provide a preconfigured `cga-mcp-server` entry in `.adc/cga-relay/mcp/mcp-servers.json` so agents can load CGA retrieval tools consistently.
 
 For local CGA development, the default SSE MCP endpoint is:
 
@@ -126,7 +126,7 @@ Use `Authorization` and `X-Project-ID` headers when project-scoped access is req
 
 ContextGraph MCP integrations are for retrieval, indexing, and external context operations. Local build, test, and deployment execution should remain on native project tooling.
 
-ContextGraph credentials such as `CONTEXTGRAPH_PROJECT_ID`, `CONTEXTGRAPH_MCP_TOKEN`, and `CONTEXTGRAPH_EDGE_AGENT_TOKEN` must be injected through environment variables and must not be committed.
+ContextGraph credentials such as `CONTEXTGRAPH_PROJECT_ID` and `CONTEXTGRAPH_MCP_TOKEN` must be injected through environment variables and must not be committed.
 
 ## Governance Patterns
 
@@ -141,6 +141,6 @@ ContextGraph credentials such as `CONTEXTGRAPH_PROJECT_ID`, `CONTEXTGRAPH_MCP_TO
 The following command creates a bare ADC skeleton for an existing codebase. Populate the files with the actual project rules before relying on them for agent automation.
 
 ```bash
-mkdir -p .adc/planning .adc/standards/conventions .adc/standards/checklists .adc/standards/runbooks .adc/knowledge/adr .adc/knowledge/diagrams .adc/contextgraph-edge-agent/skills .adc/contextgraph-edge-agent/mcp .adc/contextgraph-edge-agent/tasks/todo .adc/contextgraph-edge-agent/tasks/in-progress .adc/contextgraph-edge-agent/tasks/done .adc/contextgraph-edge-agent/scratchpad tests .github
-touch .adc/index.md .adc/bootstrap.md .adc/prompt-rules.md .adc/planning/status.md .adc/planning/project-roadmap.md .adc/planning/development-phases.md .adc/knowledge/glossary.md .adc/knowledge/known-issues.md .adc/knowledge/amendments.md .adc/standards/conventions/structure.md .adc/standards/conventions/frontend.md .adc/standards/conventions/backend.md .adc/standards/conventions/data-engineering.md .adc/standards/conventions/performance.md .adc/standards/conventions/observability.md .adc/standards/conventions/security.md .adc/standards/conventions/devops.md .adc/standards/conventions/testing.md .adc/contextgraph-edge-agent/mcp/mcp-servers.json .adc/standards/checklists/pr-review.md .adc/standards/runbooks/001-common-errors.md .adc/contextgraph-edge-agent/scratchpad/session.md .adc/contextgraph-edge-agent/tasks/todo/TASK-001.md .adcignore .cursorrules .windsurfrules .clinerules .roomadesrules .aider.rules .codexrules .antigravityrules .codeiumrules .codyrules .github/copilot-instructions.md
+mkdir -p .adc/planning .adc/standards/conventions .adc/standards/checklists .adc/standards/runbooks .adc/knowledge/adr .adc/knowledge/diagrams .adc/cga-relay/skills .adc/cga-relay/mcp .adc/cga-relay/tasks/todo .adc/cga-relay/tasks/in-progress .adc/cga-relay/tasks/done .adc/cga-relay/scratchpad tests .github
+touch .adc/index.md .adc/bootstrap.md .adc/prompt-rules.md .adc/planning/status.md .adc/planning/project-roadmap.md .adc/planning/development-phases.md .adc/knowledge/glossary.md .adc/knowledge/known-issues.md .adc/knowledge/amendments.md .adc/standards/conventions/structure.md .adc/standards/conventions/frontend.md .adc/standards/conventions/backend.md .adc/standards/conventions/data-engineering.md .adc/standards/conventions/performance.md .adc/standards/conventions/observability.md .adc/standards/conventions/security.md .adc/standards/conventions/devops.md .adc/standards/conventions/testing.md .adc/cga-relay/mcp/mcp-servers.json .adc/standards/checklists/pr-review.md .adc/standards/runbooks/001-common-errors.md .adc/cga-relay/scratchpad/session.md .adc/cga-relay/tasks/todo/TASK-001.md .adcignore .cursorrules .windsurfrules .clinerules .roomadesrules .aider.rules .codexrules .antigravityrules .codeiumrules .codyrules .github/copilot-instructions.md
 ```

@@ -19,7 +19,7 @@ This file defines all domain-specific terminology, abbreviations, and shortcuts 
 |---|---|
 | **ContextGraph** | Central artifact catalog, project registry, and orchestration service (default local CGA endpoint `http://localhost:18001`) |
 | **CGA MCP Server** | Model Context Protocol endpoint for programmatic ContextGraph access (default local dev SSE endpoint `http://localhost:18001/mcp/sse`) |
-| **ContextGraph Edge Agent** | Local execution and orchestration agent; workspace stored in `.adc/contextgraph-edge-agent`, implementation in `src/contextgraph-edge-agent` |
+| **CGA-Relay** | Local MCP gateway and project sync agent; workspace stored in `.adc/cga-relay`, implementation in `src/cga-relay` |
 | **CGA MCP Server Profile** | Standard MCP server profile name (`cga-mcp-server`) used by ADC templates for auto-loading CGA MCP wiring |
 | **CGA Admin UI** | Local setup surface for project registration and token creation at `http://localhost:18001/admin` |
 
@@ -42,7 +42,7 @@ This file defines all domain-specific terminology, abbreviations, and shortcuts 
 | **Planning** | `.adc/planning/` | Project phases, roadmap, status tracking |
 | **Standards** | `.adc/standards/` | Conventions, checklists, runbooks organized by domain |
 | **Knowledge** | `.adc/knowledge/` | Glossary, known issues, ADRs, diagrams |
-| **ContextGraph Edge Agent** | `.adc/contextgraph-edge-agent/` | Agent workspace: tasks, scratchpad, MCP configs, skills |
+| **CGA-Relay** | `.adc/cga-relay/` | Relay workspace: tasks, scratchpad, MCP configs, skills |
 
 ## File Type Conventions
 

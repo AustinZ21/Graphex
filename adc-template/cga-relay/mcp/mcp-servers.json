@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "cga-mcp-server": {
+      "transport": "http",
+      "url": "http://localhost:18001/mcp/sse",
+      "headers": {
+        "Authorization": "Bearer ${CONTEXTGRAPH_MCP_TOKEN}",
+        "X-Project-ID": "${CONTEXTGRAPH_PROJECT_ID}"
+      },
+      "env": {
+        "CONTEXTGRAPH_MCP_TOKEN": "${CONTEXTGRAPH_MCP_TOKEN}",
+        "CONTEXTGRAPH_PROJECT_ID": "${CONTEXTGRAPH_PROJECT_ID}"
+      },
+      "description": "CGA MCP Server endpoint profile for ADC projects (language-agnostic MCP wiring)"
+    }
+  }
+}

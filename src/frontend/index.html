@@ -2478,7 +2478,7 @@
           </div>
           <div class="form-group">
             <label>Agent ID</label>
-            <input id="schedule-agent-id" placeholder="edge-agent-a or browseragent-local" />
+            <input id="schedule-agent-id" placeholder="cga-relay-a or browseragent-local" />
           </div>
           <div class="form-group">
             <label>Runner URL</label>
@@ -3240,7 +3240,6 @@
       <label>Token Type</label>
       <select id="gt-type">
         <option value="mcp">mcp</option>
-        <option value="edge_agent">edge_agent</option>
       </select>
     </div>
     <div id="gt-result" style="display:none">
@@ -5242,7 +5241,6 @@ async function toggleTokens(projectId, btn) {
 function renderTokensPanel(panel, tokens, projectId) {
   const purposeLabel = (tokenType) => {
     if (tokenType === 'mcp') return 'MCP transport';
-    if (tokenType === 'edge_agent') return 'Edge indexing/query';
     return 'General access';
   };
 
@@ -6008,7 +6006,7 @@ function buildWorkBriefingPowerShellTemplate(payload) {
   const jsonPayload = JSON.stringify(buildWorkBriefingJsonTemplate(payload), null, 2);
   return [
     `$headers = @{`,
-    `  Authorization = \"Bearer $env:CONTEXTGRAPH_EDGE_AGENT_TOKEN\"`,
+    `  Authorization = \"Bearer $env:CONTEXTGRAPH_MCP_TOKEN\"`,
     `  \"X-Project-ID\" = \"${projectId}\"`,
     `}`,
     `$body = @'`,
@@ -6032,7 +6030,7 @@ function buildWorkBriefingPythonTemplate(payload) {
     `    data=json.dumps(payload).encode(\"utf-8\"),`,
     `    method=\"POST\",`,
     `    headers={`,
-    `        \"Authorization\": \"Bearer <CONTEXTGRAPH_EDGE_AGENT_TOKEN>\",`,
+    `        \"Authorization\": \"Bearer <CONTEXTGRAPH_MCP_TOKEN>\",`,
     `        \"X-Project-ID\": \"${projectId}\",`,
     `        \"Content-Type\": \"application/json\",`,
     `    },`,
@@ -6071,7 +6069,7 @@ function renderWorkBriefingRequestTemplates(payload) {
       <div class="briefing-command-pill-row">
         <span class="briefing-command-pill"><span>Endpoint</span><strong>/api/project/work-briefing/activity</strong></span>
         <span class="briefing-command-pill"><span>Project</span><strong>${esc(projectId)}</strong></span>
-        <span class="briefing-command-pill"><span>Token</span><strong>edge_agent or mcp</strong></span>
+        <span class="briefing-command-pill"><span>Token</span><strong>mcp</strong></span>
       </div>
       <div class="briefing-template-grid">
         <section class="briefing-template-block">

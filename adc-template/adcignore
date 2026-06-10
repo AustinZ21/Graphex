@@ -6,7 +6,7 @@ build/
 coverage/
 tmp/
 src/log/
-contextgraph-edge-agent/scratchpad/
-contextgraph-edge-agent/tasks/
+cga-relay/scratchpad/
+cga-relay/tasks/
 
 

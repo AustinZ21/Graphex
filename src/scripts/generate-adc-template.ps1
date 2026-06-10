@@ -7,18 +7,18 @@ New-Item -ItemType Directory -Force -Path "$TargetDir\standards\checklists" | Ou
 New-Item -ItemType Directory -Force -Path "$TargetDir\standards\runbooks" | Out-Null
 New-Item -ItemType Directory -Force -Path "$TargetDir\skills\sample-skill\scripts" | Out-Null
 New-Item -ItemType Directory -Force -Path "$TargetDir\adr" | Out-Null
-New-Item -ItemType Directory -Force -Path "$TargetDir\contextgraph-edge-agent\tasks\done" | Out-Null
-New-Item -ItemType Directory -Force -Path "$TargetDir\contextgraph-edge-agent\tasks\in-progress" | Out-Null
-New-Item -ItemType Directory -Force -Path "$TargetDir\contextgraph-edge-agent\tasks\todo" | Out-Null
-New-Item -ItemType Directory -Force -Path "$TargetDir\contextgraph-edge-agent\scratchpad" | Out-Null
-New-Item -ItemType Directory -Force -Path "$TargetDir\contextgraph-edge-agent\mcp" | Out-Null
-New-Item -ItemType Directory -Force -Path "$TargetDir\contextgraph-edge-agent\skills\sample-skill\scripts" | Out-Null
-New-Item -ItemType Directory -Force -Path "$TargetDir\contextgraph-edge-agent\tasks\done" | Out-Null
-New-Item -ItemType Directory -Force -Path "$TargetDir\contextgraph-edge-agent\tasks\in-progress" | Out-Null
-New-Item -ItemType Directory -Force -Path "$TargetDir\contextgraph-edge-agent\tasks\todo" | Out-Null
-New-Item -ItemType Directory -Force -Path "$TargetDir\contextgraph-edge-agent\scratchpad" | Out-Null
-New-Item -ItemType Directory -Force -Path "$TargetDir\contextgraph-edge-agent\mcp" | Out-Null
-New-Item -ItemType Directory -Force -Path "$TargetDir\contextgraph-edge-agent\skills\sample-skill\scripts" | Out-Null
+New-Item -ItemType Directory -Force -Path "$TargetDir\cga-relay\tasks\done" | Out-Null
+New-Item -ItemType Directory -Force -Path "$TargetDir\cga-relay\tasks\in-progress" | Out-Null
+New-Item -ItemType Directory -Force -Path "$TargetDir\cga-relay\tasks\todo" | Out-Null
+New-Item -ItemType Directory -Force -Path "$TargetDir\cga-relay\scratchpad" | Out-Null
+New-Item -ItemType Directory -Force -Path "$TargetDir\cga-relay\mcp" | Out-Null
+New-Item -ItemType Directory -Force -Path "$TargetDir\cga-relay\skills\sample-skill\scripts" | Out-Null
+New-Item -ItemType Directory -Force -Path "$TargetDir\cga-relay\tasks\done" | Out-Null
+New-Item -ItemType Directory -Force -Path "$TargetDir\cga-relay\tasks\in-progress" | Out-Null
+New-Item -ItemType Directory -Force -Path "$TargetDir\cga-relay\tasks\todo" | Out-Null
+New-Item -ItemType Directory -Force -Path "$TargetDir\cga-relay\scratchpad" | Out-Null
+New-Item -ItemType Directory -Force -Path "$TargetDir\cga-relay\mcp" | Out-Null
+New-Item -ItemType Directory -Force -Path "$TargetDir\cga-relay\skills\sample-skill\scripts" | Out-Null
 
 $Files = @{
     "index.md" = @'
@@ -46,9 +46,9 @@ It defines the exact rules, constraints, and architecture that AI Agents must fo
 ## Required Integrations
 This project **MUST** integrate with the ContextGraph ecosystem:
 - **ContextGraph Project**: Central repository and artifact management system (registration via CGA Admin UI at `http://localhost:18001/admin`)
-- **ContextGraph Edge Agent** (`src/contextgraph-edge-agent`): Local execution and orchestration agent
+- **CGA-Relay** (`src/cga-relay`): Local MCP gateway and project sync agent
 - **CGA MCP Server**: Model Context Protocol endpoint for programmatic ContextGraph access (default local dev SSE endpoint: `http://localhost:18001/mcp/sse`)
-- **Initial ContextGraph Indexing**: Immediately after ContextGraph Edge Agent + CGA MCP Server integration, run full-project indexing once so retrieval/review tools can access the entire repository context.
+- **Initial ContextGraph Indexing**: Immediately after CGA-Relay + CGA MCP Server integration, run full-project indexing once so retrieval/review tools can access the entire repository context.
 
 Both ContextGraph services are implemented locally within this project and must be started during bootstrap.
 
@@ -71,16 +71,16 @@ Before starting the application, register with the ContextGraph ecosystem:
 # Open CGA Admin UI: http://localhost:18001/admin
 # Follow the guided setup to:
 #   - Register this project in the ContextGraph catalog
-#   - Retrieve CGA MCP server credentials and edge agent token
+#   - Retrieve CGA MCP server credentials
 #   - Store credentials in .env (see step 2 below)
 
 # 2. Configure ContextGraph environment variables
 echo "CONTEXTGRAPH_MCP_SERVER_URL=http://localhost:18001/mcp/sse" >> .env
-echo "CONTEXTGRAPH_EDGE_AGENT_TOKEN=<token-from-cga-admin>" >> .env
+echo "CONTEXTGRAPH_MCP_TOKEN=<token-from-cga-admin>" >> .env
 echo "CONTEXTGRAPH_PROJECT_ID=<project-id-from-cga-admin>" >> .env
 ```
 
-After ContextGraph Edge Agent and CGA MCP Server are integrated, initialize a full repository index before starting feature work:
+After CGA-Relay and CGA MCP Server are integrated, initialize a full repository index before starting feature work:
 
 ```text
 Required one-time bootstrap indexing flow
@@ -105,8 +105,8 @@ cp .env.example .env
 # (Edit .env with values from ContextGraph registration above)
 
 # 5. Start ContextGraph services
-npm run contextgraph-mcp:start      # Starts src/contextgraph-mcp server (default: http://localhost:3001/mcp)
-npm run contextgraph-edge:start     # Starts src/contextgraph-edge-agent service (default: http://localhost:3002/edges)
+npm run contextgraph-mcp:start      # Starts optional repository-local MCP bridge when present
+npm run cga-relay:start             # Starts src/cga-relay when this repository ships a relay runner
 
 # 6. Start backing services (e.g. database, redis)
 docker-compose up -d db redis
@@ -123,11 +123,8 @@ npm run dev
 Once running, verify local ContextGraph services are reachable:
 
 ```bash
-# Check local MCP server health (src/contextgraph-mcp)
+# Check optional repository-local MCP bridge health
 curl http://localhost:3001/mcp/health
-
-# Check local edge agent health (src/contextgraph-edge-agent)
-curl http://localhost:3002/edges/health
 
 # Verify upstream ContextGraph connectivity
 curl http://localhost:18001/health
@@ -143,7 +140,7 @@ curl http://localhost:18001/health
 - Do not bypass safety checks in `.adc/standards/conventions/security.md`.
 - Follow Test-Driven Development (TDD) in `.adc/standards/conventions/testing.md`.
 - Do not introduce new third-party dependencies (for example, `npm install`, `pip install`) without explicit human authorization.
-- Document progress, failed attempts, and environment issues in `.adc/contextgraph-edge-agent/scratchpad/session.md` before concluding a task.
+- Document progress, failed attempts, and environment issues in `.adc/cga-relay/scratchpad/session.md` before concluding a task.
 - Keep outputs deterministic for the same symbol and unchanged repository state.
 
 ## Repository and Workflow Rules
@@ -154,12 +151,12 @@ curl http://localhost:18001/health
 - Never commit directly to `main`; use a `dev/*` branch and merge through review.
 
 ## ContextGraph Use Policy
-- Use `contextgraph-edge-agent/` for local task orchestration and session context only.
+- Use `cga-relay/` for local task orchestration and session context only.
 - Use `mcp-servers.json` and ContextGraph MCP endpoints for indexed retrieval/integration workflows only.
 - ContextGraph MCP must not replace local compile, lint, unit test, or integration test execution.
 - Treat scratchpad/task outputs as operational context, not canonical product truth.
 - Canonical rules must remain in `.adc/planning/`, `.adc/standards/`, and `.adc/knowledge/`.
-- Inject `CONTEXTGRAPH_MCP_TOKEN`, `CONTEXTGRAPH_EDGE_AGENT_TOKEN`, and `CONTEXTGRAPH_PROJECT_ID` via environment variables only.
+- Inject `CONTEXTGRAPH_MCP_TOKEN` and `CONTEXTGRAPH_PROJECT_ID` via environment variables only.
 - Never write ContextGraph credentials into tracked files.
 - PRs changing ContextGraph integration behavior must update `.adc/bootstrap.md` and MCP server wiring, and include validation notes.
 
@@ -211,12 +208,12 @@ curl http://localhost:18001/health
 - **Traceability Requirement**: Any PR that introduces or changes ContextGraph integration MUST include a short "ContextGraph integration notes" section describing what step(s) from the onboarding URL were applied.
 - **MCP Alignment**: If ContextGraph integration adds or changes external service endpoints or credentials, `mcp-servers.json` MUST be updated in the same change set.
 
-## ContextGraph Edge Agent and ContextGraph MCP Use Policy
-- **Responsibility Split**: `contextgraph-edge-agent/` is for local orchestration artifacts (task queues, scratchpad notes, MCP wiring). ContextGraph MCP is for programmatic integration/retrieval against ContextGraph services.
+## CGA-Relay and ContextGraph MCP Use Policy
+- **Responsibility Split**: `cga-relay/` is for local relay orchestration artifacts (task queues, scratchpad notes, MCP wiring). ContextGraph MCP is for programmatic integration/retrieval against ContextGraph services.
 - **Execution Policy**: ContextGraph MCP MUST NOT be used to replace local compile, lint, unit test, or integration test execution. Build/test must run through project-native tooling.
-- **Authority Policy**: Outputs from ContextGraph Edge Agent scratchpad/tasks are operational context, not product truth. Canonical product rules remain in constitution/convention/planning files.
+- **Authority Policy**: Outputs from CGA-Relay scratchpad/tasks are operational context, not product truth. Canonical product rules remain in constitution/convention/planning files.
 - **Network Policy**: Local ContextGraph services are expected on localhost endpoints; upstream ContextGraph access MUST use the configured upstream URL and approved credentials only.
-- **Secret Policy**: Tokens and project identifiers (`CONTEXTGRAPH_MCP_TOKEN`, `CONTEXTGRAPH_EDGE_AGENT_TOKEN`, `CONTEXTGRAPH_PROJECT_ID`) MUST be injected via environment variables and never committed to repository files.
+- **Secret Policy**: Tokens and project identifiers (`CONTEXTGRAPH_MCP_TOKEN`, `CONTEXTGRAPH_PROJECT_ID`) MUST be injected via environment variables and never committed to repository files.
 - **Change Policy**: Any PR changing ContextGraph integration behavior MUST update both `bootstrap.md` and `mcp-servers.json`, and include validation notes.
 '@;
 
@@ -314,7 +311,7 @@ curl http://localhost:18001/health
 - [ ] Are Docker CPU/Memory resource limits properly set as environment variables?
 '@;
 
-        "contextgraph-edge-agent\mcp\mcp-servers.json" = @'
+        "cga-relay\mcp\mcp-servers.json" = @'
 {
   "mcpServers": {
         "cga-mcp-server": {
@@ -329,10 +326,6 @@ curl http://localhost:18001/health
                 "CONTEXTGRAPH_PROJECT_ID": "${CONTEXTGRAPH_PROJECT_ID}"
             },
             "description": "CGA MCP Server endpoint profile for ADC projects (language-agnostic MCP wiring)"
-        },
-    "local-postgres": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://localhost/mydb"]
     }
   }
 }

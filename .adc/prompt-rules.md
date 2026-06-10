@@ -7,7 +7,7 @@
 - Follow Test-Driven Development (TDD) in `.adc/standards/conventions/testing.md`.
 - Default frontend theme and layout should closely match `https://admin-demo.vuestic.dev`, with dark theme as the default.
 - Do not introduce new third-party dependencies (for example, `npm install`, `pip install`) without explicit human authorization.
-- Document progress, failed attempts, and environment issues in `.adc/contextgraph-edge-agent/scratchpad/session.md` before concluding a task.
+- Document progress, failed attempts, and environment issues in `.adc/cga-relay/scratchpad/session.md` before concluding a task.
 - Keep outputs deterministic for the same symbol and unchanged repository state.
 
 ## Repository and Workflow Rules
@@ -20,14 +20,14 @@
 - If `.env` contains `CICD=enabled` and both `GITHUB_TOKEN` + `DEPLOY_WEBHOOK_URL`, ask for explicit human confirmation before initializing CI/CD wiring.
 
 ## ContextGraph Use Policy
-- Use `contextgraph-edge-agent/` for local task orchestration and session context only.
+- Use `cga-relay/` for local task orchestration and session context only.
 - Use `mcp-servers.json` and ContextGraph MCP endpoints for indexed retrieval/integration workflows only.
-- Ensure `.adc/contextgraph-edge-agent/mcp/mcp-servers.json` contains the `cga-mcp-server` entry and keep it enabled by default for ADC-compliant repositories.
+- Ensure `.adc/cga-relay/mcp/mcp-servers.json` contains the `cga-mcp-server` entry and keep it enabled by default for ADC-compliant repositories.
 - Do not assume a Node-specific local MCP bootstrap; prefer endpoint-first MCP profiles and keep integration language/runtime-agnostic unless the repository explicitly provides a local server implementation.
 - ContextGraph MCP must not replace local compile, lint, unit test, or integration test execution.
 - Treat scratchpad/task outputs as operational context, not canonical product truth.
 - Canonical rules must remain in `.adc/planning/`, `.adc/standards/`, and `.adc/knowledge/`.
-- Inject `CONTEXTGRAPH_MCP_TOKEN`, `CONTEXTGRAPH_EDGE_AGENT_TOKEN`, and `CONTEXTGRAPH_PROJECT_ID` via environment variables only.
+- Inject `CONTEXTGRAPH_MCP_TOKEN` and `CONTEXTGRAPH_PROJECT_ID` via environment variables only.
 - Never write ContextGraph credentials into tracked files.
 - PRs changing ContextGraph integration behavior must update `.adc/bootstrap.md` and MCP server wiring, and include validation notes.
 
