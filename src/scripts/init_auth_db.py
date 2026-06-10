@@ -109,17 +109,6 @@ async def main() -> None:
                 )
                 print(f"[init_auth_db]   {project_name}: mcp token imported.")
 
-            # Import edge_agent token
-            edge_raw = proj.get("edgeAgent", {}).get("token", "")
-            if edge_raw:
-                await db.execute(
-                    """INSERT INTO project_tokens(project_id, token_type, token_hash, token_hint)
-                       VALUES(?,?,?,?)
-                       ON CONFLICT (token_hash) DO NOTHING""",
-                    (db_project_id, "edge_agent", hash_token(edge_raw), token_hint(edge_raw)),
-                )
-                print(f"[init_auth_db]   {project_name}: edge_agent token imported.")
-
         print("[init_auth_db] Done.")
 
 

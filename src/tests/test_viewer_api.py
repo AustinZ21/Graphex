@@ -219,10 +219,10 @@ def test_viewer_entrypoint_is_served() -> None:
     response = TestClient(app).get("/viewer/")
 
     assert response.status_code == 200
-    assert "<title>CGA Viewer</title>" in response.text
+    assert "<title>Viewer</title>" in response.text
     assert '<link rel="icon" href="./favicon.svg" type="image/svg+xml" />' in response.text
-    assert '<svg class="brand-logo" width="28" height="28" viewBox="0 0 64 64" aria-hidden="true" focusable="false"' in response.text
-    assert '>CGA</text>' in response.text
+    assert '<a class="brand" href="/admin" title="Back to admin">' in response.text
+    assert '<span>Viewer</span>' in response.text
     assert '"sigma"' in response.text
     assert '"graphology"' in response.text
     assert 'src="./main.js?v=1.30.79"' in response.text
@@ -393,13 +393,14 @@ def test_admin_embeds_versioned_graph_viewer() -> None:
     assert '<svg class="brand-logo" width="28" height="28" viewBox="0 0 64 64" aria-hidden="true" focusable="false"' in response.text
     assert '>CGA</text>' in response.text
     assert '<span class="logo-text">CONTEXT GRAPH AGENT</span>' in response.text
-    assert '<strong>Retrieve the right evidence before generation</strong>' in response.text
-    assert 'Repository relationships, not only keywords' in response.text
-    assert '<span class="cga-feature-step">Impact graph</span>' in response.text
-    assert '<span class="cga-feature-step">Optimized context</span>' in response.text
-    assert '<span class="cga-feature-step">Minimal code</span>' in response.text
-    assert 'File/symbol targeting' in response.text
-    assert 'Dependency awareness' in response.text
+    assert '<strong>Current defaults used for project indexing</strong>' in response.text
+    assert 'aria-label="Current indexing settings"' in response.text
+    assert 'id="cga-indexing-repos-root"' in response.text
+    assert 'id="cga-indexing-strategy"' in response.text
+    assert 'id="cga-indexing-token-budget"' in response.text
+    assert 'Incremental indexing enabled' in response.text
+    assert 'Per-project repository paths' in response.text
+    assert 'Editable in Settings &gt; Indexing' in response.text or 'Editable in Settings > Indexing' in response.text
     assert 'id="wsr-save-btn" onclick="saveWorkReportEdit(\'this\')"' in response.text
     assert 'id="wsr-save-prev-btn" onclick="saveWorkReportEdit(\'prev\')"' in response.text
     assert 'id="wsr-preview" class="wsr-preview-editor"' in response.text

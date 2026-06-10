@@ -7,10 +7,10 @@ Repository: ADC
 This report captures the latest repository structure and convention updates requested during the current session.
 
 ## Completed Changes
-1. Renamed ADC workspace folder from `agent-workspace` to `contextgraph-edge-agent` under the template.
+1. Renamed ADC workspace folder from `agent-workspace` to `cga-relay` under the template.
 2. Added ContextGraph integration requirements:
    - ContextGraph project registration endpoint
-   - ContextGraph Edge Agent integration guidance
+   - CGA-Relay integration guidance
    - CGA MCP Server integration guidance
 3. Standardized build output location to `src/dist`.
 4. Added and standardized runtime log location at `src/log`.

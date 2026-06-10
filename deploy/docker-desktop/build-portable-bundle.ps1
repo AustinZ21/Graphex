@@ -43,6 +43,19 @@ foreach ($item in $filesToCopy) {
 
 Copy-Item -Path (Join-Path $repoRoot 'src\*') -Destination (Join-Path $portableRoot 'src') -Recurse -Force
 
+$generatedSourcePaths = @(
+  'src\cga-relay\target',
+  'src\viewer\node_modules',
+  'src\viewer\dist',
+  'src\dist'
+)
+foreach ($relativePath in $generatedSourcePaths) {
+  $generatedPath = Join-Path $portableRoot $relativePath
+  if (Test-Path $generatedPath) {
+    Remove-Item -Path $generatedPath -Recurse -Force
+  }
+}
+
 if (-not (Test-Path (Join-Path $portableRoot 'src\scripts\init_auth_db.py'))) {
   throw 'Portable bundle source copy failed: src\scripts\init_auth_db.py is missing.'
 }
@@ -221,6 +234,15 @@ $portableDockerIgnore = @"
 repos
 tmp
 data/backups
+src/cga-relay/target
+src/viewer/node_modules
+src/viewer/dist
+src/dist
+__pycache__
+*.pyc
+.pytest_cache
+.coverage
+coverage
 *.log
 Thumbs.db
 .DS_Store

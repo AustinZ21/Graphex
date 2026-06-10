@@ -29,7 +29,7 @@ async def _seed_db(pool) -> None:
         await db.execute(
             "INSERT INTO project_tokens(project_id, token_type, token_hash, "
             "token_hint, is_active) VALUES (?, ?, ?, ?, 1)",
-            (1, "edge_agent", hash_token("edge-token"), "edgetok..."),
+            (1, "legacy", hash_token("legacy-token"), "legacy..."),
         )
 
 
@@ -113,7 +113,7 @@ async def test_mcp_rejects_non_mcp_token_type(auth_pg_pool):
         resp = await client.get(
             "/mcp/ping",
             headers=_crystal_headers({
-                "Authorization": "Bearer edge-token",
+                "Authorization": "Bearer legacy-token",
                 "X-Project-ID": "P1",
             }),
         )
@@ -155,14 +155,14 @@ async def test_mcp_accepts_matching_mcp_token(auth_pg_pool):
 
 
 @pytest.mark.asyncio
-async def test_project_api_accepts_edge_agent_token_without_explicit_project_id(
+async def test_project_api_accepts_mcp_token_without_explicit_project_id(
     auth_pg_pool,
 ):
     await _seed_db(auth_pg_pool)
     async with _client(_build_app()) as client:
         resp = await client.get(
             "/api/project/ping",
-            headers=_crystal_headers({"Authorization": "Bearer edge-token"}),
+            headers=_crystal_headers({"Authorization": "Bearer good-token"}),
         )
 
     assert resp.status_code == 200
@@ -170,5 +170,5 @@ async def test_project_api_accepts_edge_agent_token_without_explicit_project_id(
         "ok": True,
         "project_id": "P1",
         "project_name": "p1",
-        "project_token_type": "edge_agent",
+        "project_token_type": "mcp",
     }

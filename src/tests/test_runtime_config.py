@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 import backend.main as main_module
 from backend import runtime_config
-from backend.auth.dependencies import require_admin
+from backend.auth.dependencies import get_current_user, require_admin
 from backend.main import app
 
 
@@ -174,3 +174,40 @@ def test_admin_runtime_config_endpoint_updates_indexing_repos_root(
     assert reload_response.json()["indexing"]["default_token_budget"] == 2600
     assert reload_response.json()["indexing"]["intelligence_strategy"] == "large_monorepo"
     assert reload_response.json()["indexing"]["parsing_strategy"] == "tree_sitter_ast"
+
+
+def test_indexing_settings_endpoint_allows_authenticated_developer_without_admin_config_access(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_path = tmp_path / "runtime-config.json"
+    repos_root = tmp_path / "repos"
+    repos_root.mkdir()
+
+    monkeypatch.setattr(runtime_config, "RUNTIME_CONFIG_PATH", config_path)
+    monkeypatch.setattr(main_module.runtime_config, "RUNTIME_CONFIG_PATH", config_path)
+    runtime_config.update_runtime_config(
+        {
+            "indexing": {
+                "repos_root": str(repos_root),
+                "default_token_budget": 3200,
+                "intelligence_strategy": "hybrid_semantic",
+                "parsing_strategy": "scip_lsp_semantic",
+            }
+        }
+    )
+    app.dependency_overrides[get_current_user] = lambda: {"role": "developer", "username": "developer"}
+
+    try:
+        client = TestClient(app)
+        response = client.get("/api/indexing/settings")
+        admin_response = client.get("/api/admin/runtime-config")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["indexing"]["repos_root"] == str(repos_root)
+    assert response.json()["indexing"]["repos_root_exists"] is True
+    assert response.json()["indexing"]["default_token_budget"] == 3200
+    assert response.json()["indexing"]["intelligence_strategy"] == "hybrid_semantic"
+    assert response.json()["indexing"]["parsing_strategy"] == "scip_lsp_semantic"
+    assert admin_response.status_code == 403

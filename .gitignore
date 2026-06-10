@@ -102,8 +102,18 @@ out/
 # Note: Do not ignore .adc/ itself as it contains the constitution!
 # You should however ignore temporary AI outputs or raw generated templates if you don't track them.
 # adc-template/  # Uncomment if you want to ignore the generated template test output
-.adc/contextgraph-edge-agent/scratchpad/
-.adc/contextgraph-edge-agent/tasks/
+.adc/cga-relay/scratchpad/*
+!.adc/cga-relay/scratchpad/session.md
+.adc/cga-relay/tasks/*
+!.adc/cga-relay/tasks/done/
+!.adc/cga-relay/tasks/in-progress/
+!.adc/cga-relay/tasks/todo/
+.adc/cga-relay/tasks/done/*
+.adc/cga-relay/tasks/in-progress/*
+.adc/cga-relay/tasks/todo/*
+!.adc/cga-relay/tasks/done/.gitkeep
+!.adc/cga-relay/tasks/in-progress/.gitkeep
+!.adc/cga-relay/tasks/todo/TASK-001.md
 
 *.ps1
 !src/scripts/*.ps1
@@ -113,3 +123,6 @@ out/
 deploy/docker-desktop/dist/
 
 config/
+
+# Generated root build output
+dist/

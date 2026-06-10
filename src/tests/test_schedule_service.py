@@ -79,7 +79,7 @@ async def test_disabled_scheduled_task_is_not_due(auth_pg_pool) -> None:
                 name="Disabled activation",
                 task_type="agent_activation",
                 project_id=1,
-                agent_id="edge-agent-a",
+                agent_id="cga-relay-a",
                 target_url="http://localhost:3002/activate",
                 cadence_minutes=30,
                 enabled=True,

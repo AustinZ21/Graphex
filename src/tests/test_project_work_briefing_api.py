@@ -4,6 +4,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 import backend.main as main_module
+from backend.auth.crystals import crystal_suite_headers
 from backend.auth.security import hash_token
 from backend.main import app
 from backend.workbriefing.service import WorkBriefingService
@@ -27,11 +28,6 @@ async def _seed_project_auth(pool) -> None:
         await db.execute(
             "INSERT INTO project_tokens(project_id, token_type, token_hash, "
             "token_hint, version, is_active) VALUES (?, ?, ?, ?, ?, 1)",
-            (1, "edge_agent", hash_token("edge-token"), "edge-tok", 1),
-        )
-        await db.execute(
-            "INSERT INTO project_tokens(project_id, token_type, token_hash, "
-            "token_hint, version, is_active) VALUES (?, ?, ?, ?, ?, 1)",
             (1, "mcp", hash_token("mcp-token"), "mcp-tokn", 1),
         )
 
@@ -45,8 +41,14 @@ def _client() -> AsyncClient:
     return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
 
 
+def _project_headers() -> dict[str, str]:
+    headers = crystal_suite_headers()
+    headers["Authorization"] = "Bearer mcp-token"
+    return headers
+
+
 @pytest.mark.asyncio
-async def test_project_api_records_activity_with_edge_agent_token(
+async def test_project_api_records_activity_with_mcp_token(
     monkeypatch, auth_pg_pool, pg_activity_store
 ) -> None:
     await _seed_project_auth(auth_pg_pool)
@@ -55,7 +57,7 @@ async def test_project_api_records_activity_with_edge_agent_token(
     async with _client() as client:
         response = await client.post(
             "/api/project/work-briefing/activity",
-            headers={"Authorization": "Bearer edge-token"},
+            headers=_project_headers(),
             json={
                 "event_type": "sync",
                 "title": "Synced project status",
@@ -83,7 +85,7 @@ async def test_project_api_rejects_body_project_spoof(
     async with _client() as client:
         response = await client.post(
             "/api/project/work-briefing/activity",
-            headers={"Authorization": "Bearer mcp-token"},
+            headers=_project_headers(),
             json={
                 "project_id": "WA999",
                 "event_type": "sync",
@@ -105,7 +107,7 @@ async def test_project_api_summary_uses_authenticated_project_scope(
     async with _client() as client:
         create_response = await client.post(
             "/api/project/work-briefing/activity",
-            headers={"Authorization": "Bearer edge-token"},
+            headers=_project_headers(),
             json={
                 "event_type": "review",
                 "title": "Reviewed integration slice",
@@ -116,7 +118,7 @@ async def test_project_api_summary_uses_authenticated_project_scope(
 
         response = await client.get(
             "/api/project/work-briefing?limit=10",
-            headers={"Authorization": "Bearer mcp-token"},
+            headers=_project_headers(),
         )
 
     assert response.status_code == 200
@@ -139,7 +141,7 @@ async def test_project_api_records_activity_with_ado_pbi_and_pr_refs(
     async with _client() as client:
         response = await client.post(
             "/api/project/work-briefing/activity",
-            headers={"Authorization": "Bearer edge-token"},
+            headers=_project_headers(),
             json={
                 "event_type": "checkin",
                 "title": "Implemented work-briefing PBI/PR linkage example",

@@ -154,21 +154,11 @@ async def test_generate_project_token_uses_type_prefixes(auth_pg_pool) -> None:
             _={"role": "admin"},
             db=db,
         )
-        edge = await auth_router.generate_project_token(
-            1,
-            auth_router.GenerateTokenRequest(token_type="edge_agent"),
-            _={"role": "admin"},
-            db=db,
-        )
 
     assert mcp.token is not None
     assert mcp.token.startswith("mcp_")
     assert mcp.token_type == "mcp"
     assert mcp.token_hint.startswith("mcp_")
-    assert edge.token is not None
-    assert edge.token.startswith("edge_")
-    assert edge.token_type == "edge_agent"
-    assert edge.token_hint.startswith("edge_")
 
 
 @pytest.mark.asyncio
@@ -179,19 +169,19 @@ async def test_rotate_token_preserves_type_and_prefixes_new_token(auth_pg_pool) 
             db,
             token_id=13,
             project_id=1,
-            token_type="edge_agent",
+            token_type="mcp",
             token_hash="old-hash",
-            token_hint="oldedge...",
+            token_hint="oldmcp...",
             version=4,
         )
 
         rotated = await auth_router.rotate_token(13, _={"role": "admin"}, db=db)
 
-        assert rotated.token_type == "edge_agent"
+        assert rotated.token_type == "mcp"
         assert rotated.version == 5
         assert rotated.token is not None
-        assert rotated.token.startswith("edge_")
-        assert rotated.token_hint.startswith("edge_")
+        assert rotated.token.startswith("mcp_")
+        assert rotated.token_hint.startswith("mcp_")
 
         async with db.execute(
             "SELECT is_active FROM project_tokens WHERE id = ?", (13,)

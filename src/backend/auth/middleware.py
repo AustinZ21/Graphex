@@ -27,7 +27,7 @@ _PROTECTED_ROUTE_RULES = (
     },
     {
         "prefix": "/api/project",
-        "allowed_token_types": frozenset({"mcp", "edge_agent"}),
+        "allowed_token_types": frozenset({"mcp"}),
         "require_project_id": False,
         "endpoint_label": "project endpoint",
     },
