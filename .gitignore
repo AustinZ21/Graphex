@@ -123,3 +123,6 @@ out/
 deploy/docker-desktop/dist/
 
 config/
+
+# Generated root build output
+dist/
