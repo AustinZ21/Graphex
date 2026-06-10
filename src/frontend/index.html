@@ -1080,18 +1080,46 @@
     }
     .cga-feature-step {
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: 34px;
-      padding: 6px 8px;
+      gap: 4px;
+      min-height: 58px;
+      padding: 8px;
       border-radius: 6px;
       background: rgba(74,227,135,.08);
       border: 1px solid rgba(74,227,135,.2);
-      color: var(--accent);
-      font-size: 12px;
-      font-weight: 700;
       text-align: center;
       line-height: 1.2;
+      min-width: 0;
+    }
+    .cga-feature-step.warn {
+      background: rgba(251,191,36,.08);
+      border-color: rgba(251,191,36,.28);
+    }
+    .cga-feature-step-label {
+      color: var(--muted);
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .cga-feature-step-value {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .cga-feature-step-meta {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--muted);
+      font-size: 11px;
     }
     .cga-feature-list {
       display: flex;
@@ -1318,6 +1346,9 @@
     .briefing-command-card + .briefing-command-card-full {
       margin-top: 8px;
     }
+    .briefing-command-card-full + .briefing-command-grid {
+      margin-top: 8px;
+    }
     .briefing-command-card-full + .briefing-summary-grid {
       margin-top: 8px;
     }
@@ -1460,6 +1491,48 @@
       text-align: right;
       font-variant-numeric: tabular-nums;
     }
+    .briefing-quick-start-grid {
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .briefing-quick-start-step {
+      min-width: 0;
+      min-height: 116px;
+      padding: 12px;
+      border: 1px solid rgba(70,80,104,.42);
+      border-radius: 8px;
+      background: rgba(21,28,43,.58);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .briefing-quick-start-step span {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(96,165,250,.24);
+      background: rgba(96,165,250,.08);
+      color: #b8d7ff;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .briefing-quick-start-step strong {
+      font-size: 13px;
+      line-height: 1.35;
+      color: var(--text);
+    }
+    .briefing-quick-start-step p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
     .briefing-template-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -1500,6 +1573,12 @@
       word-break: break-word;
       max-height: 320px;
       overflow: auto;
+    }
+    @media (max-width: 1040px) {
+      .briefing-quick-start-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 640px) {
+      .briefing-quick-start-grid { grid-template-columns: 1fr; }
     }
     .briefing-kicker {
       font-size: 11px;
@@ -2364,20 +2443,32 @@
           <button class="btn btn-primary btn-sm" id="new-project-btn" onclick="openNewProject()">+ New Project</button>
         </div>
       </div>
-      <section class="cga-feature-strip" aria-label="CGA retrieval highlights">
+      <section class="cga-feature-strip" aria-label="Current CGA indexing settings">
         <div class="cga-feature-lead">
-          <span class="briefing-kicker">CGA retrieval model</span>
-          <strong>Retrieve the right evidence before generation</strong>
+          <span class="briefing-kicker">Indexing settings</span>
+          <strong>Current defaults used for project indexing</strong>
         </div>
-        <div class="cga-feature-flow" aria-label="Retrieval flow">
-          <span class="cga-feature-step">Impact graph</span>
-          <span class="cga-feature-step">Optimized context</span>
-          <span class="cga-feature-step">Minimal code</span>
+        <div class="cga-feature-flow" aria-label="Current indexing settings">
+          <span class="cga-feature-step" id="cga-indexing-repos-card">
+            <span class="cga-feature-step-label">Repos folder</span>
+            <span class="cga-feature-step-value" id="cga-indexing-repos-root">Loading...</span>
+            <span class="cga-feature-step-meta" id="cga-indexing-repos-source">Source pending</span>
+          </span>
+          <span class="cga-feature-step" id="cga-indexing-strategy-card">
+            <span class="cga-feature-step-label">Strategy</span>
+            <span class="cga-feature-step-value" id="cga-indexing-strategy">Loading...</span>
+            <span class="cga-feature-step-meta">Intelligence + parsing</span>
+          </span>
+          <span class="cga-feature-step" id="cga-indexing-budget-card">
+            <span class="cga-feature-step-label">Token budget</span>
+            <span class="cga-feature-step-value" id="cga-indexing-token-budget">Loading...</span>
+            <span class="cga-feature-step-meta" id="cga-indexing-budget-range">Default per request</span>
+          </span>
         </div>
         <div class="cga-feature-list">
-          <span>Repository relationships, not only keywords</span>
-          <span>File/symbol targeting</span>
-          <span>Dependency awareness</span>
+          <span>Incremental indexing enabled</span>
+          <span>Per-project repository paths</span>
+          <span>Editable in Settings > Indexing</span>
         </div>
       </section>
       <div class="search-wrap">
@@ -2675,6 +2766,8 @@
           <button class="btn btn-accent btn-sm" onclick="refreshWorkBriefing()">Refresh</button>
         </div>
       </div>
+
+      <section class="briefing-command-card briefing-command-card-full" id="briefing-quick-start"></section>
 
       <div class="briefing-command-grid">
         <section class="briefing-command-card" id="briefing-command-center"></section>
@@ -3803,7 +3896,9 @@ async function initApp() {
   if (_me.role === 'admin') {
     try {
       const cfg = await api('GET', '/admin/runtime-config');
+      _runtimeConfig = cfg;
       if (cfg?.falkordb_url) _falkordbUrl = cfg.falkordb_url;
+      renderIndexingSummary(cfg);
     } catch {}
     document.getElementById('tab-briefing-btn').style.display = '';
     document.getElementById('tab-report-btn').style.display = '';
@@ -3816,6 +3911,7 @@ async function initApp() {
     document.getElementById('tab-users-btn').style.display = 'none';
     document.getElementById('tab-audit-btn').style.display = 'none';
   }
+  if (!_runtimeConfig?.indexing) await loadIndexingSummary({ silent: true });
   await loadProjects();
   switchTab(adminTabFromLocation(), null, { replace: true });
 }
@@ -3863,6 +3959,76 @@ function loadGraphViewerFrame() {
   if (frame && !frame.src) frame.src = frame.dataset.src || '/viewer/';
 }
 
+function compactIndexingPath(value) {
+  const text = String(value || '').trim();
+  if (!text) return 'Not configured';
+  const normalized = text.replace(/\\/g, '/');
+  const parts = normalized.split('/').filter(Boolean);
+  if (parts.length <= 3) return text;
+  const drivePrefix = /^[A-Za-z]:$/.test(parts[0]) ? `${parts[0]}/` : '';
+  const rootPrefix = !drivePrefix && normalized.startsWith('/') ? '/' : '';
+  return `${drivePrefix || rootPrefix}.../${parts.slice(-2).join('/')}`;
+}
+
+function indexingSourceLabel(source) {
+  if (source === 'saved') return 'Saved';
+  if (source === 'environment') return 'Environment';
+  return 'Default';
+}
+
+function formatIndexingNumber(value, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return new Intl.NumberFormat().format(number);
+}
+
+function setIndexingSummaryField(id, text, title) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  if (title) el.title = title;
+  else el.removeAttribute('title');
+}
+
+function renderIndexingSummary(cfg) {
+  const indexing = cfg?.indexing || {};
+  const reposRoot = indexing.repos_root || '';
+  const sourceLabel = indexingSourceLabel(indexing.repos_root_source);
+  const existsKnown = typeof indexing.repos_root_exists === 'boolean';
+  const existsLabel = existsKnown ? (indexing.repos_root_exists ? 'folder found' : 'folder not found') : 'status pending';
+  const intelligenceStrategy = indexing.intelligence_strategy || indexing.default_intelligence_strategy || 'auto';
+  const parsingStrategy = indexing.parsing_strategy || indexing.default_parsing_strategy || 'auto';
+  const tokenBudget = formatIndexingNumber(indexing.default_token_budget, 'Loading...');
+  const tokenBudgetMin = formatIndexingNumber(indexing.default_token_budget_min, '200');
+  const tokenBudgetMax = formatIndexingNumber(indexing.default_token_budget_max, '200,000');
+  const reposCard = document.getElementById('cga-indexing-repos-card');
+
+  setIndexingSummaryField('cga-indexing-repos-root', compactIndexingPath(reposRoot), reposRoot);
+  setIndexingSummaryField('cga-indexing-repos-source', `${sourceLabel} · ${existsLabel}`);
+  setIndexingSummaryField(
+    'cga-indexing-strategy',
+    `${indexingStrategyLabel('intelligence_strategy', intelligenceStrategy)} / ${indexingStrategyLabel('parsing_strategy', parsingStrategy)}`,
+  );
+  setIndexingSummaryField('cga-indexing-token-budget', `${tokenBudget} tokens`);
+  setIndexingSummaryField('cga-indexing-budget-range', `Allowed ${tokenBudgetMin}-${tokenBudgetMax}`);
+  if (reposCard) reposCard.classList.toggle('warn', existsKnown && !indexing.repos_root_exists);
+}
+
+async function loadIndexingSummary(options = {}) {
+  try {
+    const cfg = await api('GET', '/indexing/settings');
+    _runtimeConfig = { ...(_runtimeConfig || {}), indexing: cfg?.indexing || {} };
+    renderIndexingSummary(cfg);
+  } catch (e) {
+    if (!options.silent) toast(e.message, 'error');
+    setIndexingSummaryField('cga-indexing-repos-root', 'Unavailable');
+    setIndexingSummaryField('cga-indexing-repos-source', 'Settings unavailable');
+    setIndexingSummaryField('cga-indexing-strategy', 'Unavailable');
+    setIndexingSummaryField('cga-indexing-token-budget', 'Unavailable');
+    setIndexingSummaryField('cga-indexing-budget-range', 'Retry from Settings');
+  }
+}
+
 async function loadSettings() {
   if (_me?.role !== 'admin') return;
   const userEl = document.getElementById('settings-current-user');
@@ -3881,6 +4047,7 @@ async function loadSettings() {
       if (fdbEl) fdbEl.textContent = _falkordbUrl;
     }
     renderIndexingSettings(cfg);
+    renderIndexingSummary(cfg);
   } catch {}
 }
 
@@ -3913,6 +4080,7 @@ function renderIndexingSettings(cfg) {
   }
   renderIndexingStrategyCards('intelligence_strategy', intelligenceStrategy);
   renderIndexingStrategyCards('parsing_strategy', parsingStrategy);
+  renderIndexingSummary(cfg);
   if (!status) return;
   const sourceLabel = indexing.repos_root_source === 'saved'
     ? 'Saved'
@@ -4000,6 +4168,7 @@ async function saveIndexingSettings() {
     });
     _runtimeConfig = cfg;
     renderIndexingSettings(cfg);
+    renderIndexingSummary(cfg);
     toast('Indexing settings saved');
   } catch (e) {
     toast(e.message, 'error');
@@ -6040,6 +6209,59 @@ function buildWorkBriefingPythonTemplate(payload) {
   ].join('\n');
 }
 
+function renderWorkBriefingQuickStart() {
+  const host = document.getElementById('briefing-quick-start');
+  if (!host) return;
+  host.setAttribute('data-briefing-section', 'quick-start');
+  host.classList.add('briefing-collapsible');
+
+  const steps = [
+    {
+      label: 'STEP 1',
+      title: 'Add Project',
+      body: 'Open the Project tab, create the project, and set the repository path CGA should track.',
+    },
+    {
+      label: 'STEP 2',
+      title: "Create Project's MCP Server Token",
+      body: 'Expand the project row, create an mcp token, and copy the token value before closing the dialog.',
+    },
+    {
+      label: 'STEP 3',
+      title: 'Full Index',
+      body: 'Run Full Index for the project so CGA has the complete repository graph before agent use.',
+    },
+    {
+      label: 'STEP 4',
+      title: 'Add using CGA into Agent.md',
+      body: 'Add the CGA usage note to Agent.md so the agent queries this project context during work.',
+    },
+  ];
+
+  host.innerHTML = `
+    <div class="briefing-collapsible-head">
+      <div>
+        <span class="briefing-kicker">Quick Start</span>
+        <h3>Prepare a repository for CGA-assisted agents</h3>
+      </div>
+      ${renderBriefingCollapseButton('quick-start', 'Quick Start')}
+    </div>
+    <div id="${esc(briefingSectionBodyId('quick-start'))}" data-briefing-section-content>
+      <p>Follow these steps once per repository before asking an agent to rely on CGA context.</p>
+      <ol class="briefing-quick-start-grid">
+        ${steps.map(step => `
+          <li class="briefing-quick-start-step">
+            <span>${esc(step.label)}</span>
+            <strong>${esc(step.title)}</strong>
+            <p>${esc(step.body)}</p>
+          </li>
+        `).join('')}
+      </ol>
+    </div>
+  `;
+  applyBriefingSectionCollapse('quick-start');
+}
+
 function renderWorkBriefingRequestTemplates(payload) {
   const host = document.getElementById('briefing-request-templates');
   if (!host) return;
@@ -6230,6 +6452,7 @@ function renderWorkBriefing(summary = _workBriefingSummary) {
     `;
   }
 
+  renderWorkBriefingQuickStart();
   renderWorkBriefingRequestTemplates(payload);
   renderWorkBriefingDuplicateSignals(payload);
 

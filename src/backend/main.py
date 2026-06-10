@@ -39,7 +39,7 @@ from fastapi.staticfiles import StaticFiles
 
 from backend import runtime_config
 from backend.auth.database import DB_PATH, init_db, insert_audit_log
-from backend.auth.dependencies import require_admin
+from backend.auth.dependencies import get_current_user, require_admin
 from backend.auth.middleware import ProjectTokenMiddleware
 from backend.auth.pgshim import get_pool as get_auth_pool
 from backend.auth.router import router as auth_router
@@ -62,7 +62,7 @@ from backend.workbriefing.store import PgVectorActivityStore, resolve_dsn
 
 log = structlog.get_logger()
 
-APP_VERSION = "1.30.80"
+APP_VERSION = "1.30.82"
 
 FALKORDB_HOST = os.getenv("FALKORDB_HOST", "localhost")
 FALKORDB_PORT = int(os.getenv("FALKORDB_PORT", "6379"))
@@ -576,6 +576,11 @@ async def api_admin_runtime_config(_: dict = Depends(require_admin)) -> dict:
         "falkordb_url": FALKORDB_URL,
         **runtime_config.get_runtime_config(),
     }
+
+
+@app.get("/api/indexing/settings")
+async def api_indexing_settings(_: dict = Depends(get_current_user)) -> dict:
+    return {"indexing": runtime_config.get_runtime_config()["indexing"]}
 
 
 @app.patch("/api/admin/runtime-config")
