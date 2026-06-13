@@ -21,6 +21,7 @@ Thumbs.db
 *.launch
 .settings/
 *.sublime-workspace
+.claude/settings.local.json
 
 # Node / JS / TS ecosystem
 node_modules/

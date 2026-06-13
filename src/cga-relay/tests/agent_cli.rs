@@ -813,7 +813,15 @@ fn mcp_accepts_content_length_framing() {
     let framed = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
     let output = run_mcp(&config, &framed, &[]);
     assert!(output.status.success(), "stderr: {}", stderr(&output));
-    assert!(stdout(&output).contains("\"status\":\"ok\""));
+    let out = stdout(&output);
+    assert!(
+        out.starts_with("Content-Length: "),
+        "expected framed response: {out}"
+    );
+    let (_, body) = out
+        .split_once("\r\n\r\n")
+        .expect("framed response should include header separator");
+    assert!(body.contains("\"status\":\"ok\""));
 }
 
 #[test]

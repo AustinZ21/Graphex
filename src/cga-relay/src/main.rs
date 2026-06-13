@@ -1,14 +1,14 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
-use std::io::{Read, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const VERSION: &str = "1.30.79";
+const VERSION: &str = "1.30.83";
 const SERVER_NAME: &str = "cga-relay";
 const TRAY_ICON_LOGGED_IN_RESOURCE_ID: u16 = 1;
 const TRAY_ICON_LOGGED_OUT_RESOURCE_ID: u16 = 4;
@@ -58,6 +58,18 @@ struct ProjectEntry {
     name: String,
     root: PathBuf,
     project_id: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum McpFraming {
+    JsonLine,
+    ContentLength,
+}
+
+#[derive(Clone, Debug)]
+struct McpMessage {
+    body: String,
+    framing: McpFraming,
 }
 
 #[derive(Clone, Debug)]
@@ -311,15 +323,11 @@ fn cmd_settings(args: &[String]) -> AgentResult<()> {
 
 fn cmd_mcp(args: &[String]) -> AgentResult<()> {
     let config = load_config(required_arg(args, "--config")?)?;
-    let mut input = String::new();
-    std::io::stdin()
-        .read_to_string(&mut input)
-        .map_err(|err| AgentError(format!("failed to read stdin: {err}")))?;
-    log_communication(&config, "mcp.stdin", &input);
-    let responses = handle_mcp_session(&config, &input)?;
-    log_communication(&config, "mcp.stdout", &responses);
-    print!("{responses}");
-    Ok(())
+    let stdin = std::io::stdin();
+    let stdout = std::io::stdout();
+    let mut reader = BufReader::new(stdin.lock());
+    let mut writer = stdout.lock();
+    handle_mcp_stream(&config, &mut reader, &mut writer)
 }
 
 fn tray_status_json(config: &AgentConfig) -> String {
@@ -1941,80 +1949,117 @@ fn snapshot_json(snapshot: &Snapshot) -> String {
     )
 }
 
-fn handle_mcp_session(config: &AgentConfig, input: &str) -> AgentResult<String> {
-    let messages = parse_mcp_messages(input)?;
-    let mut responses = Vec::new();
-    for message in messages {
-        if let Some(response) = handle_mcp_message(config, &message) {
-            responses.push(response);
+fn handle_mcp_stream(
+    config: &AgentConfig,
+    reader: &mut impl BufRead,
+    writer: &mut impl Write,
+) -> AgentResult<()> {
+    while let Some(message) = read_mcp_message(reader)? {
+        log_communication(config, "mcp.stdin", &message.body);
+        if let Some(response) = handle_mcp_message(config, &message.body) {
+            log_communication(config, "mcp.stdout", &response);
+            write_mcp_response(writer, message.framing, &response)?;
         }
     }
-    Ok(if responses.is_empty() {
-        String::new()
-    } else {
-        format!("{}\n", responses.join("\n"))
-    })
+    Ok(())
 }
 
-fn parse_mcp_messages(input: &str) -> AgentResult<Vec<String>> {
-    let mut messages = Vec::new();
-    let mut index = 0;
-    while index < input.len() {
-        while index < input.len() && input.as_bytes()[index].is_ascii_whitespace() {
-            index += 1;
+fn read_mcp_message(reader: &mut impl BufRead) -> AgentResult<Option<McpMessage>> {
+    let mut line = String::new();
+    loop {
+        line.clear();
+        let read = reader
+            .read_line(&mut line)
+            .map_err(|err| AgentError(format!("failed to read MCP message: {err}")))?;
+        if read == 0 {
+            return Ok(None);
         }
-        if index >= input.len() {
-            break;
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
         }
-        if input[index..]
-            .to_ascii_lowercase()
-            .starts_with("content-length:")
-        {
-            let Some(header_end) = input[index..].find("\r\n\r\n").map(|pos| index + pos) else {
-                return Err(AgentError("invalid Content-Length frame".to_string()));
-            };
-            let header = &input[index..header_end];
-            let mut length = None;
-            for line in header.lines() {
-                if let Some((name, value)) = line.split_once(':') {
-                    if name.eq_ignore_ascii_case("content-length") {
-                        length =
-                            Some(value.trim().parse::<usize>().map_err(|_| {
-                                AgentError("invalid Content-Length value".to_string())
-                            })?);
-                    }
+        if trimmed.to_ascii_lowercase().starts_with("content-length:") {
+            let length = trimmed
+                .split_once(':')
+                .and_then(|(_, value)| value.trim().parse::<usize>().ok())
+                .ok_or_else(|| AgentError("invalid Content-Length value".to_string()))?;
+            loop {
+                line.clear();
+                let read = reader
+                    .read_line(&mut line)
+                    .map_err(|err| AgentError(format!("failed to read MCP headers: {err}")))?;
+                if read == 0 {
+                    return Err(AgentError("short Content-Length header".to_string()));
+                }
+                if line.trim().is_empty() {
+                    break;
                 }
             }
-            let length = length.ok_or_else(|| AgentError("missing Content-Length".to_string()))?;
-            let body_start = header_end + 4;
-            let body_end = body_start + length;
-            if body_end > input.len() {
-                return Err(AgentError("short Content-Length frame".to_string()));
-            }
-            messages.push(input[body_start..body_end].to_string());
-            index = body_end;
-        } else {
-            let line_end = input[index..]
-                .find('\n')
-                .map_or(input.len(), |pos| index + pos);
-            let line = input[index..line_end].trim();
-            if !line.is_empty() {
-                messages.push(line.to_string());
-            }
-            index = line_end.saturating_add(1);
+            let mut body = vec![0_u8; length];
+            reader
+                .read_exact(&mut body)
+                .map_err(|err| AgentError(format!("short Content-Length body: {err}")))?;
+            return String::from_utf8(body)
+                .map(|body| {
+                    Some(McpMessage {
+                        body,
+                        framing: McpFraming::ContentLength,
+                    })
+                })
+                .map_err(|err| AgentError(format!("invalid UTF-8 MCP body: {err}")));
+        }
+        return Ok(Some(McpMessage {
+            body: trimmed.to_string(),
+            framing: McpFraming::JsonLine,
+        }));
+    }
+}
+
+fn write_mcp_response(
+    writer: &mut impl Write,
+    framing: McpFraming,
+    response: &str,
+) -> AgentResult<()> {
+    match framing {
+        McpFraming::JsonLine => {
+            writer
+                .write_all(response.as_bytes())
+                .map_err(|err| AgentError(format!("failed to write MCP response: {err}")))?;
+            writer.write_all(b"\n").map_err(|err| {
+                AgentError(format!("failed to write MCP response newline: {err}"))
+            })?;
+        }
+        McpFraming::ContentLength => {
+            let header = format!("Content-Length: {}\r\n\r\n", response.len());
+            writer
+                .write_all(header.as_bytes())
+                .map_err(|err| AgentError(format!("failed to write MCP response header: {err}")))?;
+            writer
+                .write_all(response.as_bytes())
+                .map_err(|err| AgentError(format!("failed to write MCP response body: {err}")))?;
         }
     }
-    Ok(messages)
+    writer
+        .flush()
+        .map_err(|err| AgentError(format!("failed to flush MCP response: {err}")))?;
+    Ok(())
 }
 
 fn handle_mcp_message(config: &AgentConfig, message: &str) -> Option<String> {
     let id = json_field(message, "id").unwrap_or_else(|| "null".to_string());
     let method = json_string_field(message, "method").unwrap_or_default();
     match method.as_str() {
-        "initialize" => Some(format!(
-            "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{{\"tools\":{{}}}},\"serverInfo\":{{\"name\":\"{}\",\"version\":\"{}\"}}}}}}",
-            id, SERVER_NAME, VERSION
-        )),
+        "initialize" => {
+            let protocol_version =
+                json_string_field(message, "protocolVersion").unwrap_or_else(|| "2024-11-05".to_string());
+            Some(format!(
+                "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{{\"protocolVersion\":\"{}\",\"capabilities\":{{\"tools\":{{}}}},\"serverInfo\":{{\"name\":\"{}\",\"version\":\"{}\"}},\"instructions\":\"Use CGA as a local development-only context graph for indexed repository discovery and impact analysis. Query CGA before broad repo scans; checked-out source files remain authoritative.\"}}}}",
+                id,
+                json_escape(&protocol_version),
+                SERVER_NAME,
+                VERSION
+            ))
+        }
         "tools/list" => Some(format!(
             "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{{\"tools\":[{}]}}}}",
             id,
@@ -2043,13 +2088,29 @@ fn mcp_tools_json() -> String {
     ]
     .into_iter()
     .map(|name| {
+        let description = mcp_tool_description(name);
         format!(
             "{{\"name\":\"{}\",\"description\":\"CGA-Relay tool: {}\",\"inputSchema\":{{\"type\":\"object\",\"additionalProperties\":true}}}}",
-            name, name
+            json_escape(name),
+            json_escape(description)
         )
     })
     .collect::<Vec<_>>()
     .join(",")
+}
+
+fn mcp_tool_description(name: &str) -> &str {
+    match name {
+        "health_check" => "Check whether the local CGA API is reachable and healthy.",
+        "getstarted" => "Return CGA project and relay setup guidance for the configured repository.",
+        "index_incremental" => "Queue an incremental index for explicit changed paths in the configured repository.",
+        "index_git_incremental" => "Queue an incremental index from the repository git diff.",
+        "index_progress" => "Check CGA indexing progress for the configured repository.",
+        "query_impact_graph" => "Query the indexed code graph for impact analysis, ownership, dependencies, and likely files before broad repo discovery.",
+        "fetch_minimal_code" => "Fetch focused source snippets from indexed files or symbols after graph discovery.",
+        "get_optimized_context" => "Return a compact context bundle from the indexed graph for a task, feature, symbol, or file area.",
+        _ => "CGA-Relay tool.",
+    }
 }
 
 fn handle_mcp_tool_call(config: &AgentConfig, message: &str, id: &str) -> String {
